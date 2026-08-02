@@ -8,6 +8,10 @@ TextField {
     height: 46
 
     property var resultList
+    property var appProvider
+
+    signal activated()
+    signal closeRequested()
 
     placeholderText: "Search ..."
     placeholderTextColor: "#888888"
@@ -20,24 +24,38 @@ TextField {
 
     selectByMouse: true
 
-    Keys.onDownPressed: {
-        if (resultList)
-            resultList.next()
+    onTextChanged: {
+        if (appProvider)
+            appProvider.query = text
     }
 
-    Keys.onUpPressed: {
-        if (resultList)
-            resultList.previous()
+    Keys.onPressed: (event) => {
+        switch (event.key) {
+        case Qt.Key_Down:
+            if (resultList)
+                resultList.next()
+            event.accepted = true
+            break
+        case Qt.Key_Up:
+            if (resultList)
+                resultList.previous()
+            event.accepted = true
+            break
+        case Qt.Key_Return:
+        case Qt.Key_Enter:
+            event.accepted = true
+            activated()
+            break
+        case Qt.Key_Escape:
+            event.accepted = true
+            closeRequested()
+            break
+        }
     }
 
     background: Rectangle {
         radius: 14
 
         color: "transparent"
-
-    }
-
-    Keys.onPressed: (event) => {
-      console.log("SearchBar:", event.key)
     }
 }

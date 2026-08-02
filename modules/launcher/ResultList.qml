@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 
 ListView {
     id: root
@@ -8,70 +9,65 @@ ListView {
     clip: true
     spacing: 6
 
-    focus: true
-
     currentIndex: 0
 
-    model: [
-        {
-            title: "Firefox",
-            subtitle: "Web Browser"
-        },
-        {
-            title: "Kitty",
-            subtitle: "Terminal"
-        },
-        {
-            title: "Files",
-            subtitle: "File Manager"
-        },
-        {
-            title: "Visual Studio Code",
-            subtitle: "Editor"
-        }
-    ]
+    property var appProvider
+
+    model: appProvider ? appProvider.apps : []
+
+    ScrollBar.vertical: ScrollBar {
+        policy: ScrollBar.AsNeeded
+    }
 
     function next() {
-        currentIndex = Math.min(currentIndex + 1, count - 1)
-        positionViewAtIndex(currentIndex, ListView.Contain)
+        if (count === 0)
+            return
 
-        console.log("Current:", currentIndex)
+        if (currentIndex < 0)
+            currentIndex = 0
+        else
+            currentIndex = Math.min(currentIndex + 1, count - 1)
+
+        positionViewAtIndex(currentIndex, ListView.Contain)
     }
 
     function previous() {
-        currentIndex = Math.max(currentIndex - 1, 0)
+        if (count === 0)
+            return
+
+        if (currentIndex < 0)
+            currentIndex = 0
+        else
+            currentIndex = Math.max(currentIndex - 1, 0)
+
         positionViewAtIndex(currentIndex, ListView.Contain)
+    }
+
+    function activate() {
+        if (currentItem)
+            currentItem.launch()
     }
 
     delegate: ResultItem {
 
         width: ListView.view.width
 
-        title: modelData.title
-        subtitle: modelData.subtitle
+        entry: modelData
+
+        title: modelData.name
+        subtitle: modelData.genericName
 
         selected: index === ListView.view.currentIndex
     }
 
-    Keys.onPressed: (event) => {
+    Connections {
+        target: appProvider
 
-        console.log("KEY:", event.key)
-
-        switch(event.key) {
-
-        case Qt.Key_Down:
-
-            currentIndex = Math.min(currentIndex + 1, count - 1)
-            positionViewAtIndex(currentIndex, ListView.Contain)
-            event.accepted = true
-            break
-
-        case Qt.Key_Up:
-
-            currentIndex = Math.max(currentIndex - 1, 0)
-            positionViewAtIndex(currentIndex, ListView.Contain)
-            event.accepted = true
-            break
+        function onAppsChanged() {
+            Qt.callLater(function() {
+                if (count > 0)
+                    currentIndex = 0
+            })
         }
     }
 }

@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import "../services"
 
 PanelWindow {
     id: root
@@ -17,7 +18,17 @@ PanelWindow {
     aboveWindows: true
     focusable: true
 
+    AppProvider {
+        id: appProvider
+    }
+
     LauncherView {
         anchors.centerIn: parent
+
+        appProvider: appProvider
+
+        onCloseRequested: {
+            root.visible = false
+        }
     }
 }

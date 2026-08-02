@@ -1,7 +1,9 @@
-import QtQuick
+//@ pragma UseQApplication
+
 import Quickshell
+import QtQuick
 import "modules/launcher"
 
-ShellRoot {
+Scope {
     Launcher {}
 }
