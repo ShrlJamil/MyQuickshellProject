@@ -4,7 +4,11 @@ import QtQuick.Controls
 ListView {
     id: root
 
-    anchors.fill: parent
+    anchors {
+        top: parent.top
+        left: parent.left
+        right: parent.right
+    }
 
     clip: true
     spacing: 6
@@ -12,8 +16,20 @@ ListView {
     currentIndex: 0
 
     property var appProvider
+    property int maxHeight: 360
 
     model: appProvider ? appProvider.apps : []
+
+    height: appProvider && appProvider.query.length > 0
+        ? Math.min(contentHeight, maxHeight)
+        : 0
+
+    Behavior on height {
+        NumberAnimation {
+            duration: 150
+            easing.type: Easing.OutCubic
+        }
+    }
 
     ScrollBar.vertical: ScrollBar {
         policy: ScrollBar.AsNeeded

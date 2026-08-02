@@ -49,18 +49,14 @@ Rectangle {
         }
 
         ResultContainer {
-
-            visible: searchBar.text.length > 0
-
-            opacity: visible ? 1 : 0
-
             id: resultContainer
+
+            resultsHeight: resultList.height
 
             ResultList {
                 id: resultList
                 appProvider: root.appProvider
             }
-
         }
     }
 }

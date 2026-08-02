@@ -4,7 +4,11 @@ Rectangle {
     id: root
 
     width: parent ? parent.width : 640
-    height: 280
+
+    property real resultsHeight: 0
+
+    height: resultsHeight
+    visible: resultsHeight > 0
 
     radius: 18
 
