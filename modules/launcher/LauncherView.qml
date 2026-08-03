@@ -37,9 +37,7 @@ Rectangle {
           appProvider: root.appProvider
 
           onActivated: {
-            resultList.activate()
-            searchBar.text = ""
-            root.closeRequested()
+            resultList.activateCurrent()
           }
 
           onCloseRequested: {
@@ -56,6 +54,11 @@ Rectangle {
             ResultList {
                 id: resultList
                 appProvider: root.appProvider
+
+                onActivated: {
+                  searchBar.text = ""
+                  root.closeRequested()
+                }
             }
         }
     }

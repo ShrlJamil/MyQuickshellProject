@@ -10,14 +10,11 @@ Rectangle {
     property string subtitle: ""
     property bool selected: false
 
-    function launch() {
-        if (entry)
-            entry.execute()
-    }
+    signal activated(var entry)
 
     height: 64
 
-    radius: 12
+    radius: 18
 
     HoverHandler {
         id: hover
@@ -27,7 +24,7 @@ Rectangle {
 
     TapHandler {
         onTapped: {
-            root.launch()
+            root.activated(root.entry)
         }
     }
 

@@ -18,6 +18,8 @@ ListView {
     property var appProvider
     property int maxHeight: 360
 
+    signal activated(var entry)
+
     model: appProvider ? appProvider.apps : []
 
     height: appProvider && appProvider.query.length > 0
@@ -59,9 +61,20 @@ ListView {
         positionViewAtIndex(currentIndex, ListView.Contain)
     }
 
-    function activate() {
+    function activate(entry, index) {
+        if (!entry)
+            return
+
+        if (index >= 0)
+            currentIndex = index
+
+        entry.execute()
+        root.activated(entry)
+    }
+
+    function activateCurrent() {
         if (currentItem)
-            currentItem.launch()
+            activate(currentItem.entry, currentIndex)
     }
 
     delegate: ResultItem {
@@ -74,6 +87,10 @@ ListView {
         subtitle: modelData.genericName
 
         selected: index === ListView.view.currentIndex
+
+        onActivated: {
+            root.activate(entry, index)
+        }
     }
 
     Connections {
