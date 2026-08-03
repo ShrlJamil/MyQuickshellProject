@@ -15,6 +15,13 @@ Rectangle {
 
     signal closeRequested()
 
+    function reset() {
+        searchBar.text = ""
+        if (appProvider)
+            appProvider.query = ""
+        resultList.currentIndex = 0
+    }
+
     implicitHeight: content.implicitHeight + 32
 
     Column {
@@ -41,7 +48,6 @@ Rectangle {
           }
 
           onCloseRequested: {
-            searchBar.text = ""
             root.closeRequested()
           }
         }
@@ -56,7 +62,6 @@ Rectangle {
                 appProvider: root.appProvider
 
                 onActivated: {
-                  searchBar.text = ""
                   root.closeRequested()
                 }
             }

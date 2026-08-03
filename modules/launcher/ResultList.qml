@@ -81,10 +81,13 @@ ListView {
 
         width: ListView.view.width
 
-        entry: modelData
+        entry: modelData.app
 
-        title: modelData.name
-        subtitle: modelData.genericName
+        title: modelData.app.name
+        subtitle: modelData.app.genericName
+
+        titlePositions: modelData.titlePositions
+        subtitlePositions: modelData.subtitlePositions
 
         selected: index === ListView.view.currentIndex
 

@@ -49,7 +49,7 @@ Item {
 
     function score(q, target) {
         if (q.length === 0)
-            return 0
+            return { score: 0, positions: [] }
 
         var ql = q.toLowerCase()
         var tl = target.toLowerCase()
@@ -58,6 +58,7 @@ Item {
         var lastPos = -1
         var firstPos = -1
         var score = 0
+        var positions = []
 
         for (var ti = 0; ti < tl.length && qi < ql.length; ti++) {
             if (tl.charAt(ti) === ql.charAt(qi)) {
@@ -67,12 +68,13 @@ Item {
                 if (firstPos < 0)
                     firstPos = ti
                 lastPos = ti
+                positions.push(ti)
                 qi++
             }
         }
 
         if (qi < ql.length)
-            return -1
+            return { score: -1, positions: [] }
 
         score -= firstPos
 
@@ -85,40 +87,59 @@ Item {
         if (acronym(target).toLowerCase().startsWith(ql))
             score += 400
 
-        return score
+        return { score: score, positions: positions }
     }
 
     function appScore(app, q) {
         var best = -1
-        var s = score(q, app.name)
-        if (s >= 0)
-            s *= 100
-        if (s > best)
-            best = s
+        var bestField = ""
+        var bestPositions = []
 
-        s = score(q, app.genericName)
-        if (s >= 0)
-            s *= 40
-        if (s > best)
-            best = s
-
-        s = score(q, app.execString)
-        if (s >= 0)
-            s *= 10
-        if (s > best)
-            best = s
-
-        if (app.keywords) {
-            for (var j = 0; j < app.keywords.length; j++) {
-                var ks = score(q, app.keywords[j])
-                if (ks >= 0)
-                    ks *= 20
-                if (ks > best)
-                    best = ks
+        var r = score(q, app.name)
+        if (r.score >= 0) {
+            var s = r.score * 100
+            if (s > best) {
+                best = s
+                bestField = "name"
+                bestPositions = r.positions
             }
         }
 
-        return best
+        r = score(q, app.genericName)
+        if (r.score >= 0) {
+            s = r.score * 40
+            if (s > best) {
+                best = s
+                bestField = "genericName"
+                bestPositions = r.positions
+            }
+        }
+
+        r = score(q, app.execString)
+        if (r.score >= 0) {
+            s = r.score * 10
+            if (s > best) {
+                best = s
+                bestField = "execString"
+                bestPositions = r.positions
+            }
+        }
+
+        if (app.keywords) {
+            for (var j = 0; j < app.keywords.length; j++) {
+                r = score(q, app.keywords[j])
+                if (r.score >= 0) {
+                    s = r.score * 20
+                    if (s > best) {
+                        best = s
+                        bestField = "keywords"
+                        bestPositions = r.positions
+                    }
+                }
+            }
+        }
+
+        return { score: best, field: bestField, positions: bestPositions }
     }
 
     function refilter() {
@@ -128,7 +149,13 @@ Item {
         var q = root.query.toLowerCase()
 
         if (q.length === 0) {
-            apps = allApps.values
+            var all = allApps.values
+            var empty = []
+
+            for (var e = 0; e < all.length; e++)
+                empty.push({ app: all[e], titlePositions: [], subtitlePositions: [], score: 0 })
+
+            apps = empty
             return
         }
 
@@ -136,9 +163,27 @@ Item {
         var scored = []
 
         for (var i = 0; i < values.length; i++) {
-            var s = appScore(values[i], q)
-            if (s > 0)
-                scored.push({ score: s, index: i, app: values[i] })
+            var m = appScore(values[i], q)
+            if (m.score > 0) {
+                var titlePositions = []
+                var subtitlePositions = []
+
+                var rn = score(q, values[i].name)
+                if (rn.score > 0)
+                    titlePositions = rn.positions
+
+                var rg = score(q, values[i].genericName)
+                if (rg.score > 0)
+                    subtitlePositions = rg.positions
+
+                scored.push({
+                    score: m.score,
+                    index: i,
+                    app: values[i],
+                    titlePositions: titlePositions,
+                    subtitlePositions: subtitlePositions
+                })
+            }
         }
 
         scored.sort(function(a, b) {
@@ -148,7 +193,12 @@ Item {
         })
 
         apps = scored.map(function(x) {
-            return x.app
+            return {
+                app: x.app,
+                titlePositions: x.titlePositions,
+                subtitlePositions: x.subtitlePositions,
+                score: x.score
+            }
         })
     }
 

@@ -25,6 +25,7 @@ PanelWindow {
     focusable: true
 
     function close() {
+        launcherView.reset()
         launcherController.hide()
     }
 
