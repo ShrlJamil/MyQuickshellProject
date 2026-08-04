@@ -11,7 +11,7 @@ QtObject {
         _mode === "apps" ? "system-search-symbolic"
         : _mode === "url" ? "applications-internet-symbolic"
         : _mode === "calculator" ? "accessories-calculator-symbolic"
-        : _mode === "currency" ? "x-office-spreadsheet-symbolic"
+        : _mode === "command" ? "utilities-terminal-symbolic"
         : "web-browser-symbolic"
 
     function isUrlQuery(query) {
@@ -46,7 +46,7 @@ QtObject {
         else if (q.charAt(0) === "=")
             root._mode = "calculator"
         else if (q.charAt(0) === ">")
-            root._mode = "currency"
+            root._mode = "command"
         else if (q.charAt(0) === "?")
             root._mode = "web"
         else

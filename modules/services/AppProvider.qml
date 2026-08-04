@@ -24,6 +24,61 @@ Item {
     readonly property string urlFallbackId: "open-url"
     readonly property string webSearchId: "web-search"
     readonly property string calculatorResultId: "calculator-result"
+    readonly property string commandEntryId: "command"
+
+    readonly property var commandActions: [
+        {
+            id: "lock",
+            title: "Lock Screen",
+            subtitle: "Session",
+            icon: "system-lock-screen-symbolic",
+            aliases: ["lock", "lockscreen", "lock-screen"],
+            execute: function() { root.executeCommandAction("lock") }
+        },
+        {
+            id: "logout",
+            title: "Log Out",
+            subtitle: "Session",
+            icon: "system-log-out-symbolic",
+            aliases: ["logout", "signout", "exit"],
+            execute: function() { root.executeCommandAction("logout") }
+        },
+        {
+            id: "suspend",
+            title: "Suspend",
+            subtitle: "Power",
+            icon: "media-playback-pause-symbolic",
+            aliases: ["sleep", "suspend"],
+            execute: function() { root.executeCommandAction("suspend") }
+        },
+        {
+            id: "reboot",
+            title: "Restart System",
+            subtitle: "Power",
+            icon: "system-reboot-symbolic",
+            aliases: ["reboot", "restart"],
+            execute: function() { root.executeCommandAction("reboot") }
+        },
+        {
+            id: "shutdown",
+            title: "Shut Down",
+            subtitle: "Power",
+            icon: "system-shutdown-symbolic",
+            aliases: ["shutdown", "poweroff", "halt"],
+            execute: function() { root.executeCommandAction("shutdown") }
+        }
+    ]
+
+    readonly property var commandActionCommands: ({
+        "lock": ["loginctl", "lock-session"],
+        "logout": ["hyprctl", "dispatch", "exit"],
+        "suspend": ["systemctl", "suspend"],
+        "reboot": ["systemctl", "reboot"],
+        "shutdown": ["systemctl", "poweroff"]
+    })
+
+    readonly property string terminalExecutable: "kitty"
+    readonly property var terminalArguments: ["fish", "-C"]
 
     property string query: ""
     property var searchModeProvider
@@ -61,6 +116,10 @@ Item {
 
             property var entries: ({})
         }
+    }
+
+    Process {
+        id: commandProcess
     }
 
     function isAlphaNum(c) {
@@ -278,6 +337,8 @@ Item {
         if (entry.id === root.webSearchId)
             return
         if (entry.id === root.calculatorResultId)
+            return
+        if (entry.id === root.commandEntryId)
             return
 
         var q = query || ""
@@ -607,6 +668,81 @@ Item {
         return String(rounded)
     }
 
+    function launchInTerminal(command) {
+        if (!command || command.length === 0)
+            return
+
+        commandProcess.command = [root.terminalExecutable].concat(root.terminalArguments).concat([command])
+        commandProcess.running = true
+    }
+
+    function executeCommandAction(actionId) {
+        var command = root.commandActionCommands[actionId]
+        if (!command)
+            return
+
+        commandProcess.command = command
+        commandProcess.running = true
+    }
+
+    function findCommandAction(command) {
+        var q = command.trim().toLowerCase()
+
+        for (var i = 0; i < root.commandActions.length; i++) {
+            var a = root.commandActions[i]
+
+            for (var j = 0; j < a.aliases.length; j++) {
+                if (a.aliases[j] === q)
+                    return a
+            }
+        }
+
+        return null
+    }
+
+    function commandEntry(query) {
+        var q = query.trim()
+
+        if (q.charAt(0) === ">")
+            q = q.substring(1)
+
+        q = q.trim()
+
+        if (q.length === 0)
+            return null
+
+        var action = root.findCommandAction(q)
+
+        if (action)
+            return {
+                app: {
+                    id: root.commandEntryId,
+                    name: action.title,
+                    subtitle: action.subtitle,
+                    genericName: "",
+                    icon: action.icon,
+                    execute: action.execute
+                },
+                titlePositions: [],
+                subtitlePositions: [],
+                score: 0
+            }
+
+        return {
+            app: {
+                id: root.commandEntryId,
+                name: 'Run "' + q + '"',
+                subtitle: "Run in terminal",
+                genericName: "",
+                icon: "utilities-terminal-symbolic",
+                execute: function() { root.launchInTerminal(q) }
+            },
+            titlePositions: [],
+            subtitlePositions: [],
+            score: 0
+        }
+    }
+
     function refilter() {
         if (!allApps)
             return
@@ -623,6 +759,13 @@ Item {
             && root.searchModeProvider.currentMode === "calculator") {
             var calcEntry = root.calculatorEntry(root.query)
             apps = calcEntry ? [calcEntry] : []
+            return
+        }
+
+        if (root.searchModeProvider
+            && root.searchModeProvider.currentMode === "command") {
+            var cmdEntry = root.commandEntry(root.query)
+            apps = cmdEntry ? [cmdEntry] : []
             return
         }
 
