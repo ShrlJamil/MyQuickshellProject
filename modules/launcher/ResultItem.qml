@@ -37,7 +37,7 @@ Rectangle {
 
     height: 64
 
-    radius: 18
+    radius: 22
 
     HoverHandler {
         id: hover

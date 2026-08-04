@@ -5,7 +5,7 @@ TextField {
     id: searchField
 
     width: parent.width
-    height: 46
+    height: 42
 
     property var resultList
     property var appProvider
@@ -13,10 +13,10 @@ TextField {
     signal activated()
     signal closeRequested()
 
-    placeholderText: "Search ..."
+    placeholderText: "Search"
     placeholderTextColor: "#888888"
 
-    font.pixelSize: 18
+    font.pixelSize: 24
 
     color: "#ffffff"
 

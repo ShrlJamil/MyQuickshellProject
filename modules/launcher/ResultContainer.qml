@@ -12,9 +12,6 @@ Rectangle {
 
     radius: 30
 
-    color: "#252536"
-
-    border.width: 1
-    border.color: "#3d3d55"
+    color: "transparent"
 
 }

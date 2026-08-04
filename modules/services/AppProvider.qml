@@ -15,6 +15,11 @@ Item {
     readonly property real maxRelativeBoost: 0.10
     readonly property real usageSaturation: 5
 
+    readonly property real execPenalty: 150
+    readonly property real genericPenalty: 300
+    readonly property real keywordPenalty: 450
+    readonly property real minFieldScore: 10
+
     property string query: ""
     property var apps: []
 
@@ -118,13 +123,13 @@ Item {
         score -= firstPos
 
         if (tl.startsWith(ql))
-            score += 300
+            score += 450
 
         if (firstPos === 0 || isSeparator(tl.charAt(firstPos - 1)))
             score += 150
 
         if (acronym(target).toLowerCase().startsWith(ql))
-            score += 400
+            score += 300
 
         return { score: score, positions: positions }
     }
@@ -136,7 +141,7 @@ Item {
 
         var r = score(q, app.name)
         if (r.score >= 0) {
-            var s = r.score * 100
+            var s = r.score
             if (s > best) {
                 best = s
                 bestField = "name"
@@ -146,7 +151,7 @@ Item {
 
         r = score(q, app.genericName)
         if (r.score >= 0) {
-            s = r.score * 40
+            s = Math.max(r.score - root.genericPenalty, root.minFieldScore)
             if (s > best) {
                 best = s
                 bestField = "genericName"
@@ -156,7 +161,7 @@ Item {
 
         r = score(q, app.execString)
         if (r.score >= 0) {
-            s = r.score * 10
+            s = Math.max(r.score - root.execPenalty, root.minFieldScore)
             if (s > best) {
                 best = s
                 bestField = "execString"
@@ -168,7 +173,7 @@ Item {
             for (var j = 0; j < app.keywords.length; j++) {
                 r = score(q, app.keywords[j])
                 if (r.score >= 0) {
-                    s = r.score * 20
+                    s = Math.max(r.score - root.keywordPenalty, root.minFieldScore)
                     if (s > best) {
                         best = s
                         bestField = "keywords"
@@ -297,7 +302,7 @@ Item {
         if (!allApps)
             return
 
-        var q = root.query.toLowerCase()
+        var q = root.query.trim().toLowerCase()
 
         if (q.length === 0) {
             var all = allApps.values
@@ -331,12 +336,15 @@ Item {
                 if (m.score > topFuzzy)
                     topFuzzy = m.score
 
+                var isExact = values[i].name.trim().toLowerCase() === q
+
                 scored.push({
                     fuzzy: m.score,
                     index: i,
                     app: values[i],
                     titlePositions: titlePositions,
-                    subtitlePositions: subtitlePositions
+                    subtitlePositions: subtitlePositions,
+                    isExact: isExact
                 })
             }
         }
@@ -347,6 +355,8 @@ Item {
         }
 
         scored.sort(function(a, b) {
+            if (a.isExact !== b.isExact)
+                return a.isExact ? -1 : 1
             if (a.score !== b.score)
                 return b.score - a.score
             return a.index - b.index
