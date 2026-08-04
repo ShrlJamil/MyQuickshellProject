@@ -21,8 +21,10 @@ Item {
     readonly property real minFieldScore: 10
 
     readonly property string searchFallbackId: "search-the-web"
+    readonly property string urlFallbackId: "open-url"
 
     property string query: ""
+    property string searchEngine: "https://www.google.com/search?q=%1"
     property var apps: []
 
     FileView {
@@ -267,6 +269,8 @@ Item {
             return
         if (entry.id === root.searchFallbackId)
             return
+        if (entry.id === root.urlFallbackId)
+            return
 
         var q = query || ""
         q = q.trim().toLowerCase()
@@ -302,6 +306,54 @@ Item {
         historyAdapter.entries = updated
     }
 
+    function isUrlQuery(query) {
+        var q = query.trim()
+
+        if (/\s/.test(q))
+            return false
+
+        if (q.charAt(0) === "?")
+            return false
+
+        if (/^https?:\/\//i.test(q))
+            return true
+
+        if (/^[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}([/:?#].*)?$/.test(q))
+            return true
+
+        if (/^localhost([/:?#].*)?$/.test(q))
+            return true
+
+        if (/^(\d{1,3}\.){3}\d{1,3}([/:?#].*)?$/.test(q))
+            return true
+
+        return false
+    }
+
+    function urlFallbackEntry(query) {
+        var q = query.trim()
+        var url = q
+
+        if (!/^https?:\/\//i.test(url))
+            url = "https://" + url
+
+        return {
+            app: {
+                id: root.urlFallbackId,
+                name: 'Open "' + q + '"',
+                subtitle: "Open URL in default browser",
+                genericName: "",
+                icon: "applications-internet",
+                execute: function() {
+                    Qt.openUrlExternally(url)
+                }
+            },
+            titlePositions: [],
+            subtitlePositions: [],
+            score: 0
+        }
+    }
+
     function searchFallbackEntry(query) {
         var q = query.trim()
 
@@ -314,7 +366,7 @@ Item {
                 icon: "search",
                 execute: function() {
                     Qt.openUrlExternally(
-                        "https://www.google.com/search?q=" + encodeURIComponent(q)
+                        root.searchEngine.replace("%1", encodeURIComponent(q))
                     )
                 }
             },
@@ -388,9 +440,12 @@ Item {
             return a.index - b.index
         })
 
-        if (scored.length === 0)
-            apps = [root.searchFallbackEntry(root.query)]
-        else
+        if (scored.length === 0) {
+            if (root.isUrlQuery(root.query))
+                apps = [root.urlFallbackEntry(root.query)]
+            else
+                apps = [root.searchFallbackEntry(root.query)]
+        } else
             apps = scored.map(function(x) {
                 return {
                     app: x.app,
