@@ -419,9 +419,27 @@ Item {
 
         q = q.trim()
 
-        var result = root.evaluateCalc(q)
+        var parsed = root.evaluateCalc(q)
 
-        if (result === null)
+        if (parsed.state === "empty")
+            return null
+
+        if (parsed.state === "incomplete")
+            return {
+                app: {
+                    id: root.calculatorResultId,
+                    name: "Continue typing…",
+                    subtitle: "Calculator",
+                    genericName: "",
+                    icon: "accessories-calculator-symbolic",
+                    execute: function() {}
+                },
+                titlePositions: [],
+                subtitlePositions: [],
+                score: 0
+            }
+
+        if (parsed.state === "invalid")
             return {
                 app: {
                     id: root.calculatorResultId,
@@ -439,12 +457,12 @@ Item {
         return {
             app: {
                 id: root.calculatorResultId,
-                name: root.formatCalcResult(result),
+                name: root.formatCalcResult(parsed.value),
                 subtitle: "Copy result to clipboard",
                 genericName: "",
                 icon: "accessories-calculator-symbolic",
                 execute: function() {
-                    Quickshell.clipboardText = root.formatCalcResult(result)
+                    Quickshell.clipboardText = root.formatCalcResult(parsed.value)
                 }
             },
             titlePositions: [],
@@ -547,10 +565,41 @@ Item {
         var result = parseExpr()
         skipWs()
 
-        if (pos < input.length || isNaN(result) || !isFinite(result))
-            return null
+        if (input.length === 0)
+            return { state: "empty", value: null }
 
-        return result
+        if (pos >= input.length && !isNaN(result) && isFinite(result))
+            return { state: "success", value: result }
+
+        if (!/^[0-9+\-*/%().\s]*$/.test(input))
+            return { state: "invalid", value: null }
+
+        if (root.isIncompleteExpr(input))
+            return { state: "incomplete", value: null }
+
+        return { state: "invalid", value: null }
+    }
+
+    function isIncompleteExpr(input) {
+        var open = 0
+        var close = 0
+
+        for (var i = 0; i < input.length; i++) {
+            var c = input.charAt(i)
+
+            if (c === "(")
+                open++
+            else if (c === ")")
+                close++
+        }
+
+        if (close > open)
+            return false
+
+        if (/[+\-*/%(]/.test(input.charAt(input.length - 1)))
+            return true
+
+        return open > close
     }
 
     function formatCalcResult(value) {
@@ -572,7 +621,8 @@ Item {
 
         if (root.searchModeProvider
             && root.searchModeProvider.currentMode === "calculator") {
-            apps = [root.calculatorEntry(root.query)]
+            var calcEntry = root.calculatorEntry(root.query)
+            apps = calcEntry ? [calcEntry] : []
             return
         }
 
