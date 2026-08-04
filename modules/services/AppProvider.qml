@@ -20,6 +20,8 @@ Item {
     readonly property real keywordPenalty: 450
     readonly property real minFieldScore: 10
 
+    readonly property string searchFallbackId: "search-the-web"
+
     property string query: ""
     property var apps: []
 
@@ -263,6 +265,8 @@ Item {
     function recordLaunch(entry, query) {
         if (!entry || !entry.id || !historyAdapter)
             return
+        if (entry.id === root.searchFallbackId)
+            return
 
         var q = query || ""
         q = q.trim().toLowerCase()
@@ -296,6 +300,28 @@ Item {
 
         updated[bucketKey] = newBucket
         historyAdapter.entries = updated
+    }
+
+    function searchFallbackEntry(query) {
+        var q = query.trim()
+
+        return {
+            app: {
+                id: root.searchFallbackId,
+                name: 'Search the web for "' + q + '"',
+                subtitle: "Open in default browser",
+                genericName: "Open in default browser",
+                icon: "search",
+                execute: function() {
+                    Qt.openUrlExternally(
+                        "https://www.google.com/search?q=" + encodeURIComponent(q)
+                    )
+                }
+            },
+            titlePositions: [],
+            subtitlePositions: [],
+            score: 0
+        }
     }
 
     function refilter() {
@@ -362,14 +388,17 @@ Item {
             return a.index - b.index
         })
 
-        apps = scored.map(function(x) {
-            return {
-                app: x.app,
-                titlePositions: x.titlePositions,
-                subtitlePositions: x.subtitlePositions,
-                score: x.score
-            }
-        })
+        if (scored.length === 0)
+            apps = [root.searchFallbackEntry(root.query)]
+        else
+            apps = scored.map(function(x) {
+                return {
+                    app: x.app,
+                    titlePositions: x.titlePositions,
+                    subtitlePositions: x.subtitlePositions,
+                    score: x.score
+                }
+            })
 
     }
 
