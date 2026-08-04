@@ -69,10 +69,18 @@ ListView {
             currentIndex = index
 
         entry.execute()
+        if (appProvider)
+            appProvider.recordLaunch(entry, appProvider.query)
         root.activated(entry)
     }
 
     function activateCurrent() {
+        if (appProvider && appProvider.query.trim().length === 0)
+            return
+
+        if (appProvider && appProvider.apps.length === 0)
+            return
+
         if (currentItem)
             activate(currentItem.entry, currentIndex)
     }

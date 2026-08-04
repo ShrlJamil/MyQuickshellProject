@@ -4,7 +4,7 @@ Rectangle {
 
     width: 600
 
-    radius: 22
+    radius: 40
 
     color: "#1e1e2e"
 

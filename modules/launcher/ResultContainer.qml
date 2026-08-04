@@ -10,7 +10,7 @@ Rectangle {
     height: resultsHeight
     visible: resultsHeight > 0
 
-    radius: 18
+    radius: 30
 
     color: "#252536"
 
