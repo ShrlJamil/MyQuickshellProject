@@ -16,7 +16,8 @@ Rectangle {
 
     property var resultList
     property var appProvider
-    property string modeIconName: "system-search-symbolic"
+    property var searchModeProvider
+    property string modeIconName: searchModeProvider ? searchModeProvider.currentIcon : "system-search-symbolic"
     property string text: ""
 
     signal activated()

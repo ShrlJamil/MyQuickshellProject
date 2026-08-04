@@ -1,4 +1,6 @@
 import QtQuick
+import "../services"
+
 Rectangle {
     id: root
 
@@ -14,6 +16,15 @@ Rectangle {
     property var appProvider
 
     signal closeRequested()
+
+    SearchModeProvider {
+        id: searchModeProvider
+    }
+
+    onAppProviderChanged: {
+        if (appProvider)
+            appProvider.searchModeProvider = searchModeProvider
+    }
 
     function reset() {
         searchBar.text = ""
@@ -42,6 +53,7 @@ Rectangle {
 
           resultList: resultList
           appProvider: root.appProvider
+          searchModeProvider: searchModeProvider
 
           onActivated: {
             resultList.activateCurrent()
@@ -65,6 +77,14 @@ Rectangle {
                   root.closeRequested()
                 }
             }
+        }
+    }
+
+    Connections {
+        target: appProvider
+
+        function onQueryChanged() {
+            searchModeProvider.detectMode(appProvider.query)
         }
     }
 }

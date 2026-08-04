@@ -22,10 +22,14 @@ Item {
 
     readonly property string searchFallbackId: "search-the-web"
     readonly property string urlFallbackId: "open-url"
+    readonly property string webSearchId: "web-search"
+    readonly property string calculatorResultId: "calculator-result"
 
     property string query: ""
-    property string searchEngine: "https://www.google.com/search?q=%1"
+    property var searchModeProvider
     property var apps: []
+
+    readonly property string searchEngine: "https://www.google.com/search?q="
 
     FileView {
         id: historyFile
@@ -271,6 +275,10 @@ Item {
             return
         if (entry.id === root.urlFallbackId)
             return
+        if (entry.id === root.webSearchId)
+            return
+        if (entry.id === root.calculatorResultId)
+            return
 
         var q = query || ""
         q = q.trim().toLowerCase()
@@ -366,7 +374,7 @@ Item {
                 icon: "search",
                 execute: function() {
                     Qt.openUrlExternally(
-                        root.searchEngine.replace("%1", encodeURIComponent(q))
+                        root.searchEngine + encodeURIComponent(q)
                     )
                 }
             },
@@ -376,11 +384,197 @@ Item {
         }
     }
 
+    function webSearchEntry(query) {
+        var q = query.trim()
+
+        if (q.charAt(0) === "?")
+            q = q.substring(1)
+
+        q = q.trim()
+
+        return {
+            app: {
+                id: root.webSearchId,
+                name: 'Search Google for "' + q + '"',
+                subtitle: "Open in default browser",
+                genericName: "",
+                icon: "google",
+                execute: function() {
+                    Qt.openUrlExternally(
+                        root.searchEngine + encodeURIComponent(q)
+                    )
+                }
+            },
+            titlePositions: [],
+            subtitlePositions: [],
+            score: 0
+        }
+    }
+
+    function calculatorEntry(query) {
+        var q = query.trim()
+
+        if (q.charAt(0) === "=")
+            q = q.substring(1)
+
+        q = q.trim()
+
+        var result = root.evaluateCalc(q)
+
+        if (result === null)
+            return {
+                app: {
+                    id: root.calculatorResultId,
+                    name: "Invalid expression",
+                    subtitle: "Calculator",
+                    genericName: "",
+                    icon: "accessories-calculator-symbolic",
+                    execute: function() {}
+                },
+                titlePositions: [],
+                subtitlePositions: [],
+                score: 0
+            }
+
+        return {
+            app: {
+                id: root.calculatorResultId,
+                name: root.formatCalcResult(result),
+                subtitle: "Copy result to clipboard",
+                genericName: "",
+                icon: "accessories-calculator-symbolic",
+                execute: function() {
+                    Quickshell.clipboardText = root.formatCalcResult(result)
+                }
+            },
+            titlePositions: [],
+            subtitlePositions: [],
+            score: 0
+        }
+    }
+
+    function evaluateCalc(expr) {
+        var input = expr
+        var pos = 0
+
+        function skipWs() {
+            while (pos < input.length && /\s/.test(input.charAt(pos)))
+                pos++
+        }
+
+        function parseExpr() {
+            var value = parseTerm()
+
+            while (true) {
+                skipWs()
+                var c = input.charAt(pos)
+
+                if (c === "+") {
+                    pos++
+                    value = value + parseTerm()
+                } else if (c === "-") {
+                    pos++
+                    value = value - parseTerm()
+                } else
+                    break
+            }
+
+            return value
+        }
+
+        function parseTerm() {
+            var value = parseFactor()
+
+            while (true) {
+                skipWs()
+                var c = input.charAt(pos)
+
+                if (c === "*") {
+                    pos++
+                    value = value * parseFactor()
+                } else if (c === "/") {
+                    pos++
+                    value = value / parseFactor()
+                } else if (c === "%") {
+                    pos++
+                    value = value % parseFactor()
+                } else
+                    break
+            }
+
+            return value
+        }
+
+        function parseFactor() {
+            skipWs()
+            var c = input.charAt(pos)
+
+            if (c === "-") {
+                pos++
+                return -parseFactor()
+            }
+
+            if (c === "+") {
+                pos++
+                return parseFactor()
+            }
+
+            if (c === "(") {
+                pos++
+                var v = parseExpr()
+                skipWs()
+
+                if (input.charAt(pos) !== ")")
+                    return NaN
+
+                pos++
+                return v
+            }
+
+            var start = pos
+
+            while (pos < input.length && /[0-9.]/.test(input.charAt(pos)))
+                pos++
+
+            var num = input.substring(start, pos)
+
+            if (!/^(\d+\.?\d*|\.\d+)$/.test(num))
+                return NaN
+
+            return parseFloat(num)
+        }
+
+        var result = parseExpr()
+        skipWs()
+
+        if (pos < input.length || isNaN(result) || !isFinite(result))
+            return null
+
+        return result
+    }
+
+    function formatCalcResult(value) {
+        var rounded = Math.round(value * 1e10) / 1e10
+        return String(rounded)
+    }
+
     function refilter() {
         if (!allApps)
             return
 
         var q = root.query.trim().toLowerCase()
+
+        if (root.searchModeProvider
+            && root.searchModeProvider.currentMode === "web") {
+            apps = [root.webSearchEntry(root.query)]
+            return
+        }
+
+        if (root.searchModeProvider
+            && root.searchModeProvider.currentMode === "calculator") {
+            apps = [root.calculatorEntry(root.query)]
+            return
+        }
 
         if (q.length === 0) {
             var all = allApps.values
@@ -457,7 +651,11 @@ Item {
 
     }
 
-    onQueryChanged: refilter()
+    onQueryChanged: {
+        if (root.searchModeProvider)
+            root.searchModeProvider.detectMode(root.query)
+        root.refilter()
+    }
 
     Connections {
         target: DesktopEntries
