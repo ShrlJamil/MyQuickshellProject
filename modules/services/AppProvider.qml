@@ -25,6 +25,7 @@ Item {
     readonly property string webSearchId: "web-search"
     readonly property string calculatorResultId: "calculator-result"
     readonly property string commandEntryId: "command"
+    readonly property string clipboardEntryId: "clipboard"
 
     readonly property var commandActions: [
         {
@@ -83,6 +84,7 @@ Item {
     property string query: ""
     property var searchModeProvider
     property var apps: []
+    property string lastMode: "apps"
 
     readonly property string searchEngine: "https://www.google.com/search?q="
 
@@ -120,6 +122,63 @@ Item {
 
     Process {
         id: commandProcess
+    }
+
+    property var clipboardCache: []
+    property bool clipboardLoaded: false
+    property bool clipboardBusy: false
+
+    Process {
+        id: cliphistProcess
+
+        command: ["cliphist", "list"]
+
+        stdout: StdioCollector {
+            id: clipstdout
+        }
+
+        onExited: function(exitCode) {
+            if (exitCode !== 0 && root.clipboardBusy) {
+                root.clipboardCache = []
+                root.clipboardLoaded = true
+                root.clipboardBusy = false
+                root.refilter()
+            }
+        }
+
+        onRunningChanged: {
+            if (root.clipboardBusy && !cliphistProcess.running) {
+                root.clipboardCache = root.parseCliphist(clipstdout.text)
+                root.clipboardLoaded = true
+                root.clipboardBusy = false
+                root.refilter()
+            }
+        }
+    }
+
+    Process {
+        id: clipdecodeProcess
+
+        stdout: StdioCollector {
+            id: clipdecoded
+        }
+
+        onExited: function(exitCode) {
+            if (exitCode === 0)
+                copyProcess.running = true
+        }
+    }
+
+    Process {
+        id: copyProcess
+
+        command: ["wl-copy"]
+        stdinEnabled: true
+
+        onStarted: {
+            copyProcess.write(clipdecoded.text)
+            copyProcess.stdinEnabled = false
+        }
     }
 
     function isAlphaNum(c) {
@@ -339,6 +398,9 @@ Item {
         if (entry.id === root.calculatorResultId)
             return
         if (entry.id === root.commandEntryId)
+            return
+        if (root.searchModeProvider
+            && root.searchModeProvider.currentMode === "clipboard")
             return
 
         var q = query || ""
@@ -743,6 +805,92 @@ Item {
         }
     }
 
+    function parseCliphist(data) {
+        var result = []
+        var lines = data.split("\n")
+
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i]
+            if (line.length === 0)
+                continue
+
+            var idx = line.indexOf("\t")
+            var clipId = idx >= 0 ? line.substring(0, idx) : line
+            var content = idx >= 0 ? line.substring(idx + 1) : line
+
+            if (content.length === 0)
+                continue
+
+            result.push({
+                app: root.makeClipboardApp(clipId, content),
+                titlePositions: [],
+                subtitlePositions: [],
+                score: 0
+            })
+        }
+
+        return result
+    }
+
+    function runCliphist() {
+        if (root.clipboardBusy || root.clipboardLoaded)
+            return
+
+        root.clipboardBusy = true
+        cliphistProcess.running = true
+    }
+
+    function makeClipboardApp(clipId, content) {
+        return {
+            id: clipId,
+            name: content,
+            subtitle: "Clipboard",
+            genericName: "",
+            icon: "edit-paste-symbolic",
+            execute: function() { root.copyClipboard(clipId) }
+        }
+    }
+
+    function copyClipboard(clipId) {
+        if (!clipId || clipId.length === 0)
+            return
+
+        clipdecodeProcess.command = ["cliphist", "decode", String(clipId)]
+        clipdecodeProcess.running = true
+    }
+
+    function noClipboardEntry() {
+        return {
+            app: {
+                id: root.clipboardEntryId,
+                name: "Clipboard History",
+                subtitle: "No clipboard entries",
+                genericName: "",
+                icon: "edit-paste-symbolic",
+                execute: function() {}
+            },
+            titlePositions: [],
+            subtitlePositions: [],
+            score: 0
+        }
+    }
+
+    function noMatchClipboardEntry() {
+        return {
+            app: {
+                id: root.clipboardEntryId,
+                name: "Clipboard History",
+                subtitle: "No matching clipboard entries",
+                genericName: "",
+                icon: "edit-paste-symbolic",
+                execute: function() {}
+            },
+            titlePositions: [],
+            subtitlePositions: [],
+            score: 0
+        }
+    }
+
     function refilter() {
         if (!allApps)
             return
@@ -766,6 +914,71 @@ Item {
             && root.searchModeProvider.currentMode === "command") {
             var cmdEntry = root.commandEntry(root.query)
             apps = cmdEntry ? [cmdEntry] : []
+            return
+        }
+
+        if (root.searchModeProvider
+            && root.searchModeProvider.currentMode === "clipboard") {
+            root.runCliphist()
+
+            if (root.clipboardCache.length === 0) {
+                apps = [root.noClipboardEntry()]
+                return
+            }
+
+            var cq = root.query.trim()
+            if (cq.charAt(0) === ":")
+                cq = cq.substring(1)
+            cq = cq.trim().toLowerCase()
+
+            if (cq.length === 0) {
+                apps = root.clipboardCache
+                return
+            }
+
+            var cScored = []
+
+            for (var i = 0; i < root.clipboardCache.length; i++) {
+                var cRes = score(cq, root.clipboardCache[i].app.name)
+                if (cRes.score > 0) {
+                    var cExact = String(root.clipboardCache[i].app.name)
+                        .trim().toLowerCase() === cq
+
+                    cScored.push({
+                        fuzzy: cRes.score,
+                        index: i,
+                        app: root.clipboardCache[i].app,
+                        titlePositions: cRes.positions,
+                        subtitlePositions: [],
+                        isExact: cExact
+                    })
+                }
+            }
+
+            for (var j = 0; j < cScored.length; j++)
+                cScored[j].score = cScored[j].fuzzy
+
+            cScored.sort(function(a, b) {
+                if (a.isExact !== b.isExact)
+                    return a.isExact ? -1 : 1
+                if (a.score !== b.score)
+                    return b.score - a.score
+                return a.index - b.index
+            })
+
+            if (cScored.length === 0) {
+                apps = [root.noMatchClipboardEntry()]
+                return
+            }
+
+            apps = cScored.map(function(x) {
+                return {
+                    app: x.app,
+                    titlePositions: x.titlePositions,
+                    subtitlePositions: x.subtitlePositions,
+                    score: x.score
+                }
+            })
             return
         }
 
@@ -845,8 +1058,18 @@ Item {
     }
 
     onQueryChanged: {
-        if (root.searchModeProvider)
+        var newMode = "apps"
+        if (root.searchModeProvider) {
             root.searchModeProvider.detectMode(root.query)
+            newMode = root.searchModeProvider.currentMode
+        }
+
+        if (root.lastMode === "clipboard" && newMode !== "clipboard") {
+            root.clipboardLoaded = false
+            root.clipboardCache = []
+        }
+
+        root.lastMode = newMode
         root.refilter()
     }
 
