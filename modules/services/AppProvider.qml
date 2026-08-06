@@ -173,6 +173,24 @@ Item {
         }
     }
 
+    Process {
+        id: clipwipeProcess
+
+        command: ["cliphist", "wipe"]
+
+        onExited: function(exitCode) {
+            if (exitCode !== 0) {
+                console.warn("Failed to wipe clipboard history")
+                return
+            }
+
+            root.clipboardCache = []
+            root.clipboardLoaded = true
+            root.clipboardBusy = false
+            root.refilter()
+        }
+    }
+
     property var clipdeletePending: undefined
 
     Process {
@@ -927,6 +945,12 @@ Item {
         root.clipdeletePending = String(clipId)
         clipdeleteProcess.stdinEnabled = true
         clipdeleteProcess.running = true
+    }
+
+    function wipeClipboardHistory() {
+        if (clipwipeProcess.running)
+            return
+        clipwipeProcess.running = true
     }
 
     function removeClipboardEntry(clipId) {

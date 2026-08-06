@@ -110,7 +110,12 @@ Rectangle {
                     break
                 case Qt.Key_Delete:
                     if (searchModeProvider && searchModeProvider.currentMode === "clipboard") {
-                        root.deleteSelectedClipboard()
+                        if ((event.modifiers & Qt.ControlModifier)
+                            && (event.modifiers & Qt.ShiftModifier)) {
+                            appProvider.wipeClipboardHistory()
+                        } else {
+                            root.deleteSelectedClipboard()
+                        }
                         event.accepted = true
                     }
                     break
