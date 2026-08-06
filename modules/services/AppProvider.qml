@@ -128,6 +128,8 @@ Item {
     property bool clipboardLoaded: false
     property bool clipboardBusy: false
 
+    signal clipboardDeleted(var clipId)
+
     Process {
         id: cliphistProcess
 
@@ -165,19 +167,44 @@ Item {
 
         onExited: function(exitCode) {
             if (exitCode === 0)
-                copyProcess.running = true
+                Quickshell.clipboardText = clipdecoded.text
+            else
+                console.warn("Failed to decode cliphist entry")
         }
     }
 
-    Process {
-        id: copyProcess
+    property var clipdeletePending: undefined
 
-        command: ["wl-copy"]
+    Process {
+        id: clipdeleteProcess
+
+        command: ["cliphist", "delete"]
         stdinEnabled: true
 
         onStarted: {
-            copyProcess.write(clipdecoded.text)
-            copyProcess.stdinEnabled = false
+            if (root.clipdeletePending !== undefined) {
+                clipdeleteProcess.write(root.clipdeletePending + "\n")
+                clipdeleteProcess.stdinEnabled = false
+            }
+        }
+
+        onExited: function(exitCode) {
+            var clipId = root.clipdeletePending
+            root.clipdeletePending = undefined
+
+            if (exitCode !== 0) {
+                console.warn("Failed to delete cliphist entry " + clipId)
+                return
+            }
+
+            root.removeClipboardEntry(clipId)
+        }
+
+        onRunningChanged: {
+            if (root.clipdeletePending !== undefined && !clipdeleteProcess.running) {
+                root.clipdeletePending = undefined
+                console.warn("cliphist delete failed to start")
+            }
         }
     }
 
@@ -822,7 +849,7 @@ Item {
                 continue
 
             result.push({
-                app: root.makeClipboardApp(clipId, content),
+                app: root.makeClipboardApp(clipId, content, root.formatClipboardPreview(content)),
                 titlePositions: [],
                 subtitlePositions: [],
                 score: 0
@@ -840,23 +867,79 @@ Item {
         cliphistProcess.running = true
     }
 
-    function makeClipboardApp(clipId, content) {
+    function makeClipboardApp(clipId, content, preview) {
         return {
             id: clipId,
-            name: content,
+            clipId: clipId,
+            clipContent: content,
+            name: preview,
             subtitle: "Clipboard",
-            genericName: "",
+            genericName: "Clipboard",
             icon: "edit-paste-symbolic",
-            execute: function() { root.copyClipboard(clipId) }
+            execute: function() { root.copyClipboardEntry(clipId) }
         }
     }
 
-    function copyClipboard(clipId) {
+    function formatClipboardPreview(text) {
+        if (!text)
+            return text
+
+        if (/^\[\[ binary/.test(text.trim()))
+            return text
+
+        var preview = text
+            .replace(/\r\n/g, "\n")
+            .replace(/\r/g, "\n")
+            .split("\n")
+            .map(function(line) { return line.trim() })
+            .filter(function(line) { return line.length > 0 })
+            .join(" ↵ ")
+
+        preview = preview.replace(/\t/g, " ")
+        preview = preview.replace(/\s+/g, " ")
+        preview = preview.trim()
+
+        if (preview.length > 100) {
+            var cut = preview.substring(0, 100)
+            var lastSpace = cut.lastIndexOf(" ")
+            if (lastSpace > 0)
+                cut = cut.substring(0, lastSpace)
+            preview = cut + "…"
+        }
+
+        return preview
+    }
+
+    function copyClipboardEntry(clipId) {
         if (!clipId || clipId.length === 0)
             return
 
         clipdecodeProcess.command = ["cliphist", "decode", String(clipId)]
         clipdecodeProcess.running = true
+    }
+
+    function deleteClipboardEntry(clipId) {
+        if (!clipId || clipId.length === 0)
+            return
+        if (root.clipdeletePending !== undefined)
+            return
+
+        root.clipdeletePending = String(clipId)
+        clipdeleteProcess.stdinEnabled = true
+        clipdeleteProcess.running = true
+    }
+
+    function removeClipboardEntry(clipId) {
+        var updated = []
+
+        for (var i = 0; i < root.clipboardCache.length; i++) {
+            if (root.clipboardCache[i].app.clipId !== clipId)
+                updated.push(root.clipboardCache[i])
+        }
+
+        root.clipboardCache = updated
+        root.refilter()
+        root.clipboardDeleted(clipId)
     }
 
     function noClipboardEntry() {

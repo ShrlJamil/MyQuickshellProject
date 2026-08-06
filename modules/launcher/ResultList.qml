@@ -18,6 +18,8 @@ ListView {
     property var appProvider
     property int maxHeight: 360
 
+    property int deletePendingIndex: -1
+
     signal activated(var entry)
 
     model: appProvider ? appProvider.apps : []
@@ -109,9 +111,23 @@ ListView {
 
         function onAppsChanged() {
             Qt.callLater(function() {
-                if (count > 0)
-                    currentIndex = 0
+                var idx = root.deletePendingIndex
+                root.deletePendingIndex = -1
+
+                if (count > 0) {
+                    if (idx >= 0)
+                        idx = Math.min(idx, count - 1)
+                    else
+                        idx = 0
+
+                    root.currentIndex = idx
+                    root.positionViewAtIndex(idx, ListView.Contain)
+                }
             })
+        }
+
+        function onClipboardDeleted(clipId) {
+            root.deletePendingIndex = root.currentIndex
         }
     }
 }

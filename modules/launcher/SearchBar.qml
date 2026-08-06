@@ -23,6 +23,27 @@ Rectangle {
     signal activated()
     signal closeRequested()
 
+    function deleteSelectedClipboard() {
+        if (!resultList || !appProvider)
+            return
+
+        if (searchModeProvider && searchModeProvider.currentMode !== "clipboard")
+            return
+
+        if (resultList.count === 0 || resultList.currentIndex < 0)
+            return
+
+        var entry = resultList.currentItem ? resultList.currentItem.entry : null
+        if (!entry)
+            return
+
+        var clipId = entry.clipId
+        if (!clipId || clipId.length === 0)
+            return
+
+        appProvider.deleteClipboardEntry(clipId)
+    }
+
     onTextChanged: {
         if (searchField)
             searchField.text = root.text
@@ -86,6 +107,12 @@ Rectangle {
                 case Qt.Key_Enter:
                     event.accepted = true
                     activated()
+                    break
+                case Qt.Key_Delete:
+                    if (searchModeProvider && searchModeProvider.currentMode === "clipboard") {
+                        root.deleteSelectedClipboard()
+                        event.accepted = true
+                    }
                     break
                 case Qt.Key_Escape:
                     event.accepted = true
