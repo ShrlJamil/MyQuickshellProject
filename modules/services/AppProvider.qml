@@ -127,8 +127,27 @@ Item {
     property var clipboardCache: []
     property bool clipboardLoaded: false
     property bool clipboardBusy: false
+    property bool clipboardRefreshing: false
+    property bool clipboardWatchActive: false
+
+    readonly property string clipboardDbPath: root.resolveClipboardDb()
 
     signal clipboardDeleted(var clipId)
+    signal clipboardRefreshStarted()
+    signal clipboardRefreshed()
+
+    FileView {
+        id: clipboardWatcher
+
+        path: root.clipboardDbPath
+        watchChanges: root.clipboardWatchActive
+        blockWrites: true
+        printErrors: false
+
+        onFileChanged: {
+            root.clipboardDatabaseChanged()
+        }
+    }
 
     Process {
         id: cliphistProcess
@@ -140,20 +159,33 @@ Item {
         }
 
         onExited: function(exitCode) {
-            if (exitCode !== 0 && root.clipboardBusy) {
-                root.clipboardCache = []
-                root.clipboardLoaded = true
+            if (exitCode === 0 || !root.clipboardBusy)
+                return
+
+            if (root.clipboardRefreshing) {
+                root.clipboardRefreshing = false
                 root.clipboardBusy = false
-                root.refilter()
+                console.warn("cliphist list failed during live refresh")
+                root.clipboardRefreshed()
+                return
             }
+
+            root.clipboardCache = []
+            root.clipboardLoaded = true
+            root.clipboardBusy = false
+            root.refilter()
         }
 
         onRunningChanged: {
             if (root.clipboardBusy && !cliphistProcess.running) {
+                var wasRefreshing = root.clipboardRefreshing
                 root.clipboardCache = root.parseCliphist(clipstdout.text)
                 root.clipboardLoaded = true
+                root.clipboardRefreshing = false
                 root.clipboardBusy = false
                 root.refilter()
+                if (wasRefreshing)
+                    root.clipboardRefreshed()
             }
         }
     }
@@ -877,11 +909,30 @@ Item {
         return result
     }
 
+    function resolveClipboardDb() {
+        var xdg = Quickshell.env("XDG_CACHE_HOME")
+        var base = (xdg && xdg.length > 0)
+            ? xdg
+            : (Quickshell.env("HOME") + "/.cache")
+
+        return base + "/cliphist/db"
+    }
+
     function runCliphist() {
         if (root.clipboardBusy || root.clipboardLoaded)
             return
 
         root.clipboardBusy = true
+        cliphistProcess.running = true
+    }
+
+    function clipboardDatabaseChanged() {
+        if (!root.clipboardWatchActive || root.clipboardBusy)
+            return
+
+        root.clipboardRefreshing = true
+        root.clipboardBusy = true
+        root.clipboardRefreshStarted()
         cliphistProcess.running = true
     }
 
@@ -1176,6 +1227,7 @@ Item {
             root.clipboardCache = []
         }
 
+        root.clipboardWatchActive = newMode === "clipboard"
         root.lastMode = newMode
         root.refilter()
     }
