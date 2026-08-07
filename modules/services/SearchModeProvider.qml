@@ -13,6 +13,7 @@ QtObject {
         : _mode === "calculator" ? "accessories-calculator-symbolic"
         : _mode === "command" ? "utilities-terminal-symbolic"
         : _mode === "clipboard" ? "edit-paste-symbolic"
+        : _mode === "file" ? "folder-documents-symbolic"
         : "web-browser-symbolic"
 
     function isUrlQuery(query) {
@@ -52,6 +53,8 @@ QtObject {
             root._mode = "web"
         else if (q.charAt(0) === ":")
             root._mode = "clipboard"
+        else if (q.charAt(0) === "/")
+            root._mode = "file"
         else
             root._mode = "apps"
     }

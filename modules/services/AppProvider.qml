@@ -26,6 +26,7 @@ Item {
     readonly property string calculatorResultId: "calculator-result"
     readonly property string commandEntryId: "command"
     readonly property string clipboardEntryId: "clipboard"
+    readonly property string fileEntryId: "file"
 
     readonly property var commandActions: [
         {
@@ -478,6 +479,9 @@ Item {
             return
         if (root.searchModeProvider
             && root.searchModeProvider.currentMode === "clipboard")
+            return
+        if (root.searchModeProvider
+            && root.searchModeProvider.currentMode === "file")
             return
 
         var q = query || ""
@@ -1033,6 +1037,22 @@ Item {
         }
     }
 
+    function fileEntry() {
+        return {
+            app: {
+                id: root.fileEntryId,
+                name: "File Search",
+                subtitle: "Coming soon",
+                genericName: "",
+                icon: "folder-documents-symbolic",
+                execute: function() {}
+            },
+            titlePositions: [],
+            subtitlePositions: [],
+            score: 0
+        }
+    }
+
     function noMatchClipboardEntry() {
         return {
             app: {
@@ -1072,6 +1092,12 @@ Item {
             && root.searchModeProvider.currentMode === "command") {
             var cmdEntry = root.commandEntry(root.query)
             apps = cmdEntry ? [cmdEntry] : []
+            return
+        }
+
+        if (root.searchModeProvider
+            && root.searchModeProvider.currentMode === "file") {
+            apps = [root.fileEntry()]
             return
         }
 
