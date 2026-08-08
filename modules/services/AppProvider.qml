@@ -131,9 +131,13 @@ Item {
     property bool clipboardRefreshing: false
     property bool clipboardWatchActive: false
 
-    property var fileCache: []
+    property var filePaths: []
     property bool fileLoaded: false
     property bool fileBusy: false
+
+    readonly property int fileResultLimit: 250
+    readonly property string fileIcon: "folder-documents-symbolic"
+    readonly property var fileExecute: function() {}
 
     readonly property var fileRoots: root.resolveFileRoots()
 
@@ -276,7 +280,7 @@ Item {
             if (exitCode === 0 || !root.fileBusy)
                 return
 
-            root.fileCache = []
+            root.filePaths = []
             root.fileLoaded = true
             root.fileBusy = false
             root.refilter()
@@ -284,7 +288,7 @@ Item {
 
         onRunningChanged: {
             if (root.fileBusy && !fileProcess.running) {
-                root.fileCache = root.parseFd(fileStdout.text)
+                root.filePaths = root.parseFd(fileStdout.text)
                 root.fileLoaded = true
                 root.fileBusy = false
                 root.refilter()
@@ -971,25 +975,14 @@ Item {
         return roots
     }
 
-    function makeFileEntry(path) {
+    function fileBasename(path) {
         var idx = path.lastIndexOf("/")
-        var name = idx >= 0 ? path.substring(idx + 1) : path
-        var parent = idx >= 0 ? path.substring(0, idx) : ""
+        return idx >= 0 ? path.substring(idx + 1) : path
+    }
 
-        return {
-            app: {
-                id: root.fileEntryId + ":" + path,
-                path: path,
-                name: name,
-                subtitle: parent,
-                genericName: parent,
-                icon: "folder-documents-symbolic",
-                execute: function() {}
-            },
-            titlePositions: [],
-            subtitlePositions: [],
-            score: 0
-        }
+    function fileParentPath(path) {
+        var idx = path.lastIndexOf("/")
+        return idx >= 0 ? path.substring(0, idx) : ""
     }
 
     function parseFd(data) {
@@ -1001,10 +994,73 @@ Item {
             if (line.length === 0)
                 continue
 
-            result.push(root.makeFileEntry(line))
+            result.push(line)
         }
 
         return result
+    }
+
+    function makeFileApp(path, name, parent) {
+        return {
+            id: root.fileEntryId + ":" + path,
+            path: path,
+            name: name,
+            subtitle: parent,
+            genericName: parent,
+            icon: root.fileIcon,
+            execute: root.fileExecute
+        }
+    }
+
+    function makeFileResult(path, query, entryScore) {
+        var name = root.fileBasename(path)
+        var parent = root.fileParentPath(path)
+
+        var tp = score(query, name)
+        var subtitlePositions = []
+
+        var sp = score(query, parent)
+        if (sp.score > 0)
+            subtitlePositions = sp.positions
+
+        return {
+            app: root.makeFileApp(path, name, parent),
+            titlePositions: tp.score > 0 ? tp.positions : [],
+            subtitlePositions: subtitlePositions,
+            score: entryScore
+        }
+    }
+
+    function fileScoresBefore(a, b) {
+        if (a.e !== b.e)
+            return a.e > b.e
+        if (a.s !== b.s)
+            return a.s > b.s
+        return a.i < b.i
+    }
+
+    function fileTopInsert(top, score, index, exact) {
+        var item = { s: score, i: index, e: exact ? 1 : 0 }
+
+        if (top.length >= root.fileResultLimit) {
+            if (!root.fileScoresBefore(item, top[top.length - 1]))
+                return
+
+            top[top.length - 1] = item
+            var k = top.length - 1
+            while (k > 0 && root.fileScoresBefore(top[k], top[k - 1])) {
+                var tmp = top[k - 1]
+                top[k - 1] = top[k]
+                top[k] = tmp
+                k--
+            }
+            return
+        }
+
+        var pos = 0
+        while (pos < top.length && root.fileScoresBefore(top[pos], item))
+            pos++
+        top.splice(pos, 0, item)
     }
 
     function loadFileIndex() {
@@ -1147,6 +1203,22 @@ Item {
         }
     }
 
+    function noFileMatchEntry() {
+        return {
+            app: {
+                id: root.fileEntryId,
+                name: "File Search",
+                subtitle: "No matching files",
+                genericName: "",
+                icon: "folder-documents-symbolic",
+                execute: function() {}
+            },
+            titlePositions: [],
+            subtitlePositions: [],
+            score: 0
+        }
+    }
+
     function noMatchClipboardEntry() {
         return {
             app: {
@@ -1193,12 +1265,46 @@ Item {
             && root.searchModeProvider.currentMode === "file") {
             root.loadFileIndex()
 
-            if (root.fileCache.length === 0) {
+            if (root.filePaths.length === 0) {
                 apps = [root.fileEntry()]
                 return
             }
 
-            apps = root.fileCache
+            var fq = root.query.trim()
+            if (fq.charAt(0) === "/")
+                fq = fq.substring(1)
+            fq = fq.trim().toLowerCase()
+
+            if (fq.length === 0) {
+                var fAll = []
+                var fAllCount = Math.min(root.fileResultLimit, root.filePaths.length)
+                for (var fa = 0; fa < fAllCount; fa++)
+                    fAll.push(root.makeFileResult(root.filePaths[fa], "", 0))
+                apps = fAll
+                return
+            }
+
+            var fTop = []
+
+            for (var i = 0; i < root.filePaths.length; i++) {
+                var fPath = root.filePaths[i]
+                var fName = root.fileBasename(fPath)
+                var fRes = score(fq, fName)
+                if (fRes.score < 0)
+                    fRes = score(fq, fPath)
+                if (fRes.score > 0)
+                    root.fileTopInsert(fTop, fRes.score, i, String(fName).trim().toLowerCase() === fq)
+            }
+
+            if (fTop.length === 0) {
+                apps = [root.noFileMatchEntry()]
+                return
+            }
+
+            var fApps = []
+            for (var ti = 0; ti < fTop.length; ti++)
+                fApps.push(root.makeFileResult(root.filePaths[fTop[ti].i], fq, fTop[ti].s))
+            apps = fApps
             return
         }
 
