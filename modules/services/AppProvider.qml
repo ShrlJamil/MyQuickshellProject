@@ -131,6 +131,12 @@ Item {
     property bool clipboardRefreshing: false
     property bool clipboardWatchActive: false
 
+    property var fileCache: []
+    property bool fileLoaded: false
+    property bool fileBusy: false
+
+    readonly property var fileRoots: root.resolveFileRoots()
+
     readonly property string clipboardDbPath: root.resolveClipboardDb()
 
     signal clipboardDeleted(var clipId)
@@ -255,6 +261,33 @@ Item {
             if (root.clipdeletePending !== undefined && !clipdeleteProcess.running) {
                 root.clipdeletePending = undefined
                 console.warn("cliphist delete failed to start")
+            }
+        }
+    }
+
+    Process {
+        id: fileProcess
+
+        stdout: StdioCollector {
+            id: fileStdout
+        }
+
+        onExited: function(exitCode) {
+            if (exitCode === 0 || !root.fileBusy)
+                return
+
+            root.fileCache = []
+            root.fileLoaded = true
+            root.fileBusy = false
+            root.refilter()
+        }
+
+        onRunningChanged: {
+            if (root.fileBusy && !fileProcess.running) {
+                root.fileCache = root.parseFd(fileStdout.text)
+                root.fileLoaded = true
+                root.fileBusy = false
+                root.refilter()
             }
         }
     }
@@ -922,6 +955,67 @@ Item {
         return base + "/cliphist/db"
     }
 
+    function resolveFileRoots() {
+        var home = Quickshell.env("HOME") || ""
+        var roots = []
+
+        var xdgConfig = Quickshell.env("XDG_CONFIG_HOME")
+        roots.push((xdgConfig && xdgConfig.length > 0)
+            ? xdgConfig
+            : home + "/.config")
+
+        roots.push(home + "/Projects")
+        roots.push(home + "/Documents")
+        roots.push(home + "/Downloads")
+
+        return roots
+    }
+
+    function makeFileEntry(path) {
+        var idx = path.lastIndexOf("/")
+        var name = idx >= 0 ? path.substring(idx + 1) : path
+        var parent = idx >= 0 ? path.substring(0, idx) : ""
+
+        return {
+            app: {
+                id: root.fileEntryId + ":" + path,
+                path: path,
+                name: name,
+                subtitle: parent,
+                genericName: parent,
+                icon: "folder-documents-symbolic",
+                execute: function() {}
+            },
+            titlePositions: [],
+            subtitlePositions: [],
+            score: 0
+        }
+    }
+
+    function parseFd(data) {
+        var result = []
+        var lines = data.split("\n")
+
+        for (var i = 0; i < lines.length; i++) {
+            var line = lines[i].trim()
+            if (line.length === 0)
+                continue
+
+            result.push(root.makeFileEntry(line))
+        }
+
+        return result
+    }
+
+    function loadFileIndex() {
+        if (root.fileBusy || root.fileLoaded)
+            return
+
+        root.fileBusy = true
+        fileProcess.command = ["fd", "--type", "f", "."].concat(root.fileRoots)
+        fileProcess.running = true
+    }
+
     function runCliphist() {
         if (root.clipboardBusy || root.clipboardLoaded)
             return
@@ -1042,7 +1136,7 @@ Item {
             app: {
                 id: root.fileEntryId,
                 name: "File Search",
-                subtitle: "Coming soon",
+                subtitle: "No files found",
                 genericName: "",
                 icon: "folder-documents-symbolic",
                 execute: function() {}
@@ -1097,7 +1191,14 @@ Item {
 
         if (root.searchModeProvider
             && root.searchModeProvider.currentMode === "file") {
-            apps = [root.fileEntry()]
+            root.loadFileIndex()
+
+            if (root.fileCache.length === 0) {
+                apps = [root.fileEntry()]
+                return
+            }
+
+            apps = root.fileCache
             return
         }
 
