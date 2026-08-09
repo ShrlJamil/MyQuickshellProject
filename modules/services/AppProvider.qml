@@ -135,6 +135,14 @@ Item {
     property bool fileLoaded: false
     property bool fileBusy: false
 
+    property int fileScanGen: 0
+    property int fileScanCursor: 0
+    property var fileScanTop: []
+    property string fileScanQuery: ""
+    property var fileScanPaths: []
+
+    readonly property int fileChunkSize: 500
+
     readonly property int fileResultLimit: 250
     readonly property string fileIcon: "folder-documents-symbolic"
     readonly property var fileExecute: function() {}
@@ -146,6 +154,16 @@ Item {
     signal clipboardDeleted(var clipId)
     signal clipboardRefreshStarted()
     signal clipboardRefreshed()
+
+    Timer {
+        id: fileScanTimer
+
+        interval: 1
+        repeat: false
+        running: false
+
+        onTriggered: root.fileScanStep()
+    }
 
     FileView {
         id: clipboardWatcher
@@ -315,7 +333,7 @@ Item {
     }
 
     function acronym(target) {
-        var result = ""
+        var result = []
 
         for (var i = 0; i < target.length; i++) {
             var c = target.charAt(i)
@@ -326,10 +344,10 @@ Item {
                 || (isLower(prev) && isUpper(c))
 
             if (wordStart && isAlphaNum(c))
-                result += c.toUpperCase()
+                result.push(c.toUpperCase())
         }
 
-        return result
+        return result.join("")
     }
 
     function score(q, target) {
@@ -1063,6 +1081,67 @@ Item {
         top.splice(pos, 0, item)
     }
 
+    function fileScanStart(fq) {
+        root.fileScanGen++
+        root.fileScanCursor = 0
+        root.fileScanTop = []
+        root.fileScanQuery = fq
+        root.fileScanPaths = root.filePaths
+        fileScanTimer.start()
+    }
+
+    function fileScanStep() {
+        var gen = root.fileScanGen
+        var fq = root.fileScanQuery
+        var paths = root.fileScanPaths
+        var n = paths.length
+        var end = Math.min(root.fileScanCursor + root.fileChunkSize, n)
+        var fTop = root.fileScanTop
+
+        for (var i = root.fileScanCursor; i < end; i++) {
+            var fPath = paths[i]
+            var fName = root.fileBasename(fPath)
+            var fRes = score(fq, fName)
+            if (fRes.score < 0)
+                fRes = score(fq, fPath)
+            if (fRes.score > 0)
+                root.fileTopInsert(fTop, fRes.score, i, String(fName).trim().toLowerCase() === fq)
+        }
+
+        root.fileScanCursor = end
+
+        if (gen !== root.fileScanGen)
+            return
+
+        if (end >= n) {
+            root.fileScanFinish()
+            return
+        }
+
+        fileScanTimer.start()
+    }
+
+    function fileScanFinish() {
+        var fq = root.fileScanQuery
+        var paths = root.fileScanPaths
+        var fTop = root.fileScanTop
+
+        if (fTop.length === 0) {
+            apps = [root.noFileMatchEntry()]
+            return
+        }
+
+        var fApps = []
+        for (var ti = 0; ti < fTop.length; ti++)
+            fApps.push(root.makeFileResult(paths[fTop[ti].i], fq, fTop[ti].s))
+        apps = fApps
+    }
+
+    function fileScanCancel() {
+        fileScanTimer.stop()
+        root.fileScanGen++
+    }
+
     function loadFileIndex() {
         if (root.fileBusy || root.fileLoaded)
             return
@@ -1239,6 +1318,8 @@ Item {
         if (!allApps)
             return
 
+        root.fileScanCancel()
+
         var q = root.query.trim().toLowerCase()
 
         if (root.searchModeProvider
@@ -1284,27 +1365,7 @@ Item {
                 return
             }
 
-            var fTop = []
-
-            for (var i = 0; i < root.filePaths.length; i++) {
-                var fPath = root.filePaths[i]
-                var fName = root.fileBasename(fPath)
-                var fRes = score(fq, fName)
-                if (fRes.score < 0)
-                    fRes = score(fq, fPath)
-                if (fRes.score > 0)
-                    root.fileTopInsert(fTop, fRes.score, i, String(fName).trim().toLowerCase() === fq)
-            }
-
-            if (fTop.length === 0) {
-                apps = [root.noFileMatchEntry()]
-                return
-            }
-
-            var fApps = []
-            for (var ti = 0; ti < fTop.length; ti++)
-                fApps.push(root.makeFileResult(root.filePaths[fTop[ti].i], fq, fTop[ti].s))
-            apps = fApps
+            root.fileScanStart(fq)
             return
         }
 
