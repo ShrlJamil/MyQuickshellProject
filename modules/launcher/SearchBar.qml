@@ -23,6 +23,23 @@ Rectangle {
     signal activated()
     signal closeRequested()
 
+    function commandText() {
+        if (!searchField)
+            return ""
+
+        var q = searchField.text.trim()
+
+        if (q.charAt(0) === ">")
+            q = q.substring(1)
+
+        return q.trim()
+    }
+
+    function setCommandHistory(command) {
+        if (searchField)
+            searchField.text = ">" + (command !== undefined ? command : "")
+    }
+
     function deleteSelectedClipboard() {
         if (!resultList || !appProvider)
             return
@@ -94,13 +111,23 @@ Rectangle {
             Keys.onPressed: (event) => {
                 switch (event.key) {
                 case Qt.Key_Down:
-                    if (resultList)
+                    if (searchModeProvider
+                        && searchModeProvider.currentMode === "command"
+                        && appProvider) {
+                        root.setCommandHistory(appProvider.commandHistoryNext(root.commandText()))
+                    } else if (resultList) {
                         resultList.next()
+                    }
                     event.accepted = true
                     break
                 case Qt.Key_Up:
-                    if (resultList)
+                    if (searchModeProvider
+                        && searchModeProvider.currentMode === "command"
+                        && appProvider) {
+                        root.setCommandHistory(appProvider.commandHistoryPrevious(root.commandText()))
+                    } else if (resultList) {
                         resultList.previous()
+                    }
                     event.accepted = true
                     break
                 case Qt.Key_Return:

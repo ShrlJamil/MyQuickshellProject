@@ -31,8 +31,10 @@ Rectangle {
 
     function reset() {
         searchBar.text = ""
-        if (appProvider)
+        if (appProvider) {
             appProvider.query = ""
+            appProvider.commandHistoryReset()
+        }
         resultList.currentIndex = 0
     }
 

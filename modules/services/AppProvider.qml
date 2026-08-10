@@ -82,6 +82,11 @@ Item {
     readonly property string terminalExecutable: "kitty"
     readonly property var terminalArguments: ["fish", "-C"]
 
+    property var commandHistory: []
+    property int commandHistoryCursor: -1
+    property bool commandHistoryNavActive: false
+    property string commandHistoryDraft: ""
+
     property string query: ""
     property var searchModeProvider
     property var apps: []
@@ -866,6 +871,58 @@ Item {
         return String(rounded)
     }
 
+    function recordCommand(command) {
+        var cmd = (command !== undefined && command !== null) ? String(command).trim() : ""
+        if (cmd.length === 0)
+            return
+
+        if (root.commandHistory.length > 0
+            && root.commandHistory[root.commandHistory.length - 1] === cmd)
+            return
+
+        root.commandHistory = root.commandHistory.concat([cmd])
+        root.commandHistoryReset()
+    }
+
+    function commandHistoryReset() {
+        root.commandHistoryCursor = -1
+        root.commandHistoryNavActive = false
+        root.commandHistoryDraft = ""
+    }
+
+    function commandHistoryPrevious(current) {
+        var cur = (current !== undefined && current !== null) ? String(current).trim() : ""
+
+        if (root.commandHistory.length === 0)
+            return cur
+
+        if (!root.commandHistoryNavActive) {
+            root.commandHistoryNavActive = true
+            root.commandHistoryCursor = root.commandHistory.length - 1
+            root.commandHistoryDraft = cur
+            return root.commandHistory[root.commandHistoryCursor]
+        }
+
+        root.commandHistoryCursor = Math.max(0, root.commandHistoryCursor - 1)
+        return root.commandHistory[root.commandHistoryCursor]
+    }
+
+    function commandHistoryNext(current) {
+        var cur = (current !== undefined && current !== null) ? String(current).trim() : ""
+
+        if (root.commandHistory.length === 0 || !root.commandHistoryNavActive)
+            return cur
+
+        if (root.commandHistoryCursor >= root.commandHistory.length - 1) {
+            var draft = root.commandHistoryDraft
+            root.commandHistoryReset()
+            return draft
+        }
+
+        root.commandHistoryCursor = Math.min(root.commandHistory.length - 1, root.commandHistoryCursor + 1)
+        return root.commandHistory[root.commandHistoryCursor]
+    }
+
     function launchInTerminal(command) {
         if (!command || command.length === 0)
             return
@@ -919,7 +976,7 @@ Item {
                     subtitle: action.subtitle,
                     genericName: "",
                     icon: action.icon,
-                    execute: action.execute
+                    execute: function() { root.recordCommand(q); action.execute() }
                 },
                 titlePositions: [],
                 subtitlePositions: [],
@@ -933,7 +990,7 @@ Item {
                 subtitle: "Run in terminal",
                 genericName: "",
                 icon: "utilities-terminal-symbolic",
-                execute: function() { root.launchInTerminal(q) }
+                execute: function() { root.recordCommand(q); root.launchInTerminal(q) }
             },
             titlePositions: [],
             subtitlePositions: [],
