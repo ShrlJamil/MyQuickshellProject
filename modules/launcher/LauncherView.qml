@@ -1,5 +1,6 @@
 import QtQuick
 import "../services"
+import "../../components"
 
 Rectangle {
     id: root
@@ -8,7 +9,7 @@ Rectangle {
 
     radius: 40
 
-    color: "#000000"
+    color: Theme.background
 
     property var appProvider
 

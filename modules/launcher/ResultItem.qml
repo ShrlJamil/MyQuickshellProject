@@ -1,6 +1,7 @@
 import QtQuick
 import Quickshell
 import Quickshell.Widgets
+import "../../components"
 
 Rectangle {
     id: root
@@ -27,7 +28,7 @@ Rectangle {
                 : c
 
             if (positions.indexOf(i) >= 0)
-                out += '<font color="#89b4fa">' + escaped + "</font>"
+                out += '<font color="' + Theme.accent + '">' + escaped + "</font>"
             else
                 out += escaped
         }
@@ -53,9 +54,9 @@ Rectangle {
 
     color:
     selected
-    ? "#313244"
+    ? Theme.surface
     : hover.hovered
-        ? Qt.rgba(1,1,1,0.05)
+        ? Theme.surfaceHover
         : "transparent"
     scale: selected ? 1.01 : 1.0
 
@@ -96,7 +97,7 @@ Rectangle {
             Text {
                 text: root.rich(root.title, root.titlePositions)
                 textFormat: Text.RichText
-                color: "white"
+                color: Theme.text
                 font.pixelSize: 16
                 font.weight: Font.DemiBold
             }
@@ -105,7 +106,7 @@ Rectangle {
                 visible: text.length > 0
                 text: root.rich(root.subtitle, root.subtitlePositions)
                 textFormat: Text.RichText
-                color: "#a6adc8"
+                color: Theme.textDim
                 font.pixelSize: 13
                 opacity: 0.75
             }

@@ -3,6 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import Quickshell.Widgets
 import Quickshell
+import "../../components"
 
 Rectangle {
     id: root
@@ -92,11 +93,11 @@ Rectangle {
             Layout.fillHeight: true
 
             placeholderText: "Search"
-            placeholderTextColor: "#888888"
+            placeholderTextColor: Theme.textMuted
 
             font.pixelSize: 24
 
-            color: "#ffffff"
+            color: Theme.text
 
             focus: true
 
