@@ -24,13 +24,34 @@ PanelWindow {
     aboveWindows: true
     focusable: true
 
+    property bool maskReady: false
+
+    onVisibleChanged: {
+        if (visible) {
+            root.maskReady = false
+            maskEnableTimer.restart()
+        } else {
+            maskEnableTimer.stop()
+            root.maskReady = false
+        }
+    }
+
+    Timer {
+        id: maskEnableTimer
+
+        interval: 50
+        repeat: false
+
+        onTriggered: root.maskReady = true
+    }
+
     function close() {
         launcherView.reset()
         launcherController.hide()
     }
 
     mask: Region {
-        item: visible ? launcherView : null
+        item: visible && root.maskReady ? launcherView : null
     }
 
     HyprlandFocusGrab {
@@ -49,6 +70,8 @@ PanelWindow {
 
     LauncherView {
         id: launcherView
+
+        visible: root.maskReady
 
         anchors.centerIn: parent
 

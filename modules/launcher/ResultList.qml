@@ -30,7 +30,7 @@ ListView {
 
     Behavior on height {
         NumberAnimation {
-            duration: 150
+            duration: 200
             easing.type: Easing.OutCubic
         }
     }

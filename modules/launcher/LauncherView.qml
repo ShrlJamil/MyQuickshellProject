@@ -8,10 +8,7 @@ Rectangle {
 
     radius: 40
 
-    color: "#1e1e2e"
-
-    border.width: 1
-    border.color: "#44475a"
+    color: "#000000"
 
     property var appProvider
 
