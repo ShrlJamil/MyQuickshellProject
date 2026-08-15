@@ -58,16 +58,8 @@ Rectangle {
     : hover.hovered
         ? Theme.surfaceHover
         : "transparent"
-    scale: selected ? 1.01 : 1.0
-
     Behavior on color {
         ColorAnimation {
-            duration: 100
-        }
-    }
-
-    Behavior on scale {
-        NumberAnimation {
             duration: 100
         }
     }
