@@ -61,9 +61,9 @@ PanelWindow {
     Rectangle {
         id: background
 
-        width: root.active ? 360 : parent.width
-        radius: root.active ? 24 : 0
-        height: root.active ? root.openHeight : 40
+        width: parent.width
+        radius: 0
+        height: 40
 
         anchors {
             top: parent.top
@@ -72,40 +72,184 @@ PanelWindow {
 
         color: Theme.background
 
-        Behavior on width {
-            NumberAnimation {
-                duration: 220
-                easing.type: Easing.OutCubic
-            }
-        }
+        states: [
+            State {
+                name: "idle"
 
-        Behavior on height {
-            NumberAnimation {
-                duration: 220
-                easing.type: Easing.OutCubic
-            }
-        }
+                when: !root.active
 
-        Behavior on radius {
-            NumberAnimation {
-                duration: 220
-                easing.type: Easing.OutCubic
+                PropertyChanges {
+                    target: background
+                    width: background.parent.width
+                    height: 40
+                    radius: 0
+                }
+
+                PropertyChanges {
+                    target: menuBox
+                    opacity: 0
+                }
+
+                PropertyChanges {
+                    target: barContent
+                    opacity: 1
+                }
+            },
+            State {
+                name: "active"
+
+                when: root.active
+
+                PropertyChanges {
+                    target: background
+                    width: 360
+                    height: root.openHeight
+                    radius: 24
+                }
+
+                PropertyChanges {
+                    target: menuBox
+                    opacity: 1
+                }
+
+                PropertyChanges {
+                    target: barContent
+                    opacity: 0
+                }
             }
-        }
+        ]
+
+        transitions: [
+            Transition {
+                from: "idle"
+                to: "active"
+
+                ParallelAnimation {
+                    SequentialAnimation {
+                        PauseAnimation { duration: 0 }
+
+                        NumberAnimation {
+                            target: background
+                            property: "width"
+                            duration: 260
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+
+                    SequentialAnimation {
+                        PauseAnimation { duration: 140 }
+
+                        NumberAnimation {
+                            target: background
+                            property: "height"
+                            duration: 320
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+
+                    SequentialAnimation {
+                        PauseAnimation { duration: 10 }
+
+                        NumberAnimation {
+                            target: background
+                            property: "radius"
+                            duration: 220
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+
+                    SequentialAnimation {
+                        PauseAnimation { duration: 0 }
+
+                        NumberAnimation {
+                            target: barContent
+                            property: "opacity"
+                            duration: 190
+                            easing.type: Easing.OutQuad
+                        }
+                    }
+
+                    SequentialAnimation {
+                        PauseAnimation { duration: 160 }
+
+                        NumberAnimation {
+                            target: menuBox
+                            property: "opacity"
+                            duration: 220
+                            easing.type: Easing.OutQuad
+                        }
+                    }
+                }
+            },
+            Transition {
+                from: "active"
+                to: "idle"
+
+                ParallelAnimation {
+                    SequentialAnimation {
+                        PauseAnimation { duration: 0 }
+
+                        NumberAnimation {
+                            target: background
+                            property: "height"
+                            duration: 260
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+
+                    SequentialAnimation {
+                        PauseAnimation { duration: 140 }
+
+                        NumberAnimation {
+                            target: background
+                            property: "width"
+                            duration: 320
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+
+                    SequentialAnimation {
+                        PauseAnimation { duration: 20 }
+
+                        NumberAnimation {
+                            target: background
+                            property: "radius"
+                            duration: 220
+                            easing.type: Easing.OutCubic
+                        }
+                    }
+
+                    SequentialAnimation {
+                        PauseAnimation { duration: 0 }
+
+                        NumberAnimation {
+                            target: menuBox
+                            property: "opacity"
+                            duration: 190
+                            easing.type: Easing.OutQuad
+                        }
+                    }
+
+                    SequentialAnimation {
+                        PauseAnimation { duration: 140 }
+
+                        NumberAnimation {
+                            target: barContent
+                            property: "opacity"
+                            duration: 220
+                            easing.type: Easing.OutQuad
+                        }
+                    }
+                }
+            }
+        ]
 
         Item {
             id: menuBox
 
-            opacity: root.active ? 1 : 0
+            opacity: 0
 
             anchors.fill: parent
-
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: 140
-                    easing.type: Easing.OutQuad
-                }
-            }
 
             PowerMenu {
                 id: powerMenu
@@ -122,7 +266,7 @@ PanelWindow {
         Item {
             id: barContent
 
-            opacity: root.active ? 0 : 1
+            opacity: 1
 
             anchors {
                 top: parent.top
@@ -131,13 +275,6 @@ PanelWindow {
             }
 
             height: 40
-
-            Behavior on opacity {
-                NumberAnimation {
-                    duration: 140
-                    easing.type: Easing.OutQuad
-                }
-            }
 
             Item {
                 id: leftSlot
