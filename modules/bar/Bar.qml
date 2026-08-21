@@ -14,8 +14,13 @@ PanelWindow {
 
     screen: modelData.screen
 
-    property bool active: barState.mode !== "" && barState.screen === root.screen
+    visible: barState.barEnabled
+
+    property bool active: barState.mode === "power" && barState.screen === root.screen
+    property bool centerOpen: barState.mode === "center" && barState.screen === root.screen
     property real openHeight: 320
+    property real menuWidth: 640
+    property real menuHeight: 200
 
     implicitHeight: openHeight
 
@@ -102,8 +107,8 @@ PanelWindow {
 
                 PropertyChanges {
                     target: background
-                    width: 360
-                    height: root.openHeight
+                    width: root.menuWidth
+                    height: root.menuHeight
                     radius: 24
                 }
 
@@ -347,6 +352,47 @@ PanelWindow {
 
                 width: 36
                 height: 36
+
+                Rectangle {
+                    id: centerButton
+
+                    anchors.fill: parent
+
+                    radius: 10
+                    color: root.centerOpen || centerTap.pressed ? Theme.surfaceHover : (centerHover.hovered ? Theme.surfaceHover : "transparent")
+
+                    HoverHandler {
+                        id: centerHover
+
+                        cursorShape: Qt.PointingHandCursor
+                    }
+
+                    TapHandler {
+                        id: centerTap
+
+                        onTapped: {
+                            if (root.centerOpen) {
+                                barState.screen = null
+                                barState.mode = ""
+                            } else {
+                                barState.screen = root.screen
+                                barState.mode = "center"
+                            }
+                        }
+                    }
+
+                    IconImage {
+                        id: centerIcon
+
+                        anchors.centerIn: parent
+
+                        width: 20
+                        height: 20
+
+                        source: "file://" + Quickshell.shellPath("assets/controls-symbolic.svg")
+                        asynchronous: true
+                    }
+                }
             }
         }
     }

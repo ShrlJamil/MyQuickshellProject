@@ -16,7 +16,7 @@ Item {
     property color textMuted: "#888888"
     property color accent: "#89b4fa"
 
-    readonly property string palettePath: Quickshell.configPath("palette.json")
+    readonly property string palettePath: Quickshell.shellPath("palette.json")
 
     FileView {
         id: paletteFile

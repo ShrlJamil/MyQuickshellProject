@@ -56,6 +56,15 @@ ShellRoot {
 
         property string mode: ""
         property ShellScreen screen: null
+        property bool barEnabled: false
+    }
+
+    IpcHandler {
+        target: "bar"
+
+        function enable(): void { barState.barEnabled = true }
+        function disable(): void { barState.barEnabled = false }
+        function toggle(): void { barState.barEnabled = !barState.barEnabled }
     }
 
     IpcHandler {
@@ -87,6 +96,27 @@ ShellRoot {
         }
     }
 
+    IpcHandler {
+        target: "center"
+
+        function show(): void {
+            focusState.inquire()
+            const screen = focusedScreen()
+            if (!screen) return
+            if (barState.mode === "center" && barState.screen === screen) return
+            barState.screen = screen
+            barState.mode = "center"
+        }
+        function hide(): void {
+            barState.screen = null
+            barState.mode = ""
+        }
+        function toggle(): void {
+            if (barState.mode === "center") hide()
+            else show()
+        }
+    }
+
     Launcher {
         id: launcher
         launcherController: launcherController
@@ -96,5 +126,11 @@ ShellRoot {
         model: Quickshell.screens.map(screen => ({ barState: barState, launcherController: launcherController, screen: screen }))
 
         delegate: Bar {}
+    }
+
+    Variants {
+        model: Quickshell.screens.map(screen => ({ barState: barState, screen: screen }))
+
+        delegate: ControlCenter {}
     }
 }

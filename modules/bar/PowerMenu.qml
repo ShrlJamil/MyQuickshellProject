@@ -10,6 +10,21 @@ Item {
     property int selectedIndex: 0
     property bool stubActions: false
     property bool showError: false
+    property int holdDuration: 1000
+
+    readonly property var actions: [
+        { id: "lock", label: "Lock", command: "loginctl lock-session" },
+        { id: "hibernate", label: "Hibernate", command: "systemctl hibernate" },
+        { id: "logout", label: "Logout", command: "loginctl terminate-user \"$USER\"" },
+        { id: "shutdown", label: "Shutdown", command: "systemctl poweroff" },
+        { id: "suspend", label: "Suspend", command: "systemctl suspend" },
+        { id: "reboot", label: "Reboot", command: "systemctl reboot" }
+    ]
+
+    readonly property int itemWidth: Math.floor((actionsRow.width - (root.actions.length - 1) * actionsRow.spacing) / root.actions.length)
+    readonly property int itemHeight: Math.max(88, Math.round(root.height - 44))
+
+    readonly property var currentItem: actionsRepeater.itemAt(root.selectedIndex)
 
     signal closeRequested()
 
@@ -17,14 +32,21 @@ Item {
         if (event.key === Qt.Key_Escape) {
             root.closeRequested()
             event.accepted = true
-        } else if (event.key === Qt.Key_Down) {
-            root.selectedIndex = (root.selectedIndex + 1) % 3
+        } else if (event.key === Qt.Key_Left || event.key === Qt.Key_Up) {
+            root.selectedIndex = (root.selectedIndex + root.actions.length - 1) % root.actions.length
             event.accepted = true
-        } else if (event.key === Qt.Key_Up) {
-            root.selectedIndex = (root.selectedIndex + 2) % 3
+        } else if (event.key === Qt.Key_Right || event.key === Qt.Key_Down) {
+            root.selectedIndex = (root.selectedIndex + 1) % root.actions.length
             event.accepted = true
         } else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            root.activateSelected()
+            if (root.currentItem) root.currentItem.startHold()
+            event.accepted = true
+        }
+    }
+
+    Keys.onReleased: (event) => {
+        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
+            if (root.currentItem) root.currentItem.cancelHold()
             event.accepted = true
         }
     }
@@ -32,49 +54,50 @@ Item {
     function reset() {
         root.selectedIndex = 0
         root.showError = false
-    }
-
-    function activateSelected() {
-        switch (root.selectedIndex) {
-        case 0:
-            runLock()
-            break
-        case 1:
-            runReboot()
-            break
-        case 2:
-            runShutdown()
-            break
+        for (let i = 0; i < actionsRepeater.count; i++) {
+            const item = actionsRepeater.itemAt(i)
+            if (item) item.reset()
         }
     }
 
-    function runLock() {
+    function executeCommand(actionId) {
         if (root.stubActions) {
-            console.log("[PowerMenu:stub] would run: loginctl lock-session")
+            console.log("[PowerMenu:stub] would run: " + root.commandFor(actionId))
             root.closeRequested()
             return
         }
-        lockProc.exec(["loginctl", "lock-session"])
+        switch (actionId) {
+        case "lock":
+            lockProc.exec(["loginctl", "lock-session"])
+            break
+        case "hibernate":
+            Quickshell.execDetached(["systemctl", "hibernate"])
+            root.closeRequested()
+            break
+        case "logout":
+            Quickshell.execDetached(["bash", "-c", "loginctl terminate-user \"$USER\""])
+            root.closeRequested()
+            break
+        case "shutdown":
+            Quickshell.execDetached(["systemctl", "poweroff"])
+            root.closeRequested()
+            break
+        case "suspend":
+            Quickshell.execDetached(["systemctl", "suspend"])
+            root.closeRequested()
+            break
+        case "reboot":
+            Quickshell.execDetached(["systemctl", "reboot"])
+            root.closeRequested()
+            break
+        }
     }
 
-    function runReboot() {
-        if (root.stubActions) {
-            console.log("[PowerMenu:stub] would run: systemctl reboot")
-            root.closeRequested()
-            return
+    function commandFor(actionId) {
+        for (let i = 0; i < root.actions.length; i++) {
+            if (root.actions[i].id === actionId) return root.actions[i].command
         }
-        Quickshell.execDetached(["systemctl", "reboot"])
-        root.closeRequested()
-    }
-
-    function runShutdown() {
-        if (root.stubActions) {
-            console.log("[PowerMenu:stub] would run: systemctl poweroff")
-            root.closeRequested()
-            return
-        }
-        Quickshell.execDetached(["systemctl", "poweroff"])
-        root.closeRequested()
+        return ""
     }
 
     Process {
@@ -94,16 +117,16 @@ Item {
             horizontalCenter: parent.horizontalCenter
         }
 
-        anchors.topMargin: 20
+        anchors.topMargin: 10
 
-        text: "Power Menu"
+        text: "Hold to confirm"
         color: Theme.textMuted
-        font.pixelSize: 13
+        font.pixelSize: 11
         font.weight: Font.DemiBold
     }
 
-    Column {
-        id: menuCol
+    Row {
+        id: actionsRow
 
         anchors {
             top: menuTitle.bottom
@@ -111,147 +134,26 @@ Item {
             right: parent.right
         }
 
-        anchors.topMargin: 12
-        anchors.leftMargin: 16
-        anchors.rightMargin: 16
+        anchors.topMargin: 10
+        anchors.leftMargin: 24
+        anchors.rightMargin: 24
 
-        spacing: 8
+        spacing: 10
 
-        Rectangle {
-            id: lockRow
+        Repeater {
+            id: actionsRepeater
 
-            width: parent.width
-            height: 52
-            radius: 10
-            color: lockHover.hovered || root.selectedIndex === 0 ? Theme.surfaceHover : "transparent"
+            model: root.actions
 
-            IconImage {
-                id: lockIcon
+            delegate: PowerActionItem {
+                width: root.itemWidth
+                height: root.itemHeight
 
-                anchors {
-                    left: parent.left
-                    verticalCenter: parent.verticalCenter
-                }
+                actionId: modelData.id
+                label: modelData.label
+                selected: root.selectedIndex === index
 
-                anchors.leftMargin: 14
-
-                source: Quickshell.iconPath("system-lock-screen", "system-lock-screen")
-                asynchronous: true
-            }
-
-            Text {
-                anchors {
-                    left: lockIcon.right
-                    verticalCenter: parent.verticalCenter
-                }
-
-                anchors.leftMargin: 14
-
-                text: "Lock"
-                color: Theme.text
-                font.pixelSize: 14
-            }
-
-            HoverHandler {
-                id: lockHover
-
-                cursorShape: Qt.PointingHandCursor
-            }
-
-            TapHandler {
-                onTapped: root.runLock()
-            }
-        }
-
-        Rectangle {
-            id: rebootRow
-
-            width: parent.width
-            height: 52
-            radius: 10
-            color: rebootHover.hovered || root.selectedIndex === 1 ? Theme.surfaceHover : "transparent"
-
-            IconImage {
-                id: rebootIcon
-
-                anchors {
-                    left: parent.left
-                    verticalCenter: parent.verticalCenter
-                }
-
-                anchors.leftMargin: 14
-
-                source: Quickshell.iconPath("system-reboot", "view-refresh")
-                asynchronous: true
-            }
-
-            Text {
-                anchors {
-                    left: rebootIcon.right
-                    verticalCenter: parent.verticalCenter
-                }
-
-                anchors.leftMargin: 14
-
-                text: "Reboot"
-                color: Theme.text
-                font.pixelSize: 14
-            }
-
-            HoverHandler {
-                id: rebootHover
-
-                cursorShape: Qt.PointingHandCursor
-            }
-
-            TapHandler {
-                onTapped: root.runReboot()
-            }
-        }
-
-        Rectangle {
-            id: shutdownRow
-
-            width: parent.width
-            height: 52
-            radius: 10
-            color: shutdownHover.hovered || root.selectedIndex === 2 ? Theme.surfaceHover : "transparent"
-
-            IconImage {
-                id: shutdownIcon
-
-                anchors {
-                    left: parent.left
-                    verticalCenter: parent.verticalCenter
-                }
-
-                anchors.leftMargin: 14
-
-                source: Quickshell.iconPath("system-shutdown", "system-shutdown")
-                asynchronous: true
-            }
-
-            Text {
-                anchors {
-                    left: shutdownIcon.right
-                    verticalCenter: parent.verticalCenter
-                }
-
-                anchors.leftMargin: 14
-
-                text: "Shutdown"
-                color: Theme.text
-                font.pixelSize: 14
-            }
-
-            HoverHandler {
-                id: shutdownHover
-
-                cursorShape: Qt.PointingHandCursor
-            }
-
-            TapHandler {
-                onTapped: root.runShutdown()
+                onActionRequested: (id) => root.executeCommand(id)
             }
         }
     }
@@ -264,7 +166,7 @@ Item {
             horizontalCenter: parent.horizontalCenter
         }
 
-        anchors.bottomMargin: 16
+        anchors.bottomMargin: 5
 
         visible: root.showError
 
