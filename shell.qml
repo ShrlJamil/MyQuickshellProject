@@ -52,10 +52,6 @@ ShellRoot {
         id: launcherController
     }
 
-    CaptureService {
-        id: captureService
-    }
-
     QtObject {
         id: barState
 
@@ -167,11 +163,11 @@ ShellRoot {
     IpcHandler {
         target: "capture"
 
-        function open(): void { captureService.openBar() }
-        function region(): void { captureService.triggerCapture("region") }
-        function window(): void { captureService.triggerCapture("window") }
-        function screen(): void { captureService.triggerCapture("screen") }
-        function bar(): void { captureService.openBar() }
+        function open(): void { console.log("[IPC] capture open"); CaptureService.openBar() }
+        function region(): void { CaptureService.triggerCapture("region") }
+        function window(): void { CaptureService.triggerCapture("window") }
+        function screen(): void { CaptureService.triggerCapture("screen") }
+        function bar(): void { CaptureService.openBar() }
     }
 
     IpcHandler {
@@ -201,18 +197,16 @@ ShellRoot {
     }
 
     Variants {
-        model: Quickshell.screens.map(screen => ({ barState: barState, launcherController: launcherController, captureService: captureService, screen: screen }))
+        model: Quickshell.screens.map(screen => ({ barState: barState, launcherController: launcherController, screen: screen }))
 
         delegate: Bar {}
     }
 
     Variants {
-        model: Quickshell.screens.map(screen => ({ barState: barState, captureService: captureService, screen: screen }))
+        model: Quickshell.screens.map(screen => ({ barState: barState, screen: screen }))
 
         delegate: ControlCenter {}
     }
 
-    CapturePreview {
-        captureService: captureService
-    }
+    CapturePreview {}
 }

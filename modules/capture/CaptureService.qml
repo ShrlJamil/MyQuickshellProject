@@ -1,3 +1,5 @@
+pragma Singleton
+
 import QtQuick
 import Quickshell
 import Quickshell.Io
@@ -8,6 +10,9 @@ Item {
     property bool busy: false
     property bool barVisible: false
     property string pendingMode: ""
+
+    onBarVisibleChanged: console.log("[CaptureService] barVisible ->", root.barVisible)
+
     property string lastPath: ""
     property string lastTimestamp: ""
     property bool bannerVisible: false
@@ -15,13 +20,8 @@ Item {
 
     signal captured(string imagePath, string timestamp)
 
-    readonly property string _base: 'd="$HOME/Pictures/Screenshots"; mkdir -p "$d"; f="$d/Screenshot_$(date +%Y%m%d_%H%M%S).png"; '
-    readonly property string _regionScript: root._base + 'g=$(slurp) && [ -n "$g" ] && grim -g "$g" "$f" && wl-copy --type image/png < "$f" && echo "$f"'
-    readonly property string _windowScript: root._base + 'g=$(slurp -f "%x,%y %wx%h") && [ -n "$g" ] && grim -g "$g" "$f" && wl-copy --type image/png < "$f" && echo "$f"'
-    readonly property string _fullScript: root._base + 'grim "$f" && wl-copy --type image/png < "$f" && echo "$f"'
-
     function openBar() {
-        console.log("[CaptureService] Bar opened")
+        console.log("[CaptureService] openBar()")
         root.barVisible = true
     }
 
@@ -33,7 +33,7 @@ Item {
     function triggerCapture(mode) {
         console.log("[CaptureService] triggerCapture(", mode, ")")
         root.pendingMode = mode
-        root.barVisible = false
+        root.closeBar()
         executeTimer.restart()
     }
 
@@ -46,15 +46,23 @@ Item {
     }
 
     function _runCapture(mode) {
-        if (root.busy) return
-        console.log("[CaptureService] _runCapture() mode =", mode)
+        if (captureProc.running) {
+            console.log("[CaptureService] Terminating lingering capture process...")
+            captureProc.running = false
+        }
+
+        const envPrefix = 'export WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-wayland-1}; export XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}; '
+
+        let cmd = envPrefix + 'mkdir -p ~/Pictures/Screenshots && f=~/Pictures/Screenshots/Screenshot_$(date +%Y%m%d_%H%M%S).png && grim "$f" && wl-copy --type image/png < "$f" && echo "$f"'
+        if (mode === "region")
+            cmd = envPrefix + 'mkdir -p ~/Pictures/Screenshots && f=~/Pictures/Screenshots/Screenshot_$(date +%Y%m%d_%H%M%S).png && g=$(slurp) && [ -n "$g" ] && grim -g "$g" "$f" && wl-copy --type image/png < "$f" && echo "$f"'
+        else if (mode === "window")
+            cmd = envPrefix + 'mkdir -p ~/Pictures/Screenshots && f=~/Pictures/Screenshots/Screenshot_$(date +%Y%m%d_%H%M%S).png && g=$(slurp -f "%x,%y %wx%h") && [ -n "$g" ] && grim -g "$g" "$f" && wl-copy --type image/png < "$f" && echo "$f"'
+
+        console.log("[CaptureService] Launching command for mode:", mode)
+        console.log("[CaptureService] cmd:", cmd)
         root.busy = true
-
-        let script = root._fullScript
-        if (mode === "region") script = root._regionScript
-        else if (mode === "window") script = root._windowScript
-
-        captureProc.command = ["bash", "-c", script]
+        captureProc.command = ["sh", "-c", cmd]
         captureProc.running = true
     }
 
@@ -110,12 +118,16 @@ Item {
 
         onExited: (exitCode, exitStatus) => {
             root.busy = false
-            const p = captureProc.stdout.text.trim()
-            console.log("[CaptureService] process exited: code =", exitCode, "path =", JSON.stringify(p), "stderr =", JSON.stringify(captureProc.stderr.text.trim()))
 
-            if (exitCode === 0 && p !== "") {
-                root.lastPath = p
-                root.lastTimestamp = Qt.formatDateTime(new Date(), "yyyy-MM-dd hh:mm:ss")
+            console.log("[CaptureService] Process exited code:", exitCode, "status:", exitStatus)
+            console.log("[CaptureService] stdout:", captureProc.stdout.text.trim())
+            console.log("[CaptureService] stderr:", captureProc.stderr.text.trim())
+
+            const out = captureProc.stdout.text.trim()
+            if (exitCode === 0 && out !== "") {
+                console.log("[CaptureService] Capture successful:", out)
+                root.lastPath = out
+                root.lastTimestamp = Qt.formatDateTime(new Date(), "hh:mm A")
                 root.bannerVisible = true
                 root.captured(root.lastPath, root.lastTimestamp)
             }

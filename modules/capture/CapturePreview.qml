@@ -3,14 +3,13 @@ import Qt5Compat.GraphicalEffects
 import Quickshell
 import Quickshell.Widgets
 import Quickshell.Wayland
+import "."
 import "../../components"
 
 PanelWindow {
     id: root
 
-    required property var captureService
-
-    readonly property bool shown: root.captureService.bannerVisible
+    readonly property bool shown: CaptureService.bannerVisible
 
     visible: root.shown || banner.opacity > 0
 
@@ -59,7 +58,7 @@ PanelWindow {
         HoverHandler {
             id: bannerHover
 
-            onHoveredChanged: root.captureService.bannerHovered = bannerHover.hovered
+            onHoveredChanged: CaptureService.bannerHovered = bannerHover.hovered
         }
 
         MouseArea {
@@ -67,7 +66,7 @@ PanelWindow {
 
             cursorShape: Qt.PointingHandCursor
 
-            onClicked: root.captureService.copyPath()
+            onClicked: CaptureService.copyPath()
         }
 
         Rectangle {
@@ -88,7 +87,7 @@ PanelWindow {
 
                 anchors.fill: parent
 
-                source: root.captureService.lastPath !== "" ? "file://" + root.captureService.lastPath : ""
+                source: CaptureService.lastPath !== "" ? "file://" + CaptureService.lastPath : ""
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
                 cache: false
@@ -129,7 +128,7 @@ PanelWindow {
                 elide: Text.ElideMiddle
 
                 text: {
-                    const p = root.captureService.lastPath
+                    const p = CaptureService.lastPath
                     const i = p.lastIndexOf("/")
                     return i >= 0 ? p.substring(i + 1) : p
                 }
@@ -152,7 +151,7 @@ PanelWindow {
                 height: 30
                 cursorShape: Qt.PointingHandCursor
 
-                onClicked: root.captureService.openLast()
+                onClicked: CaptureService.openLast()
 
                 Rectangle {
                     anchors.fill: parent
@@ -181,7 +180,7 @@ PanelWindow {
                 height: 30
                 cursorShape: Qt.PointingHandCursor
 
-                onClicked: root.captureService.deleteLast()
+                onClicked: CaptureService.deleteLast()
 
                 Rectangle {
                     anchors.fill: parent

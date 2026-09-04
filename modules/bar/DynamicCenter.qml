@@ -8,7 +8,6 @@ Item {
     id: root
 
     property string activeSurface: "idle"
-    property var captureService: null
     signal closeRequested()
 
     anchors.horizontalCenter: parent.horizontalCenter
@@ -92,7 +91,6 @@ Item {
         CaptureBar {
             id: captureBarSurface
             anchors.horizontalCenter: parent.horizontalCenter
-            captureService: root.captureService
             visible: root.activeSurface === "capture" || (root.allocatedHeight > 0 && root._lastSurface === "capture")
         }
 

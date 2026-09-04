@@ -3,6 +3,7 @@ import Quickshell
 import Quickshell.Widgets
 import Quickshell.Hyprland
 import "../../components"
+import "../capture"
 
 PanelWindow {
     id: root
@@ -11,15 +12,19 @@ PanelWindow {
 
     readonly property var barState: modelData.barState
     readonly property var launcherController: modelData.launcherController
-    readonly property var captureService: modelData.captureService
 
     screen: modelData.screen
 
     visible: barState.barEnabled
 
     property bool centerOpen: barState.mode === "center" && barState.screen === root.screen
-    readonly property bool isCaptureActive: captureService ? captureService.barVisible : false
+    readonly property bool isCaptureActive: CaptureService.barVisible
+        && root.screen
+        && Hyprland.focusedMonitor
+        && root.screen.name === Hyprland.focusedMonitor.name
     property bool surfaceActive: (barState.screen === root.screen && (barState.mode === "power" || barState.mode === "display" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact")) || root.isCaptureActive
+
+    onIsCaptureActiveChanged: console.log("[Bar] isCaptureActive ->", root.isCaptureActive, "screen =", (root.screen ? root.screen.name : "null"))
 
     implicitHeight: 218
 
@@ -48,7 +53,7 @@ PanelWindow {
                 return
             barState.screen = null
             barState.mode = ""
-            if (root.captureService) root.captureService.closeBar()
+            CaptureService.closeBar()
         }
     }
 
@@ -212,7 +217,6 @@ PanelWindow {
         id: dynamicCenter
 
         anchors.horizontalCenter: parent.horizontalCenter
-        captureService: root.captureService
         activeSurface: barState.screen === root.screen && (barState.mode === "power" || barState.mode === "display" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact")
             ? barState.mode
             : root.isCaptureActive ? "capture" : "idle"
@@ -224,7 +228,7 @@ PanelWindow {
         onCloseRequested: {
             barState.screen = null
             barState.mode = ""
-            if (root.captureService) root.captureService.closeBar()
+            CaptureService.closeBar()
         }
     }
 }

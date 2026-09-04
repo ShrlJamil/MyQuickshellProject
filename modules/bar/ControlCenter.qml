@@ -7,6 +7,7 @@ import Quickshell.Widgets
 import Quickshell.Hyprland
 import Quickshell.Wayland
 import "../../components"
+import "../capture"
 
 PanelWindow {
     id: root
@@ -14,12 +15,12 @@ PanelWindow {
     required property var modelData
 
     readonly property var barState: modelData.barState
-    readonly property var captureService: modelData.captureService
 
     screen: modelData.screen
 
     property bool open: barState.mode === "center" && barState.screen === modelData.screen
     property bool closing: false
+    property bool pendingCaptureOpen: false
     property bool wifiPanelOpen: false
     property bool bluetoothPanelOpen: false
     property bool hotspotPanelOpen: false
@@ -69,6 +70,10 @@ PanelWindow {
         if (root.visible) {
             root.probeBarSurface()
             content.forceActiveFocus()
+        } else if (root.pendingCaptureOpen) {
+            root.pendingCaptureOpen = false
+            console.log("[ControlCenter] Fully unmapped, opening CaptureBar now")
+            CaptureService.openBar()
         }
     }
 
@@ -876,9 +881,10 @@ PanelWindow {
                     cursorShape: Qt.PointingHandCursor
 
                     onClicked: {
+                        console.log("[Tile Click] Capture tile pressed")
                         screenCaptureTile.pulse = true
                         capturePulseTimer.restart()
-                        if (root.captureService) root.captureService.openBar()
+                        root.pendingCaptureOpen = true
                         root.close()
                     }
                 }
