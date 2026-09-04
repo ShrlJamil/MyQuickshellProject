@@ -1,4 +1,5 @@
 import QtQuick
+import Qt5Compat.GraphicalEffects
 import Quickshell.Widgets
 import "../../components"
 
@@ -48,32 +49,72 @@ Item {
         root.progress = 0
     }
 
-    Rectangle {
+    Item {
         id: visual
 
         anchors.fill: parent
 
-        radius: 12
-        color: root.selected || hover.hovered || root.isHolding ? Theme.surfaceHover : "transparent"
+        Rectangle {
+            id: tileBase
+
+            anchors.fill: parent
+
+            radius: 12
+            clip: true
+            color: root.selected || hover.hovered || root.isHolding ? Theme.surfaceHover : "transparent"
+
+            Rectangle {
+                id: progressFill
+
+                anchors {
+                    left: parent.left
+                    top: parent.top
+                    bottom: parent.bottom
+                }
+
+                width: parent.width * root.progress
+                radius: parent.radius
+
+                visible: root.isHolding || root.progress > 0
+
+                color: Theme.accent
+                opacity: 0.35
+            }
+        }
 
         Column {
-            anchors.centerIn: parent
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.verticalCenter: parent.verticalCenter
 
-            width: parent.width - 8
-            spacing: 7
+            width: parent.width - 28
+            spacing: 20
 
             Item {
                 width: parent.width
-                height: 40
+                height: 44
 
-                IconImage {
+                Image {
+                    id: iconImage
+
                     anchors.centerIn: parent
 
-                    width: 38
-                    height: 38
+                    width: 26
+                    height: 26
 
                     source: root.iconSource
+                    sourceSize.width: 64
+                    sourceSize.height: 64
+                    fillMode: Image.PreserveAspectFit
                     asynchronous: true
+                    smooth: true
+                    visible: false
+                }
+
+                ColorOverlay {
+                    anchors.fill: iconImage
+
+                    source: iconImage
+                    color: "white"
                     visible: root.iconSource !== ""
                 }
             }
@@ -88,43 +129,6 @@ Item {
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
             }
-        }
-    }
-
-    Rectangle {
-        id: progressTrack
-
-        anchors {
-            left: parent.left
-            right: parent.right
-            bottom: parent.bottom
-        }
-
-        anchors {
-            leftMargin: 10
-            rightMargin: 10
-            bottomMargin: 12
-        }
-
-        visible: root.isHolding || root.progress > 0
-
-        height: 4
-        radius: 2
-        color: Theme.surface
-
-        Rectangle {
-            id: progressFill
-
-            anchors {
-                left: parent.left
-                top: parent.top
-                bottom: parent.bottom
-            }
-
-            width: progressTrack.width * root.progress
-
-            radius: 2
-            color: Theme.accent
         }
     }
 

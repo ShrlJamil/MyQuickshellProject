@@ -11,6 +11,7 @@ Item {
     property bool round: false
 
     readonly property real cornerRadius: root.round ? Math.min(root.width, root.height) / 2 : 22
+    readonly property real radius: root.cornerRadius
 
     readonly property real iconSlotSize: root.round ? Math.max(26, Math.round(Math.min(root.width, root.height) * 0.4)) : 34
     readonly property real iconSize: root.round ? Math.max(22, Math.round(Math.min(root.width, root.height) * 0.34)) : 30
@@ -22,9 +23,13 @@ Item {
         anchors.fill: parent
 
         radius: root.cornerRadius
-        border.color: root.active ? Theme.accent : "transparent"
-        border.width: 1
-        color: hover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+        border.width: 0
+        border.color: "transparent"
+        color: {
+            if (root.active)
+                return hover.hovered ? Qt.lighter(Theme.accent, 1.1) : Theme.accent
+            return hover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+        }
 
         HoverHandler {
             id: hover
@@ -32,42 +37,21 @@ Item {
             cursorShape: Qt.PointingHandCursor
         }
 
-        Column {
+        Item {
             anchors.centerIn: parent
 
-            width: parent.width - (root.round ? (root.labelPixelSize * 0.5) * 7 : 0)
+            width: root.iconSlotSize
+            height: root.iconSlotSize
 
-            spacing: root.round ? 5 : 6
+            IconImage {
+                anchors.centerIn: parent
 
-            Item {
-                anchors.horizontalCenter: parent.horizontalCenter
+                width: root.iconSize
+                height: root.iconSize
 
-                width: root.iconSlotSize
-                height: root.iconSlotSize
-
-                IconImage {
-                    anchors.centerIn: parent
-
-                    width: root.iconSize
-                    height: root.iconSize
-
-                    source: root.iconSource
-                    asynchronous: true
-                    visible: root.iconSource !== ""
-                }
-            }
-
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-
-                width: parent.width
-                horizontalAlignment: Text.AlignHCenter
-                elide: Text.ElideRight
-
-                text: root.label
-                color: Theme.text
-                font.pixelSize: root.labelPixelSize
-                font.weight: Font.DemiBold
+                source: root.iconSource
+                asynchronous: true
+                visible: root.iconSource !== ""
             }
         }
     }

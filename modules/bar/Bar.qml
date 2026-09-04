@@ -11,18 +11,17 @@ PanelWindow {
 
     readonly property var barState: modelData.barState
     readonly property var launcherController: modelData.launcherController
+    readonly property var captureService: modelData.captureService
 
     screen: modelData.screen
 
     visible: barState.barEnabled
 
-    property bool active: barState.mode === "power" && barState.screen === root.screen
     property bool centerOpen: barState.mode === "center" && barState.screen === root.screen
-    property real openHeight: 320
-    property real menuWidth: 640
-    property real menuHeight: 200
+    readonly property bool isCaptureActive: captureService ? captureService.barVisible : false
+    property bool surfaceActive: (barState.screen === root.screen && (barState.mode === "power" || barState.mode === "display" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact")) || root.isCaptureActive
 
-    implicitHeight: openHeight
+    implicitHeight: 218
 
     anchors {
         top: true
@@ -33,33 +32,23 @@ PanelWindow {
     color: "transparent"
 
     exclusiveZone: 40
-    focusable: active
+    focusable: root.surfaceActive
 
-    mask: menuMask
-
-    onActiveChanged: {
-        if (root.active) {
-            powerMenu.reset()
-            powerMenu.forceActiveFocus()
-        }
-    }
-
-    Region {
-        id: menuMask
-
-        item: menuBox
-        radius: 24
-    }
+    mask: root.surfaceActive ? null : idleMask
+    Region { id: idleMask; item: background }
 
     HyprlandFocusGrab {
         id: focusGrab
 
         windows: [root]
-        active: root.active
+        active: root.surfaceActive
 
         onCleared: {
+            if (!root.surfaceActive)
+                return
             barState.screen = null
             barState.mode = ""
+            if (root.captureService) root.captureService.closeBar()
         }
     }
 
@@ -67,333 +56,175 @@ PanelWindow {
         id: background
 
         width: parent.width
-        radius: 0
         height: 40
+
+        anchors.top: parent.top
+
+        color: Theme.background
+    }
+
+    Item {
+        id: barContent
 
         anchors {
             top: parent.top
-            horizontalCenter: parent.horizontalCenter
+            left: parent.left
+            right: parent.right
         }
 
-        color: Theme.background
-
-        states: [
-            State {
-                name: "idle"
-
-                when: !root.active
-
-                PropertyChanges {
-                    target: background
-                    width: background.parent.width
-                    height: 40
-                    radius: 0
-                }
-
-                PropertyChanges {
-                    target: menuBox
-                    opacity: 0
-                }
-
-                PropertyChanges {
-                    target: barContent
-                    opacity: 1
-                }
-            },
-            State {
-                name: "active"
-
-                when: root.active
-
-                PropertyChanges {
-                    target: background
-                    width: root.menuWidth
-                    height: root.menuHeight
-                    radius: 24
-                }
-
-                PropertyChanges {
-                    target: menuBox
-                    opacity: 1
-                }
-
-                PropertyChanges {
-                    target: barContent
-                    opacity: 0
-                }
-            }
-        ]
-
-        transitions: [
-            Transition {
-                from: "idle"
-                to: "active"
-
-                ParallelAnimation {
-                    SequentialAnimation {
-                        PauseAnimation { duration: 0 }
-
-                        NumberAnimation {
-                            target: background
-                            property: "width"
-                            duration: 260
-                            easing.type: Easing.OutCubic
-                        }
-                    }
-
-                    SequentialAnimation {
-                        PauseAnimation { duration: 140 }
-
-                        NumberAnimation {
-                            target: background
-                            property: "height"
-                            duration: 320
-                            easing.type: Easing.OutCubic
-                        }
-                    }
-
-                    SequentialAnimation {
-                        PauseAnimation { duration: 10 }
-
-                        NumberAnimation {
-                            target: background
-                            property: "radius"
-                            duration: 220
-                            easing.type: Easing.OutCubic
-                        }
-                    }
-
-                    SequentialAnimation {
-                        PauseAnimation { duration: 0 }
-
-                        NumberAnimation {
-                            target: barContent
-                            property: "opacity"
-                            duration: 190
-                            easing.type: Easing.OutQuad
-                        }
-                    }
-
-                    SequentialAnimation {
-                        PauseAnimation { duration: 160 }
-
-                        NumberAnimation {
-                            target: menuBox
-                            property: "opacity"
-                            duration: 220
-                            easing.type: Easing.OutQuad
-                        }
-                    }
-                }
-            },
-            Transition {
-                from: "active"
-                to: "idle"
-
-                ParallelAnimation {
-                    SequentialAnimation {
-                        PauseAnimation { duration: 0 }
-
-                        NumberAnimation {
-                            target: background
-                            property: "height"
-                            duration: 260
-                            easing.type: Easing.OutCubic
-                        }
-                    }
-
-                    SequentialAnimation {
-                        PauseAnimation { duration: 140 }
-
-                        NumberAnimation {
-                            target: background
-                            property: "width"
-                            duration: 320
-                            easing.type: Easing.OutCubic
-                        }
-                    }
-
-                    SequentialAnimation {
-                        PauseAnimation { duration: 20 }
-
-                        NumberAnimation {
-                            target: background
-                            property: "radius"
-                            duration: 220
-                            easing.type: Easing.OutCubic
-                        }
-                    }
-
-                    SequentialAnimation {
-                        PauseAnimation { duration: 0 }
-
-                        NumberAnimation {
-                            target: menuBox
-                            property: "opacity"
-                            duration: 190
-                            easing.type: Easing.OutQuad
-                        }
-                    }
-
-                    SequentialAnimation {
-                        PauseAnimation { duration: 140 }
-
-                        NumberAnimation {
-                            target: barContent
-                            property: "opacity"
-                            duration: 220
-                            easing.type: Easing.OutQuad
-                        }
-                    }
-                }
-            }
-        ]
+        height: 40
 
         Item {
-            id: menuBox
+            id: leftSlot
 
-            opacity: 0
+            anchors {
+                left: parent.left
+                verticalCenter: parent.verticalCenter
+            }
 
-            anchors.fill: parent
+            anchors.leftMargin: 8
 
-            PowerMenu {
-                id: powerMenu
+            width: 36
+            height: 36
+
+            Rectangle {
+                id: launcherButton
 
                 anchors.fill: parent
 
-                onCloseRequested: {
-                    barState.screen = null
-                    barState.mode = ""
+                radius: 10
+                color: launcherTap.pressed ? Theme.surfaceHover : (launcherHover.hovered ? Theme.surfaceHover : "transparent")
+
+                HoverHandler {
+                    id: launcherHover
+
+                    cursorShape: Qt.PointingHandCursor
+                }
+
+                TapHandler {
+                    id: launcherTap
+
+                    onTapped: root.launcherController.toggle()
+                }
+
+                IconImage {
+                    id: launcherIcon
+
+                    anchors.centerIn: parent
+
+                    source: Quickshell.iconPath("system-search", "application-x-executable")
+                    asynchronous: true
                 }
             }
         }
 
-        Item {
-            id: barContent
+        SystemClock {
+            id: clock
 
-            opacity: 1
+            precision: SystemClock.Minutes
+        }
+
+        Text {
+            id: holdLabel
+
+            anchors.centerIn: parent
+            visible: barState.screen === root.screen && (barState.mode === "power" || barState.mode === "display" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact")
+            text: barState.mode === "power" ? "Power Menu"
+                : barState.mode === "display" ? "Display"
+                : (barState.mode === "mediaPreview" || barState.mode === "mediaCompact") ? "Media"
+                : ""
+            color: Theme.textMuted
+            font.pixelSize: 11
+            font.weight: Font.DemiBold
+        }
+
+        Item {
+            id: rightSlot
 
             anchors {
-                top: parent.top
-                left: parent.left
                 right: parent.right
+                verticalCenter: parent.verticalCenter
             }
 
-            height: 40
+            anchors.rightMargin: 8
 
-            Item {
-                id: leftSlot
+            width: 36
+            height: 36
 
-                anchors {
-                    left: parent.left
-                    verticalCenter: parent.verticalCenter
+            Rectangle {
+                id: centerButton
+
+                anchors.fill: parent
+
+                radius: 10
+                color: root.centerOpen || centerTap.pressed ? Theme.surfaceHover : (centerHover.hovered ? Theme.surfaceHover : "transparent")
+
+                HoverHandler {
+                    id: centerHover
+
+                    cursorShape: Qt.PointingHandCursor
                 }
 
-                anchors.leftMargin: 8
+                TapHandler {
+                    id: centerTap
 
-                width: 36
-                height: 36
-
-                Rectangle {
-                    id: launcherButton
-
-                    anchors.fill: parent
-
-                    radius: 10
-                    color: launcherTap.pressed ? Theme.surfaceHover : (launcherHover.hovered ? Theme.surfaceHover : "transparent")
-
-                    HoverHandler {
-                        id: launcherHover
-
-                        cursorShape: Qt.PointingHandCursor
-                    }
-
-                    TapHandler {
-                        id: launcherTap
-
-                        onTapped: root.launcherController.toggle()
-                    }
-
-                    IconImage {
-                        id: launcherIcon
-
-                        anchors.centerIn: parent
-
-                        source: Quickshell.iconPath("system-search", "application-x-executable")
-                        asynchronous: true
-                    }
-                }
-            }
-
-            SystemClock {
-                id: clock
-
-                precision: SystemClock.Minutes
-            }
-
-            Text {
-                anchors.centerIn: parent
-
-                text: Qt.formatDateTime(clock.date, "hh:mm")
-                color: Theme.text
-                font.weight: Font.DemiBold
-                font.pixelSize: 14
-            }
-
-            Item {
-                id: rightSlot
-
-                anchors {
-                    right: parent.right
-                    verticalCenter: parent.verticalCenter
-                }
-
-                anchors.rightMargin: 8
-
-                width: 36
-                height: 36
-
-                Rectangle {
-                    id: centerButton
-
-                    anchors.fill: parent
-
-                    radius: 10
-                    color: root.centerOpen || centerTap.pressed ? Theme.surfaceHover : (centerHover.hovered ? Theme.surfaceHover : "transparent")
-
-                    HoverHandler {
-                        id: centerHover
-
-                        cursorShape: Qt.PointingHandCursor
-                    }
-
-                    TapHandler {
-                        id: centerTap
-
-                        onTapped: {
-                            if (root.centerOpen) {
-                                barState.screen = null
-                                barState.mode = ""
-                            } else {
-                                barState.screen = root.screen
-                                barState.mode = "center"
-                            }
+                    onTapped: {
+                        if (root.centerOpen) {
+                            barState.screen = null
+                            barState.mode = ""
+                        } else {
+                            barState.screen = root.screen
+                            barState.mode = "center"
                         }
                     }
+                }
 
-                    IconImage {
-                        id: centerIcon
+                IconImage {
+                    id: centerIcon
 
-                        anchors.centerIn: parent
+                    anchors.centerIn: parent
 
-                        width: 20
-                        height: 20
+                    width: 20
+                    height: 20
 
-                        source: "file://" + Quickshell.shellPath("assets/controls-symbolic.svg")
-                        asynchronous: true
-                    }
+                    source: "file://" + Quickshell.shellPath("assets/controls-symbolic.svg")
+                    asynchronous: true
                 }
             }
+        }
+
+        Text {
+            id: clockText
+
+            anchors {
+                verticalCenter: parent.verticalCenter
+                right: rightSlot.left
+            }
+            anchors.rightMargin: 12
+            text: Qt.formatDateTime(clock.date, "hh:mm")
+            color: Theme.text
+            font.weight: Font.DemiBold
+            font.pixelSize: 14
+        }
+    }
+
+    DynamicCenter {
+        id: dynamicCenter
+
+        anchors.horizontalCenter: parent.horizontalCenter
+        captureService: root.captureService
+        activeSurface: barState.screen === root.screen && (barState.mode === "power" || barState.mode === "display" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact")
+            ? barState.mode
+            : root.isCaptureActive ? "capture" : "idle"
+    }
+
+    Connections {
+        target: dynamicCenter
+
+        onCloseRequested: {
+            barState.screen = null
+            barState.mode = ""
+            if (root.captureService) root.captureService.closeBar()
         }
     }
 }

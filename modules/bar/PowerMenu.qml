@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Shapes
 import Quickshell
 import Quickshell.Io
 import Quickshell.Widgets
@@ -13,18 +14,20 @@ Item {
     property int holdDuration: 1000
 
     readonly property var actions: [
-        { id: "lock", label: "Lock", command: "loginctl lock-session" },
-        { id: "hibernate", label: "Hibernate", command: "systemctl hibernate" },
-        { id: "logout", label: "Logout", command: "loginctl terminate-user \"$USER\"" },
-        { id: "shutdown", label: "Shutdown", command: "systemctl poweroff" },
-        { id: "suspend", label: "Suspend", command: "systemctl suspend" },
-        { id: "reboot", label: "Reboot", command: "systemctl reboot" }
+        { id: "lock", label: "Lock", command: "loginctl lock-session", icon: "assets/lock-svgrepo-com.svg" },
+        { id: "hibernate", label: "Hibernate", command: "systemctl hibernate", icon: "assets/moon-sleep-svgrepo-com.svg" },
+        { id: "logout", label: "Logout", command: "loginctl terminate-user \"$USER\"", icon: "assets/logout-svgrepo-com.svg" },
+        { id: "shutdown", label: "Shutdown", command: "systemctl poweroff", icon: "assets/power-material-svgrepo-com.svg" },
+        { id: "suspend", label: "Suspend", command: "systemctl suspend", icon: "assets/moon-svgrepo-com.svg" },
+        { id: "reboot", label: "Reboot", command: "systemctl reboot", icon: "assets/system-reboot-svgrepo-com.svg" }
     ]
 
     readonly property int itemWidth: Math.floor((actionsRow.width - (root.actions.length - 1) * actionsRow.spacing) / root.actions.length)
-    readonly property int itemHeight: Math.max(88, Math.round(root.height - 44))
+    readonly property int itemHeight: 128
 
     readonly property var currentItem: actionsRepeater.itemAt(root.selectedIndex)
+
+    implicitHeight: actionsRow.y + actionsRow.height + 30 + (root.showError ? errorHint.height + 8 : 0)
 
     signal closeRequested()
 
@@ -109,32 +112,90 @@ Item {
         }
     }
 
-    Text {
-        id: menuTitle
+    Shape {
+        id: background
 
-        anchors {
-            top: parent.top
-            horizontalCenter: parent.horizontalCenter
+        anchors.fill: parent
+        antialiasing: true
+        asynchronous: false
+        vendorExtensionsEnabled: true
+        preferredRendererType: Shape.CurveRenderer
+
+        readonly property real notchSize: 18
+        readonly property real bottomRadius: 16
+
+        ShapePath {
+            fillColor: Theme.background
+            strokeColor: "transparent"
+            strokeWidth: 0
+
+            startX: 0
+            startY: 0
+
+            PathCubic {
+                control1X: background.notchSize * 0.5
+                control1Y: 0
+                control2X: background.notchSize
+                control2Y: background.notchSize * 0.5
+                x: background.notchSize
+                y: background.notchSize
+            }
+
+            PathLine {
+                x: background.notchSize
+                y: background.height - background.bottomRadius
+            }
+
+            PathQuad {
+                controlX: background.notchSize
+                controlY: background.height
+                x: background.notchSize + background.bottomRadius
+                y: background.height
+            }
+
+            PathLine {
+                x: background.width - background.notchSize - background.bottomRadius
+                y: background.height
+            }
+
+            PathQuad {
+                controlX: background.width - background.notchSize
+                controlY: background.height
+                x: background.width - background.notchSize
+                y: background.height - background.bottomRadius
+            }
+
+            PathLine {
+                x: background.width - background.notchSize
+                y: background.notchSize
+            }
+
+            PathCubic {
+                control1X: background.width - background.notchSize
+                control1Y: background.notchSize * 0.5
+                control2X: background.width - background.notchSize * 0.5
+                control2Y: 0
+                x: background.width
+                y: 0
+            }
+
+            PathLine {
+                x: 0
+                y: 0
+            }
         }
-
-        anchors.topMargin: 10
-
-        text: "Hold to confirm"
-        color: Theme.textMuted
-        font.pixelSize: 11
-        font.weight: Font.DemiBold
     }
 
     Row {
         id: actionsRow
 
         anchors {
-            top: menuTitle.bottom
+            top: parent.top
             left: parent.left
             right: parent.right
         }
 
-        anchors.topMargin: 10
+        anchors.topMargin: 20
         anchors.leftMargin: 24
         anchors.rightMargin: 24
 
@@ -151,6 +212,7 @@ Item {
 
                 actionId: modelData.id
                 label: modelData.label
+                iconSource: "file://" + Quickshell.shellPath(modelData.icon)
                 selected: root.selectedIndex === index
 
                 onActionRequested: (id) => root.executeCommand(id)
