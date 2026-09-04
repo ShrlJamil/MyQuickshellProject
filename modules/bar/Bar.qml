@@ -2,6 +2,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Widgets
 import Quickshell.Hyprland
+import Quickshell.Wayland
 import "../../components"
 import "../capture"
 
@@ -123,6 +124,72 @@ PanelWindow {
             }
         }
 
+        Row {
+            id: activeWindowRow
+
+            readonly property string rawAppId: ToplevelManager.activeToplevel?.appId ?? ""
+            readonly property string displayName: {
+                if (rawAppId.length === 0)
+                    return "Desktop"
+                let names = {
+                    "code": "VS Code",
+                    "code-url-handler": "VS Code",
+                    "code-oss": "VS Code",
+                    "ghostty": "Ghostty",
+                    "com.mitchellh.ghostty": "Ghostty",
+                    "org.gnome.Nautilus": "Files",
+                    "org.gnome.nautilus": "Files",
+                    "google-chrome": "Chrome",
+                    "chrome": "Chrome",
+                    "chromium": "Chrome",
+                    "firefox": "Firefox",
+                    "kitty": "Kitty"
+                }
+                if (names[rawAppId] !== undefined)
+                    return names[rawAppId]
+                let lower = rawAppId.toLowerCase()
+                if (names[lower] !== undefined)
+                    return names[lower]
+                let parts = rawAppId.split(".")
+                let name = parts[parts.length - 1]
+                return name.charAt(0).toUpperCase() + name.slice(1)
+            }
+
+            anchors {
+                left: leftSlot.right
+                verticalCenter: parent.verticalCenter
+            }
+
+            anchors.leftMargin: 8
+
+            spacing: activeWindowIcon.visible ? 6 : 0
+
+            IconImage {
+                id: activeWindowIcon
+
+                visible: activeWindowRow.rawAppId.length > 0
+                width: visible ? 16 : 0
+                height: 16
+                anchors.verticalCenter: parent.verticalCenter
+
+                source: Quickshell.iconPath(activeWindowRow.rawAppId, "computer")
+                asynchronous: true
+            }
+
+            Text {
+                id: activeWindowTitle
+
+                width: Math.min(implicitWidth, 180)
+                anchors.verticalCenter: parent.verticalCenter
+
+                text: activeWindowRow.displayName
+                elide: Text.ElideRight
+                maximumLineCount: 1
+                color: Theme.textDim
+                font.pixelSize: 12
+            }
+        }
+
         SystemClock {
             id: clock
 
@@ -216,6 +283,7 @@ PanelWindow {
     DynamicCenter {
         id: dynamicCenter
 
+        screen: root.screen
         anchors.horizontalCenter: parent.horizontalCenter
         activeSurface: barState.screen === root.screen && (barState.mode === "power" || barState.mode === "display" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact")
             ? barState.mode
