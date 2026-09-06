@@ -208,5 +208,23 @@ ShellRoot {
         delegate: ControlCenter {}
     }
 
+    Variants {
+        model: Quickshell.screens.map(screen => ({ screen: screen }))
+
+        delegate: NotificationCenter {}
+    }
+
+    Variants {
+        model: Quickshell.screens.map(screen => ({ screen: screen }))
+
+        delegate: NotificationPopup {}
+    }
+
+    Variants {
+        model: Quickshell.screens.map(screen => ({ screen: screen }))
+
+        delegate: CaptureOverlay {}
+    }
+
     CapturePreview {}
 }

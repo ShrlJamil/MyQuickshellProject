@@ -27,7 +27,9 @@ PanelWindow {
 
     onIsCaptureActiveChanged: console.log("[Bar] isCaptureActive ->", root.isCaptureActive, "screen =", (root.screen ? root.screen.name : "null"))
 
-    implicitHeight: 218
+    readonly property int fixedHeight: 540
+
+    implicitHeight: root.fixedHeight
 
     anchors {
         top: true
@@ -40,8 +42,13 @@ PanelWindow {
     exclusiveZone: 40
     focusable: root.surfaceActive
 
-    mask: root.surfaceActive ? null : idleMask
-    Region { id: idleMask; item: background }
+    mask: root.surfaceActive ? activeMask : idleMask
+    Region { id: idleMask; item: barContent }
+    Region {
+        id: activeMask
+        item: barContent
+        Region { item: dynamicCenter }
+    }
 
     HyprlandFocusGrab {
         id: focusGrab
@@ -59,26 +66,16 @@ PanelWindow {
     }
 
     Rectangle {
-        id: background
-
-        width: parent.width
-        height: 40
-
-        anchors.top: parent.top
-
-        color: Theme.background
-    }
-
-    Item {
         id: barContent
 
-        anchors {
-            top: parent.top
-            left: parent.left
-            right: parent.right
-        }
-
+        x: 0
+        y: 0
+        width: parent.width
         height: 40
+        clip: true
+        z: 999
+
+        color: Theme.background
 
         Item {
             id: leftSlot
@@ -190,12 +187,6 @@ PanelWindow {
             }
         }
 
-        SystemClock {
-            id: clock
-
-            precision: SystemClock.Minutes
-        }
-
         Text {
             id: holdLabel
 
@@ -265,18 +256,28 @@ PanelWindow {
             }
         }
 
-        Text {
-            id: clockText
+        DateTimeWidget {
+            id: dateTime
+
+            screen: root.screen
 
             anchors {
                 verticalCenter: parent.verticalCenter
                 right: rightSlot.left
             }
-            anchors.rightMargin: 12
-            text: Qt.formatDateTime(clock.date, "hh:mm")
-            color: Theme.text
-            font.weight: Font.DemiBold
-            font.pixelSize: 14
+            anchors.rightMargin: 8
+        }
+
+        BatteryWidget {
+            id: battery
+
+            screen: root.screen
+
+            anchors {
+                verticalCenter: parent.verticalCenter
+                right: dateTime.left
+            }
+            anchors.rightMargin: 2
         }
     }
 

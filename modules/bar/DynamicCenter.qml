@@ -5,6 +5,7 @@ import Quickshell.Hyprland
 import Quickshell.Widgets
 import "../../components"
 import "../capture"
+import "../display"
 
 Item {
     id: root
@@ -45,8 +46,10 @@ Item {
 
     readonly property int contentHeight: root.activeSurface === "capture"
         ? (captureBarSurface.implicitHeight > 0 ? captureBarSurface.implicitHeight : 64)
+        : root.activeSurface === "display"
+        ? (displaySurface.implicitHeight > 0 ? displaySurface.implicitHeight : 500)
         : powerMenuSurface.implicitHeight
-    readonly property int targetHeight: (root.activeSurface === "power" || root.activeSurface === "capture") ? contentHeight : root.workspaceVisible ? workspaceSurface.implicitHeight : 0
+    readonly property int targetHeight: (root.activeSurface === "power" || root.activeSurface === "capture" || root.activeSurface === "display") ? contentHeight : root.workspaceVisible ? workspaceSurface.implicitHeight : 0
     property int allocatedHeight: 0
 
     readonly property int gap: 0
@@ -92,6 +95,7 @@ Item {
 
         anchors.horizontalCenter: parent.horizontalCenter
         width: root.surfaceWidth
+        clip: true
         implicitHeight: powerMenuSurface.visible ? powerMenuSurface.implicitHeight
             : captureBarSurface.visible ? captureBarSurface.implicitHeight
             : displaySurface.visible ? displaySurface.implicitHeight
@@ -104,7 +108,11 @@ Item {
         states: [
             State {
                 name: "hidden"
-                PropertyChanges { target: surfaceWrapper; y: -80 }
+                PropertyChanges {
+                    target: surfaceWrapper
+                    y: (root.activeSurface === "display" || root._lastSurface === "display")
+                        ? -surfaceWrapper.height : -80
+                }
             },
             State {
                 name: "visible"
@@ -115,11 +123,11 @@ Item {
         transitions: [
             Transition {
                 to: "visible"
-                NumberAnimation { property: "y"; duration: 220; easing.type: Easing.OutCubic }
+                NumberAnimation { property: "y"; duration: root.activeSurface === "display" ? 300 : 220; easing.type: Easing.OutCubic }
             },
             Transition {
                 to: "hidden"
-                NumberAnimation { property: "y"; duration: 160; easing.type: Easing.InCubic }
+                NumberAnimation { property: "y"; duration: root._lastSurface === "display" ? 220 : 160; easing.type: Easing.InCubic }
             }
         ]
 
@@ -136,10 +144,10 @@ Item {
             visible: root.activeSurface === "capture" || (root.allocatedHeight > 0 && root._lastSurface === "capture")
         }
 
-        Item {
+        DisplayManager {
             id: displaySurface
             width: parent.width
-            visible: root.activeSurface === "display"
+            visible: root.activeSurface === "display" || (root.allocatedHeight > 0 && root._lastSurface === "display")
         }
 
         Item {
