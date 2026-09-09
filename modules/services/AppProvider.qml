@@ -173,7 +173,12 @@ Item {
     FileView {
         id: clipboardWatcher
 
-        path: root.clipboardDbPath
+        // Only bind the real path while clipboard mode is active. FileView reads
+        // the whole file at `path` into memory (data + UTF-16 text) on load, and
+        // the cliphist DB is tens of MB of binary (images). Keeping it unset at
+        // idle avoids ~170 MB RSS; the actual entries come from `cliphist list`,
+        // this FileView is only a change tripwire.
+        path: root.clipboardWatchActive ? root.clipboardDbPath : ""
         watchChanges: root.clipboardWatchActive
         blockWrites: true
         printErrors: false

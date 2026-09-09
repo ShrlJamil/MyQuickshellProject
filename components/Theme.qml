@@ -16,7 +16,16 @@ Item {
     property color textMuted: "#888888"
     property color accent: "#89b4fa"
 
-    readonly property string palettePath: Quickshell.configPath("palette.json")
+    // UI text typeface (`font.family: Theme.fontFamily` on Text elements).
+    // "Google Sans Flex" is the variable-font build of Google Sans installed on
+    // this system; plain "Google Sans" is not a registered family and would
+    // silently fall back to Noto Sans. NEVER apply this to icon glyphs
+    // (Nerd Font / symbol strings) - those keep their own family.
+    readonly property string fontFamily: "Google Sans Flex"
+
+    readonly property real cornerRadius: 22
+
+    readonly property string palettePath: Quickshell.shellPath("palette.json")
 
     FileView {
         id: paletteFile
