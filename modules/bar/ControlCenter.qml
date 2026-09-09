@@ -6,8 +6,11 @@ import Quickshell.Io
 import Quickshell.Widgets
 import Quickshell.Hyprland
 import Quickshell.Wayland
+import Quickshell.Bluetooth
 import "../../components"
 import "../capture"
+import "../display"
+import "../services"
 
 PanelWindow {
     id: root
@@ -21,6 +24,7 @@ PanelWindow {
     property bool open: barState.mode === "center" && barState.screen === modelData.screen
     property bool closing: false
     property bool pendingCaptureOpen: false
+    property bool pendingColorPick: false
     property bool wifiPanelOpen: false
     property bool bluetoothPanelOpen: false
     property bool hotspotPanelOpen: false
@@ -39,7 +43,12 @@ PanelWindow {
 
     readonly property real barStripHeight: 40
     readonly property real barGap: 8
-    property int topMargin: 48
+    readonly property int barTopMarginDefault: 48
+    // Largest amount the async bar probe is allowed to move the panel away from
+    // the default before its result is treated as garbage (stale/incomplete
+    // hyprctl JSON) and discarded.
+    readonly property int barTopMarginMaxDelta: 120
+    property int topMargin: root.barTopMarginDefault
     property int barSurfaceTop: 0
 
     margins {
@@ -69,11 +78,19 @@ PanelWindow {
     onVisibleChanged: {
         if (root.visible) {
             root.probeBarSurface()
+            // Refresh the monitor model so the Mirror Screen tile shows the real
+            // current state (one-shot, same call DisplayManager makes on open).
+            DisplayService.syncFromHyprland()
             content.forceActiveFocus()
         } else if (root.pendingCaptureOpen) {
             root.pendingCaptureOpen = false
             console.log("[ControlCenter] Fully unmapped, opening CaptureBar now")
             CaptureService.openBar()
+        } else if (root.pendingColorPick) {
+            root.pendingColorPick = false
+            // Spawn only once the panel is fully unmapped so hyprpicker's
+            // overlay/grab doesn't fight the closing Control Center surface.
+            hyprpickerProc.running = true
         }
     }
 
@@ -84,10 +101,18 @@ PanelWindow {
     }
 
     function updateBarSurface() {
+        // The panel Y is `screen.y + topMargin`; topMargin is written ONLY here.
+        // This runs off an async `hyprctl -j layers` process, so a stale or
+        // incomplete result must never fling the window off-screen - any
+        // implausible value falls back to the fixed default.
+        const def = root.barTopMarginDefault
         try {
             const layers = JSON.parse(barProbe.stdout.text)
             const mon = layers[root.screen.name]
-            if (mon == null || mon.levels == null) return
+            if (mon == null || mon.levels == null) {
+                root.topMargin = def
+                return
+            }
 
             root.barSurfaceTop = 0
 
@@ -103,12 +128,19 @@ PanelWindow {
                 }
             }
 
+            // Only shift when the bar's own strip surface was actually located,
+            // and only by a small sane amount; otherwise keep the default.
             if (root.barSurfaceTop > 0) {
                 const target = root.barSurfaceTop + root.barStripHeight + root.barGap
                 const screenY = root.screen.y ? root.screen.y : 0
-                root.topMargin = Math.max(8, target - screenY)
+                const candidate = Math.max(8, target - screenY)
+                root.topMargin = (Math.abs(candidate - def) <= root.barTopMarginMaxDelta) ? candidate : def
+            } else {
+                root.topMargin = def
             }
-        } catch (e) {}
+        } catch (e) {
+            root.topMargin = def
+        }
     }
 
     Process {
@@ -121,6 +153,25 @@ PanelWindow {
         }
 
         onExited: root.updateBarSurface()
+    }
+
+    // Color picker: hyprpicker copies the HEX to the clipboard (-a), then a
+    // toast on success. A non-zero exit (Esc / cancel) fires no notification.
+    Process {
+        id: hyprpickerProc
+
+        command: ["hyprpicker", "-a", "-f", "hex"]
+
+        onExited: (exitCode) => {
+            if (exitCode === 0)
+                pickNotifyProc.running = true
+        }
+    }
+
+    Process {
+        id: pickNotifyProc
+
+        command: ["notify-send", "Color Picker", "Color code copied to clipboard"]
     }
 
     function close() {
@@ -160,7 +211,8 @@ PanelWindow {
     Timer {
         id: hideTimer
 
-        interval: 210
+        // Keep the window mapped just past the ~110ms scale-fade close.
+        interval: 140
         onTriggered: root.closing = false
     }
 
@@ -206,12 +258,16 @@ PanelWindow {
 
         anchors.fill: parent
 
+        // Fast scale-fade from the bar trigger's corner (top-right, matching the
+        // panel anchor) + a tiny -8px drift. No full-height slide.
         opacity: 0
+        scale: 0.92
+        transformOrigin: Item.TopRight
 
         transform: Translate {
             id: drift
 
-            y: -(root.implicitHeight)
+            y: -8
         }
 
         states: [
@@ -223,6 +279,7 @@ PanelWindow {
                 PropertyChanges {
                     target: content
                     opacity: 1
+                    scale: 1
                 }
 
                 PropertyChanges {
@@ -241,14 +298,21 @@ PanelWindow {
                     NumberAnimation {
                         target: content
                         property: "opacity"
-                        duration: 180
+                        duration: 150
+                        easing.type: Easing.OutQuad
+                    }
+
+                    NumberAnimation {
+                        target: content
+                        property: "scale"
+                        duration: 160
                         easing.type: Easing.OutCubic
                     }
 
                     NumberAnimation {
                         target: drift
                         property: "y"
-                        duration: 230
+                        duration: 160
                         easing.type: Easing.OutCubic
                     }
                 }
@@ -262,15 +326,22 @@ PanelWindow {
                     NumberAnimation {
                         target: content
                         property: "opacity"
-                        duration: 140
-                        easing.type: Easing.OutCubic
+                        duration: 100
+                        easing.type: Easing.InQuad
+                    }
+
+                    NumberAnimation {
+                        target: content
+                        property: "scale"
+                        duration: 110
+                        easing.type: Easing.InCubic
                     }
 
                     NumberAnimation {
                         target: drift
                         property: "y"
-                        duration: 170
-                        easing.type: Easing.OutCubic
+                        duration: 110
+                        easing.type: Easing.InCubic
                     }
                 }
             }
@@ -307,10 +378,14 @@ PanelWindow {
                 Rectangle {
                     id: wifiTile
 
+                    readonly property bool wifiOn: wifiService.enabled
+
                     width: parent.width
                     height: root.wifiHeight
 
-                    radius: 22
+                    // Full pill. The outer capsule ALWAYS stays dark - only the
+                    // inner wifiActiveCircle reflects the on/off state.
+                    radius: height / 2
                     color: wifiHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
 
                     HoverHandler {
@@ -326,42 +401,60 @@ PanelWindow {
                             verticalCenter: parent.verticalCenter
                         }
 
-                        anchors.leftMargin: 14
-                        anchors.rightMargin: 14
+                        // Inner padding: clear the full-pill (radius 50) arc.
+                        // Left is +4 over the right so the 46px circle's left
+                        // gap optically matches its top/bottom arc margin.
+                        anchors.leftMargin: 22
+                        anchors.rightMargin: 26
 
-                        spacing: 12
+                        spacing: 25
 
                         Item {
-                            width: 36
-                            height: 36
+                            // Slot matches the enlarged circle so the Row lays
+                            // the status column out to its right. Sits flush at
+                            // the Row's left (leftMargin 26), i.e. centered in
+                            // the capsule's left arc.
+                            width: 64
+                            height: 64
 
                             Rectangle {
                                 id: wifiActiveCircle
 
                                 anchors.centerIn: parent
 
-                                width: 44
-                                height: 44
+                                width: 64
+                                height: 64
                                 radius: width / 2
-                                color: Theme.accent
-                                visible: wifiService.enabled
+                                // ON -> solid white, OFF -> subtle dark surface.
+                                color: wifiTile.wifiOn ? Theme.text : Theme.surfaceHover
                             }
 
                             IconImage {
+                                id: wifiIcon
+
                                 anchors.centerIn: parent
 
-                                width: 36
-                                height: 36
+                                width: 46
+                                height: 46
 
                                 source: Quickshell.iconPath("network-wireless-symbolic", "network-wireless")
                                 asynchronous: true
                             }
 
+                            // network-wireless-symbolic is a monochrome glyph;
+                            // overlay it so it reads as accent on the white ON
+                            // circle and as Theme.text when OFF.
+                            ColorOverlay {
+                                anchors.fill: wifiIcon
+                                source: wifiIcon
+                                color: wifiTile.wifiOn ? Theme.accent : Theme.text
+                            }
+
                             MouseArea {
                                 anchors.centerIn: parent
 
-                                width: 44
-                                height: 44
+                                width: 60
+                                height: 60
                                 cursorShape: Qt.PointingHandCursor
 
                                 onClicked: wifiService.toggle()
@@ -371,7 +464,7 @@ PanelWindow {
                         Column {
                             anchors.verticalCenter: parent.verticalCenter
 
-                            width: parent.parent.width - 36 - 12 - 60
+                            width: parent.parent.width - 64 - 12
 
                             spacing: 2
 
@@ -381,6 +474,7 @@ PanelWindow {
 
                                 text: "Wi-Fi"
                                 color: Theme.text
+                                font.family: Theme.fontFamily
                                 font.pixelSize: 14
                                 font.weight: Font.DemiBold
                             }
@@ -396,24 +490,10 @@ PanelWindow {
                                 }
 
                                 color: Theme.textMuted
+                                font.family: Theme.fontFamily
                                 font.pixelSize: 11
                             }
                         }
-                    }
-
-                    IconImage {
-                        anchors {
-                            right: parent.right
-                            verticalCenter: parent.verticalCenter
-                        }
-
-                        anchors.rightMargin: 8
-
-                        width: 16
-                        height: 16
-
-                        source: Quickshell.iconPath("go-next-symbolic", "go-next")
-                        asynchronous: true
                     }
 
                     MouseArea {
@@ -424,7 +504,10 @@ PanelWindow {
                             bottom: parent.bottom
                         }
 
-                        anchors.leftMargin: 62
+                        // Clear the enlarged 64px toggle circle (Row leftMargin
+                        // 26 + 64) so tapping the circle toggles Wi-Fi rather
+                        // than opening the panel.
+                        anchors.leftMargin: 90
                         anchors.rightMargin: 14
 
                         cursorShape: Qt.PointingHandCursor
@@ -447,7 +530,7 @@ PanelWindow {
                         round: true
                         active: bluetoothService.enabled
                         label: "Bluetooth"
-                        iconSource: Quickshell.iconPath("bluetooth-active-symbolic", "bluetooth")
+                        iconSource: "file://" + Quickshell.shellPath("assets/bluetooth-svgrepo-com.svg")
 
                         MouseArea {
                             anchors.fill: parent
@@ -467,7 +550,7 @@ PanelWindow {
                         round: true
                         active: hotspotService.enabled
                         label: "Mobile"
-                        iconSource: Quickshell.iconPath("network-wireless-hotspot", "network-wireless")
+                        iconSource: "file://" + Quickshell.shellPath("assets/wifi-tethering.svg")
 
                         MouseArea {
                             anchors.fill: parent
@@ -480,11 +563,79 @@ PanelWindow {
                 }
 
                 ControlTile {
+                    id: focusTile
+
                     width: root.colWidth
                     height: root.focusHeight
 
+                    // Full pill, matching the Wi-Fi tile.
+                    radiusOverride: height / 2
+
+                    // "Focus" == Do Not Disturb: suppresses notification toasts
+                    // (history still recorded). Bound straight to
+                    // NotificationService.doNotDisturb. Icon + label are drawn by
+                    // the Row below; ControlTile just supplies the tile
+                    // background, active fill and hover state.
                     label: "Focus"
-                    iconSource: Quickshell.iconPath("moon-symbolic", "weather-clear-night")
+                    active: NotificationService.doNotDisturb
+
+                    Row {
+                        anchors.centerIn: parent
+                        spacing: 8
+
+                        Item {
+                            width: 20
+                            height: 20
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            Image {
+                                id: focusIconImg
+
+                                anchors.fill: parent
+                                sourceSize.width: 40
+                                sourceSize.height: 40
+                                fillMode: Image.PreserveAspectFit
+                                asynchronous: true
+                                smooth: true
+                                mipmap: true
+                                visible: false
+
+                                source: "file://" + Quickshell.shellPath("assets/bell-off-svgrepo-com.svg")
+                            }
+
+                            ColorOverlay {
+                                anchors.fill: focusIconImg
+                                source: focusIconImg
+                                color: focusTile.active ? Theme.accent : Theme.text
+
+                                Behavior on color {
+                                    ColorAnimation { duration: 120; easing.type: Easing.OutCubic }
+                                }
+                            }
+                        }
+
+                        Text {
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            text: "Focus"
+                            color: focusTile.active ? Theme.accent : Theme.text
+                            font.family: Theme.fontFamily
+                            font.weight: Font.Bold
+                            font.pixelSize: 13
+
+                            Behavior on color {
+                                ColorAnimation { duration: 120; easing.type: Easing.OutCubic }
+                            }
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: NotificationService.toggleDnd()
+                    }
                 }
             }
 
@@ -501,7 +652,8 @@ PanelWindow {
                     width: parent.width
                     height: root.mediaHeight
 
-                radius: 22
+                // Elevated (softer, still rectangular - not a pill).
+                radius: 29
                 color: mediaHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
 
                 HoverHandler {
@@ -584,6 +736,7 @@ PanelWindow {
 
                         text: mprisService.trackTitle !== "" ? mprisService.trackTitle : "Nothing playing"
                         color: Theme.text
+                        font.family: Theme.fontFamily
                         font.pixelSize: 14
                         font.weight: Font.DemiBold
                     }
@@ -595,6 +748,7 @@ PanelWindow {
                         visible: mprisService.trackArtist !== ""
                         text: mprisService.trackArtist
                         color: Theme.textMuted
+                        font.family: Theme.fontFamily
                         font.pixelSize: 11
                     }
                 }
@@ -689,22 +843,52 @@ PanelWindow {
 
                 spacing: root.circleGap
 
+                // Caffeine - paired with Mirror Screen in the round-tiles row.
+                // Native Wayland idle-inhibit lives on the Bar; this tile is
+                // just the toggle. See CaffeineService.qml.
                 ControlTile {
+                    id: caffeineTile
+
                     width: root.circleSize
                     height: root.circleSize
 
                     round: true
-                    label: "Workspaces"
-                    iconSource: Quickshell.iconPath("view-app-grid-symbolic", "view-grid-symbolic")
+                    label: "Caffeine"
+                    active: CaffeineService.enabled
+                    iconSource: "file://" + Quickshell.shellPath("assets/coffee-svgrepo-com.svg")
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: CaffeineService.toggle()
+                    }
                 }
 
                 ControlTile {
+                    id: mirrorTile
+
                     width: root.circleSize
                     height: root.circleSize
 
                     round: true
-                    label: "Display"
-                    iconSource: Quickshell.iconPath("video-display-symbolic", "video-display")
+                    // Instant Extend <-> Mirror toggle - reuses DisplayService's
+                    // applyPreset + applyLive (live + persist). Does NOT open the
+                    // Display Manager. Active style follows the real mirror state.
+                    label: "Mirror Screen"
+                    active: DisplayService.mirrorActive
+                    iconSource: "file://" + Quickshell.shellPath("assets/display-mode.svg")
+                    opacity: DisplayService.canMirror ? 1 : 0.4
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        enabled: DisplayService.canMirror
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: DisplayService.toggleMirror()
+                    }
                 }
             }
         }
@@ -723,7 +907,8 @@ PanelWindow {
 
             height: root.sliderHeight
 
-            radius: 22
+            // Full pill.
+            radius: height / 2
             color: displayHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
 
             HoverHandler {
@@ -740,11 +925,14 @@ PanelWindow {
                     top: parent.top
                 }
 
-                anchors.leftMargin: 20
+                // Larger than the slider's 28px edgeInset below: this label sits
+                // near the top of the pill where the radius-50 arc cuts in.
+                anchors.leftMargin: 36
                 anchors.topMargin: 16
 
                 text: "Brightness"
                 color: Theme.text
+                font.family: Theme.fontFamily
                 font.pixelSize: 14
                 font.weight: Font.DemiBold
             }
@@ -757,12 +945,20 @@ PanelWindow {
                     bottom: parent.bottom
                 }
 
-                anchors.leftMargin: 20
-                anchors.rightMargin: 20
+                // Horizontal inset is owned by ControlSlider.edgeInset (16px)
+                // so track / icon / value all align with the title above.
+                anchors.leftMargin: 0
+                anchors.rightMargin: 0
                 anchors.topMargin: 8
                 anchors.bottomMargin: 12
 
-                iconSource: Quickshell.iconPath("display-brightness-symbolic", "video-display")
+                iconSource: {
+                    if (brightnessService.brightness < 34)
+                        return "file://" + Quickshell.shellPath("assets/brightness/brightness-low-svgrepo-com.svg")
+                    if (brightnessService.brightness < 67)
+                        return "file://" + Quickshell.shellPath("assets/brightness/brightness-medium-svgrepo-com.svg")
+                    return "file://" + Quickshell.shellPath("assets/brightness/brightness-high-svgrepo-com.svg")
+                }
                 from: 0
                 to: 100
                 value: brightnessService.brightness
@@ -785,7 +981,8 @@ PanelWindow {
 
             height: root.sliderHeight
 
-            radius: 22
+            // Full pill.
+            radius: height / 2
             color: soundHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
 
             HoverHandler {
@@ -802,11 +999,14 @@ PanelWindow {
                     top: parent.top
                 }
 
-                anchors.leftMargin: 20
+                // Larger than the slider's 28px edgeInset below: this label sits
+                // near the top of the pill where the radius-50 arc cuts in.
+                anchors.leftMargin: 36
                 anchors.topMargin: 16
 
                 text: "Volume"
                 color: Theme.text
+                font.family: Theme.fontFamily
                 font.pixelSize: 14
                 font.weight: Font.DemiBold
             }
@@ -819,20 +1019,24 @@ PanelWindow {
                     bottom: parent.bottom
                 }
 
-                anchors.leftMargin: 20
-                anchors.rightMargin: 20
+                // Horizontal inset is owned by ControlSlider.edgeInset (16px)
+                // so track / icon / value all align with the title above.
+                anchors.leftMargin: 0
+                anchors.rightMargin: 0
                 anchors.topMargin: 8
                 anchors.bottomMargin: 12
 
                 iconSource: {
                     if (audioService.muted || audioService.volume === 0)
-                        return Quickshell.iconPath("audio-volume-muted-symbolic", "audio-volume-muted")
+                        return "file://" + Quickshell.shellPath("assets/volume/volume-off-svgrepo-com.svg")
                     if (audioService.volume < 34)
-                        return Quickshell.iconPath("audio-volume-low-symbolic", "audio-volume-low")
+                        return "file://" + Quickshell.shellPath("assets/volume/volume-low-svgrepo-com.svg")
                     if (audioService.volume < 67)
-                        return Quickshell.iconPath("audio-volume-medium-symbolic", "audio-volume-medium")
-                    return Quickshell.iconPath("audio-volume-high-symbolic", "audio-volume-high")
+                        return "file://" + Quickshell.shellPath("assets/volume/volume-medium-svgrepo-com.svg")
+                    return "file://" + Quickshell.shellPath("assets/volume/volume-high-svgrepo-com.svg")
                 }
+                // dim the glyph when muted / silent, matching the OSD
+                iconColor: (audioService.muted || audioService.volume === 0) ? Theme.textMuted : Theme.text
                 from: 0
                 to: 100
                 value: audioService.volume
@@ -866,7 +1070,7 @@ PanelWindow {
                 round: true
                 active: screenCaptureTile.pulse
                 label: "Capture"
-                iconSource: Quickshell.iconPath("camera-photo-symbolic", "camera-photo")
+                iconSource: "file://" + Quickshell.shellPath("assets/capture.svg")
 
                 Timer {
                     id: capturePulseTimer
@@ -899,7 +1103,9 @@ PanelWindow {
                 round: true
                 active: nightLightService.active
                 label: "Night Light"
-                iconSource: Quickshell.iconPath("night-light-symbolic", "weather-clear-night")
+                // Local solid-fill SVG so it uses the same ColorOverlay/tint
+                // path (and active inversion) as Mic / Output.
+                iconSource: "file://" + Quickshell.shellPath("assets/moon-svgrepo-com.svg")
 
                 MouseArea {
                     anchors.fill: parent
@@ -911,22 +1117,25 @@ PanelWindow {
             }
 
             ControlTile {
-                id: micMuteTile
+                id: colorPickerTile
 
                 width: root.circleSize
                 height: root.circleSize
 
                 round: true
-                active: audioService.micMuted
-                label: "Mic"
-                iconSource: Quickshell.iconPath("microphone-sensitivity-muted-symbolic", "microphone-sensitivity-muted")
+                active: hyprpickerProc.running
+                label: "Color Picker"
+                iconSource: "file://" + Quickshell.shellPath("assets/picker-svgrepo-com.svg")
 
                 MouseArea {
                     anchors.fill: parent
 
                     cursorShape: Qt.PointingHandCursor
 
-                    onClicked: audioService.toggleMicMute()
+                    onClicked: {
+                        root.pendingColorPick = true
+                        root.close()
+                    }
                 }
             }
 
@@ -939,7 +1148,7 @@ PanelWindow {
                 round: true
                 active: root.audioOutputPanelOpen
                 label: "Output"
-                iconSource: Quickshell.iconPath("audio-speakers-symbolic", "audio-speakers")
+                iconSource: "file://" + Quickshell.shellPath("assets/media-output.svg")
 
                 MouseArea {
                     anchors.fill: parent
@@ -974,10 +1183,16 @@ PanelWindow {
         enabled: root.wifiPanelOpen
         visible: wifiPanel.opacity > 0
 
+        // Freeze the position tween while the sub-panel is open: x/y are pinned
+        // to 0 then, and leaving the Behavior live lets a transient bad
+        // originPos (mapToItem re-evaluated every drift frame) animate the panel
+        // off toward a wrong coordinate. Size/opacity still animate the reveal.
         Behavior on x {
+            enabled: !root.wifiPanelOpen
             NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
         }
         Behavior on y {
+            enabled: !root.wifiPanelOpen
             NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
         }
         Behavior on width {
@@ -1112,6 +1327,7 @@ PanelWindow {
 
                     text: "Wi-Fi"
                     color: Theme.text
+                    font.family: Theme.fontFamily
                     font.pixelSize: 16
                     font.weight: Font.DemiBold
                 }
@@ -1179,6 +1395,7 @@ PanelWindow {
                     return "No networks found"
                 }
                 color: Theme.textMuted
+                font.family: Theme.fontFamily
                 font.pixelSize: 12
                 visible: wifiService.viewNetworks.length === 0
             }
@@ -1284,6 +1501,7 @@ PanelWindow {
 
                                     text: row.net ? row.net.name : ""
                                     color: Theme.text
+                                    font.family: Theme.fontFamily
                                     font.pixelSize: 13
                                     font.weight: row.net && row.net.connected ? Font.DemiBold : Font.Normal
                                 }
@@ -1294,6 +1512,7 @@ PanelWindow {
 
                                     text: root.wifiStatusText(row.net)
                                     color: Theme.textMuted
+                                    font.family: Theme.fontFamily
                                     font.pixelSize: 11
                                 }
                             }
@@ -1419,6 +1638,7 @@ PanelWindow {
                                     placeholderText: "Password"
                                     placeholderTextColor: Theme.textMuted
                                     color: Theme.text
+                                    font.family: Theme.fontFamily
                                     font.pixelSize: 12
 
                                     selectByMouse: true
@@ -1461,6 +1681,7 @@ PanelWindow {
                                         return ""
                                     }
                                     color: wifiService.failedNetwork === row.ssid && !(row.net && row.net.connecting) ? Theme.accent : Theme.textMuted
+                                    font.family: Theme.fontFamily
                                     font.pixelSize: 11
                                 }
 
@@ -1472,6 +1693,7 @@ PanelWindow {
 
                                     text: "Cancel"
                                     color: cancelHover.hovered ? Theme.text : Theme.textMuted
+                                    font.family: Theme.fontFamily
                                     font.pixelSize: 12
 
                                     HoverHandler {
@@ -1503,6 +1725,7 @@ PanelWindow {
 
                                     text: "Connect"
                                     color: connectAction.ready ? Theme.accent : Theme.textMuted
+                                    font.family: Theme.fontFamily
                                     font.pixelSize: 12
                                     font.weight: Font.DemiBold
 
@@ -1564,6 +1787,7 @@ PanelWindow {
 
                         text: "Add Hidden Network…"
                         color: Theme.text
+                        font.family: Theme.fontFamily
                         font.pixelSize: 12
                     }
                 }
@@ -1593,6 +1817,16 @@ PanelWindow {
             onClicked: wifiPanel.menuSsid = ""
         }
 
+        RectangularGlow {
+            visible: menuPopup.visible
+            anchors.fill: menuPopup
+            z: menuPopup.z
+            glowRadius: 16
+            spread: 0.35
+            color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.32)
+            cornerRadius: menuPopup.radius + glowRadius
+        }
+
         Rectangle {
             id: menuPopup
 
@@ -1607,10 +1841,12 @@ PanelWindow {
             width: 184
             height: menuPopupColumn.height + 12
 
-            radius: 12
-            color: Qt.lighter(Theme.background, 1.3)
+            // Separation from the dark list comes from the crisp accent hairline
+            // plus the outer RectangularGlow behind it; fill stays Theme.background.
+            radius: 10
+            color: Theme.background
             border.width: 1
-            border.color: Qt.lighter(Theme.background, 1.6)
+            border.color: Theme.accent
 
             Column {
                 id: menuPopupColumn
@@ -1625,8 +1861,9 @@ PanelWindow {
                 Rectangle {
                     width: parent.width
                     height: 34
-                    radius: 8
+                    radius: 6
                     color: popupDisconnectHover.hovered ? Qt.lighter(Theme.background, 1.5) : "transparent"
+                    Behavior on color { ColorAnimation { duration: 100 } }
 
                     HoverHandler {
                         id: popupDisconnectHover
@@ -1640,7 +1877,9 @@ PanelWindow {
                         anchors.verticalCenter: parent.verticalCenter
 
                         text: "Disconnect"
-                        color: Theme.text
+                        color: popupDisconnectHover.hovered ? Theme.accent : Theme.text
+                        Behavior on color { ColorAnimation { duration: 100 } }
+                        font.family: Theme.fontFamily
                         font.pixelSize: 12
                     }
 
@@ -1659,9 +1898,10 @@ PanelWindow {
                 Rectangle {
                     width: parent.width
                     height: 34
-                    radius: 8
+                    radius: 6
                     visible: wifiPanel.menuNet && wifiPanel.menuNet.known
                     color: popupForgetHover.hovered ? Qt.lighter(Theme.background, 1.5) : "transparent"
+                    Behavior on color { ColorAnimation { duration: 100 } }
 
                     HoverHandler {
                         id: popupForgetHover
@@ -1675,7 +1915,9 @@ PanelWindow {
                         anchors.verticalCenter: parent.verticalCenter
 
                         text: "Forget Network"
-                        color: Theme.text
+                        color: popupForgetHover.hovered ? Theme.accent : Theme.text
+                        Behavior on color { ColorAnimation { duration: 100 } }
+                        font.family: Theme.fontFamily
                         font.pixelSize: 12
                     }
 
@@ -1702,6 +1944,22 @@ PanelWindow {
             visible: wifiPanel.addOpen
 
             onClicked: wifiPanel.addOpen = false
+
+            // Scrim: darken the network list behind the input dialog.
+            Rectangle {
+                anchors.fill: parent
+                color: "#90000000"
+            }
+        }
+
+        RectangularGlow {
+            visible: addNetworkModal.visible
+            anchors.fill: addNetworkModal
+            z: addNetworkModal.z
+            glowRadius: 18
+            spread: 0.35
+            color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.32)
+            cornerRadius: addNetworkModal.radius + glowRadius
         }
 
         Rectangle {
@@ -1721,10 +1979,12 @@ PanelWindow {
                 NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
             }
 
-            radius: 14
-            color: Qt.lighter(Theme.background, 1.3)
+            // Dialog card: Theme.background fill, crisp accent hairline, an outer
+            // RectangularGlow for lift, floating over the scrim (addBackdrop).
+            radius: 10
+            color: Theme.background
             border.width: 1
-            border.color: Qt.lighter(Theme.background, 1.6)
+            border.color: Theme.accent
 
             Column {
                 id: addModalColumn
@@ -1741,6 +2001,7 @@ PanelWindow {
                 Text {
                     text: "Add Hidden Network"
                     color: Theme.text
+                    font.family: Theme.fontFamily
                     font.pixelSize: 13
                     font.weight: Font.DemiBold
                 }
@@ -1766,6 +2027,7 @@ PanelWindow {
                         placeholderText: "Network name (SSID)"
                         placeholderTextColor: Theme.textMuted
                         color: Theme.text
+                        font.family: Theme.fontFamily
                         font.pixelSize: 12
 
                         selectByMouse: true
@@ -1799,6 +2061,7 @@ PanelWindow {
                     width: parent.width
                     height: 34
 
+                    font.family: Theme.fontFamily
                     font.pixelSize: 12
 
                     model: ["WPA/WPA2/WPA3 Personal", "WPA/WPA2/WPA3 Enterprise", "None / Open"]
@@ -1855,6 +2118,7 @@ PanelWindow {
 
                             text: modelData
                             color: Theme.text
+                            font.family: Theme.fontFamily
                             font.pixelSize: 12
                             verticalAlignment: Text.AlignVCenter
                             elide: Text.ElideRight
@@ -1874,10 +2138,10 @@ PanelWindow {
                         implicitHeight: contentItem.implicitHeight + 8
 
                         background: Rectangle {
-                            radius: 8
-                            color: Qt.lighter(Theme.background, 1.5)
+                            radius: 10
+                            color: Theme.background
                             border.width: 1
-                            border.color: Qt.lighter(Theme.background, 1.6)
+                            border.color: Theme.accent
                         }
 
                         contentItem: ListView {
@@ -1912,6 +2176,7 @@ PanelWindow {
                         placeholderText: "Username"
                         placeholderTextColor: Theme.textMuted
                         color: Theme.text
+                        font.family: Theme.fontFamily
                         font.pixelSize: 12
 
                         selectByMouse: true
@@ -1957,6 +2222,7 @@ PanelWindow {
                         placeholderText: "Password"
                         placeholderTextColor: Theme.textMuted
                         color: Theme.text
+                        font.family: Theme.fontFamily
                         font.pixelSize: 12
 
                         selectByMouse: true
@@ -1997,6 +2263,7 @@ PanelWindow {
                             return wifiService.connectError
                         }
                         color: wifiService.connectError !== "" ? Theme.accent : Theme.textMuted
+                        font.family: Theme.fontFamily
                         font.pixelSize: 11
                     }
 
@@ -2008,6 +2275,7 @@ PanelWindow {
 
                         text: "Cancel"
                         color: addCancelHover.hovered ? Theme.text : Theme.textMuted
+                        font.family: Theme.fontFamily
                         font.pixelSize: 12
 
                         HoverHandler {
@@ -2037,6 +2305,7 @@ PanelWindow {
 
                         text: "Connect"
                         color: addConnectAction.ready ? Theme.accent : Theme.textMuted
+                        font.family: Theme.fontFamily
                         font.pixelSize: 12
                         font.weight: Font.DemiBold
 
@@ -2090,10 +2359,17 @@ PanelWindow {
         property string menuAddr: ""
         readonly property var menuDevice: bluetoothPanel.menuAddr !== "" ? bluetoothService.deviceByAddress(bluetoothPanel.menuAddr) : null
 
+        // The Bluetooth tile is NOT at the panel's top-left (unlike the Wi-Fi
+        // tile), so x/y MUST tween on open/close for the panel to morph out of
+        // and back into the tile. `enabled: root.open` runs that tween while the
+        // Control Center is up, but snaps during the CC's own open/close slide
+        // so x/y never chase the origin tile as `content` drifts away.
         Behavior on x {
+            enabled: root.open
             NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
         }
         Behavior on y {
+            enabled: root.open
             NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
         }
         Behavior on width {
@@ -2112,18 +2388,10 @@ PanelWindow {
         onVisibleChanged: {
             if (!bluetoothPanel.visible) {
                 bluetoothPanel.menuAddr = ""
+                bluetoothService.stopScan()
             } else {
-                bluetoothService.refresh()
+                bluetoothService.requestScan()
             }
-        }
-
-        Timer {
-            id: btRefreshTimer
-
-            interval: 6000
-            repeat: true
-            running: root.bluetoothPanelOpen
-            onTriggered: bluetoothService.refresh()
         }
 
         Item {
@@ -2199,6 +2467,7 @@ PanelWindow {
 
                     text: "Bluetooth"
                     color: Theme.text
+                    font.family: Theme.fontFamily
                     font.pixelSize: 16
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight
@@ -2305,6 +2574,7 @@ PanelWindow {
                     return "No devices found"
                 }
                 color: Theme.textMuted
+                font.family: Theme.fontFamily
                 font.pixelSize: 12
                 visible: bluetoothService.devices.length === 0
             }
@@ -2333,6 +2603,10 @@ PanelWindow {
 
                     readonly property var dev: btRow.modelData
                     readonly property string addr: btRow.dev ? btRow.dev.address : ""
+                    // transient BlueZ states - block the row action while in flight
+                    readonly property bool btBusy: btRow.dev
+                        && (btRow.dev.state === BluetoothDeviceState.Connecting
+                            || btRow.dev.state === BluetoothDeviceState.Disconnecting)
 
                     width: btList.width
                     height: 52
@@ -2376,6 +2650,7 @@ PanelWindow {
 
                                 text: btRow.dev ? btRow.dev.name : ""
                                 color: Theme.text
+                                font.family: Theme.fontFamily
                                 font.pixelSize: 13
                                 font.weight: btRow.dev && btRow.dev.connected ? Font.DemiBold : Font.Normal
                             }
@@ -2386,11 +2661,14 @@ PanelWindow {
 
                                 text: {
                                     if (!btRow.dev) return ""
+                                    if (btRow.dev.state === BluetoothDeviceState.Connecting) return "Connecting…"
+                                    if (btRow.dev.state === BluetoothDeviceState.Disconnecting) return "Disconnecting…"
                                     if (btRow.dev.connected) return "Connected"
                                     if (btRow.dev.paired) return "Paired"
                                     return "Available"
                                 }
                                 color: Theme.textMuted
+                                font.family: Theme.fontFamily
                                 font.pixelSize: 11
                             }
                         }
@@ -2402,6 +2680,7 @@ PanelWindow {
                         cursorShape: Qt.PointingHandCursor
 
                         onClicked: {
+                            if (btRow.btBusy) return
                             if (btRow.dev && btRow.dev.paired && !btRow.dev.connected)
                                 bluetoothService.connectDevice(btRow.addr)
                         }
@@ -2416,11 +2695,90 @@ PanelWindow {
 
                         spacing: 10
 
+                        // Fixed slots so a device connecting (battery cluster
+                        // appearing) or the action label changing length never
+                        // reflows the name column - btRowActions.width is constant.
+                        //
+                        // Battery cluster: [level glyph] [NN%], unified
+                        // single-glyph set from assets/best-battery-icon/ (the
+                        // charging state is baked into its own glyph, so there is
+                        // no separate flash overlay), tinted via ColorOverlay
+                        // (the SVGs are solid #000). The cell is a fixed 52px
+                        // wide regardless of contents.
+                        Item {
+                            id: btBatteryCell
+
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: 52
+                            height: 20
+
+                            readonly property bool hasBattery: btRow.dev && btRow.dev.batteryAvailable
+                            readonly property int pct: btBatteryCell.hasBattery
+                                ? Math.round(btRow.dev.battery * 100)   // battery is a 0.0-1.0 double
+                                : 0
+                            // Quickshell.Bluetooth's BluetoothDevice exposes no
+                            // charge-state signal, so a BT peripheral never
+                            // reports charging; kept for parity with the system
+                            // battery mapping, lights up the instant it is true.
+                            readonly property bool charging: false
+
+                            readonly property string levelFile: {
+                                if (btBatteryCell.charging) return "battery-charging-svgrepo-com.svg"
+                                const p = btBatteryCell.pct
+                                if (p >= 90) return "battery-full-svgrepo-com.svg"
+                                if (p >= 65) return "battery-75-svgrepo-com.svg"
+                                if (p >= 35) return "battery-half-svgrepo-com.svg"
+                                if (p >= 15) return "battery-low-svgrepo-com.svg"
+                                return "battery-empty-svgrepo-com.svg"
+                            }
+
+                            Row {
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 4
+                                visible: btBatteryCell.hasBattery
+
+                                Item {
+                                    width: 22
+                                    height: 18
+                                    anchors.verticalCenter: parent.verticalCenter
+
+                                    Image {
+                                        id: btLevelImg
+                                        anchors.fill: parent
+                                        visible: false
+                                        asynchronous: true
+                                        fillMode: Image.PreserveAspectFit
+                                        sourceSize.width: 44
+                                        sourceSize.height: 36
+                                        source: "file://" + Quickshell.shellPath("assets/best-battery-icon/" + btBatteryCell.levelFile)
+                                    }
+                                    ColorOverlay {
+                                        anchors.fill: btLevelImg
+                                        source: btLevelImg
+                                        color: btBatteryCell.charging ? Theme.accent : Theme.textMuted
+                                    }
+                                }
+
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: 24
+                                    horizontalAlignment: Text.AlignRight
+                                    text: btBatteryCell.pct + "%"
+                                    color: Theme.textMuted
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                }
+                            }
+                        }
+
                         Text {
                             id: btActionText
 
                             anchors.verticalCenter: parent.verticalCenter
 
+                            width: 66
+                            horizontalAlignment: Text.AlignRight
                             text: {
                                 if (!btRow.dev) return ""
                                 if (btRow.dev.connected) return "Disconnect"
@@ -2428,18 +2786,22 @@ PanelWindow {
                                 return "Pair"
                             }
                             color: btActionHover.hovered ? Theme.text : Theme.accent
+                            font.family: Theme.fontFamily
                             font.pixelSize: 11
                             font.weight: Font.DemiBold
+                            opacity: btRow.btBusy ? 0.35 : 1
 
                             HoverHandler {
                                 id: btActionHover
 
+                                enabled: !btRow.btBusy
                                 cursorShape: Qt.PointingHandCursor
                             }
 
                             MouseArea {
                                 anchors.fill: parent
 
+                                enabled: !btRow.btBusy
                                 cursorShape: Qt.PointingHandCursor
 
                                 onClicked: {
@@ -2492,6 +2854,16 @@ PanelWindow {
             onClicked: bluetoothPanel.menuAddr = ""
         }
 
+        RectangularGlow {
+            visible: btMenuPopup.visible
+            anchors.fill: btMenuPopup
+            z: btMenuPopup.z
+            glowRadius: 16
+            spread: 0.35
+            color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.32)
+            cornerRadius: btMenuPopup.radius + glowRadius
+        }
+
         Rectangle {
             id: btMenuPopup
 
@@ -2506,10 +2878,12 @@ PanelWindow {
             width: 180
             height: btMenuColumn.height + 12
 
-            radius: 12
-            color: Qt.lighter(Theme.background, 1.3)
+            // Separation from the dark list comes from the crisp accent hairline
+            // plus the outer RectangularGlow behind it; fill stays Theme.background.
+            radius: 10
+            color: Theme.background
             border.width: 1
-            border.color: Qt.lighter(Theme.background, 1.6)
+            border.color: Theme.accent
 
             Column {
                 id: btMenuColumn
@@ -2524,8 +2898,58 @@ PanelWindow {
                 Rectangle {
                     width: parent.width
                     height: 34
-                    radius: 8
+                    radius: 6
+                    color: btTrustHover.hovered ? Qt.lighter(Theme.background, 1.5) : "transparent"
+                    Behavior on color { ColorAnimation { duration: 100 } }
+
+                    HoverHandler {
+                        id: btTrustHover
+
+                        cursorShape: Qt.PointingHandCursor
+                    }
+
+                    Text {
+                        anchors.left: parent.left
+                        anchors.leftMargin: 10
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        text: "Trust Device"
+                        color: btTrustHover.hovered ? Theme.accent : Theme.text
+                        Behavior on color { ColorAnimation { duration: 100 } }
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 12
+                    }
+
+                    Text {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 10
+                        anchors.verticalCenter: parent.verticalCenter
+
+                        text: (bluetoothPanel.menuDevice && bluetoothPanel.menuDevice.trusted) ? "✓" : ""
+                        color: Theme.accent
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 13
+                        font.weight: Font.DemiBold
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: {
+                            if (bluetoothPanel.menuDevice)
+                                bluetoothService.setTrusted(bluetoothPanel.menuAddr, !bluetoothPanel.menuDevice.trusted)
+                        }
+                    }
+                }
+
+                Rectangle {
+                    width: parent.width
+                    height: 34
+                    radius: 6
                     color: btForgetHover.hovered ? Qt.lighter(Theme.background, 1.5) : "transparent"
+                    Behavior on color { ColorAnimation { duration: 100 } }
 
                     HoverHandler {
                         id: btForgetHover
@@ -2539,7 +2963,9 @@ PanelWindow {
                         anchors.verticalCenter: parent.verticalCenter
 
                         text: "Forget Device"
-                        color: Theme.text
+                        color: btForgetHover.hovered ? Theme.accent : Theme.text
+                        Behavior on color { ColorAnimation { duration: 100 } }
+                        font.family: Theme.fontFamily
                         font.pixelSize: 12
                     }
 
@@ -2582,10 +3008,17 @@ PanelWindow {
 
         property bool revealPassword: false
 
+        // The Hotspot tile isn't at the panel's top-left, so x/y must tween on
+        // open/close to morph out of / back into the tile. `enabled: root.open`
+        // runs that tween while the CC is up, but snaps during the CC's own
+        // slide so x/y never chase the origin tile as `content` drifts. (See
+        // bluetoothPanel.)
         Behavior on x {
+            enabled: root.open
             NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
         }
         Behavior on y {
+            enabled: root.open
             NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
         }
         Behavior on width {
@@ -2710,6 +3143,7 @@ PanelWindow {
 
                     text: "Mobile Hotspot"
                     color: Theme.text
+                    font.family: Theme.fontFamily
                     font.pixelSize: 16
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight
@@ -2772,6 +3206,7 @@ PanelWindow {
                     Text {
                         text: "Network name"
                         color: Theme.textMuted
+                        font.family: Theme.fontFamily
                         font.pixelSize: 11
                     }
 
@@ -2780,8 +3215,9 @@ PanelWindow {
                         height: 34
 
                         radius: 8
-                        color: Qt.lighter(Theme.surface, 1.1)
-                        border.width: hsSsidField.activeFocus ? 1 : 0
+                        // Dark fill, always-on accent hairline to define the bounds.
+                        color: Theme.background
+                        border.width: 1
                         border.color: Theme.accent
 
                         TextField {
@@ -2796,6 +3232,7 @@ PanelWindow {
                             placeholderText: "Hotspot name"
                             placeholderTextColor: Theme.textMuted
                             color: Theme.text
+                            font.family: Theme.fontFamily
                             font.pixelSize: 12
 
                             selectByMouse: true
@@ -2815,6 +3252,7 @@ PanelWindow {
                     Text {
                         text: "Security"
                         color: Theme.textMuted
+                        font.family: Theme.fontFamily
                         font.pixelSize: 11
                     }
 
@@ -2824,6 +3262,7 @@ PanelWindow {
                         width: parent.width
                         height: 34
 
+                        font.family: Theme.fontFamily
                         font.pixelSize: 12
 
                         model: ["WPA2/WPA3 Personal", "None / Open"]
@@ -2831,8 +3270,10 @@ PanelWindow {
 
                         background: Rectangle {
                             radius: 8
-                            color: Qt.lighter(Theme.surface, 1.1)
-                            border.width: hsSecurityCombo.activeFocus || hsSecurityCombo.popup.visible ? 1 : 0
+                            // Match the SSID / password fields: dark fill, always-on
+                            // accent hairline.
+                            color: Theme.background
+                            border.width: 1
                             border.color: Theme.accent
                         }
 
@@ -2869,6 +3310,7 @@ PanelWindow {
 
                                 text: modelData
                                 color: Theme.text
+                                font.family: Theme.fontFamily
                                 font.pixelSize: 12
                                 verticalAlignment: Text.AlignVCenter
                                 elide: Text.ElideRight
@@ -2888,10 +3330,10 @@ PanelWindow {
                             implicitHeight: contentItem.implicitHeight + 8
 
                             background: Rectangle {
-                                radius: 8
-                                color: Qt.lighter(Theme.surface, 1.1)
+                                radius: 10
+                                color: Theme.background
                                 border.width: 1
-                                border.color: Qt.rgba(1, 1, 1, 0.12)
+                                border.color: Theme.accent
                             }
 
                             contentItem: ListView {
@@ -2913,6 +3355,7 @@ PanelWindow {
                     Text {
                         text: "Password"
                         color: Theme.textMuted
+                        font.family: Theme.fontFamily
                         font.pixelSize: 11
                     }
 
@@ -2921,8 +3364,9 @@ PanelWindow {
                         height: 34
 
                         radius: 8
-                        color: Qt.lighter(Theme.surface, 1.1)
-                        border.width: hsPasswordField.activeFocus ? 1 : 0
+                        // Dark fill, always-on accent hairline to define the bounds.
+                        color: Theme.background
+                        border.width: 1
                         border.color: Theme.accent
 
                         TextField {
@@ -2939,6 +3383,7 @@ PanelWindow {
                             placeholderText: "Password"
                             placeholderTextColor: Theme.textMuted
                             color: Theme.text
+                            font.family: Theme.fontFamily
                             font.pixelSize: 12
 
                             selectByMouse: true
@@ -2957,6 +3402,7 @@ PanelWindow {
 
                             text: hotspotPanel.revealPassword ? "Hide" : "Show"
                             color: hsRevealHover.hovered ? Theme.text : Theme.accent
+                            font.family: Theme.fontFamily
                             font.pixelSize: 11
                             font.weight: Font.DemiBold
 
@@ -2993,6 +3439,7 @@ PanelWindow {
                             ? hotspotService.clientCount + (hotspotService.clientCount === 1 ? " device connected" : " devices connected")
                             : "Hotspot is Off"
                         color: Theme.textMuted
+                        font.family: Theme.fontFamily
                         font.pixelSize: 11
                     }
 
@@ -3007,6 +3454,7 @@ PanelWindow {
 
                         text: "Apply"
                         color: hsSaveButton.ready ? Theme.accent : Theme.textMuted
+                        font.family: Theme.fontFamily
                         font.pixelSize: 12
                         font.weight: Font.DemiBold
 
@@ -3046,10 +3494,15 @@ PanelWindow {
         enabled: root.audioOutputPanelOpen
         visible: audioOutputPanel.opacity > 0
 
+        // x/y tween so the panel morphs out of / back into the Output tile;
+        // `enabled: root.open` snaps them during the CC's own open/close slide so
+        // they don't chase the origin tile as `content` drifts. (See bluetoothPanel.)
         Behavior on x {
+            enabled: root.open
             NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
         }
         Behavior on y {
+            enabled: root.open
             NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
         }
         Behavior on width {
@@ -3140,6 +3593,7 @@ PanelWindow {
 
                     text: "Audio Output"
                     color: Theme.text
+                    font.family: Theme.fontFamily
                     font.pixelSize: 16
                     font.weight: Font.DemiBold
                 }
@@ -3153,6 +3607,7 @@ PanelWindow {
                 visible: audioService.sinks.length === 0
                 text: "No output devices"
                 color: Theme.textMuted
+                font.family: Theme.fontFamily
                 font.pixelSize: 12
             }
 
@@ -3219,6 +3674,7 @@ PanelWindow {
 
                             text: aoRow.sink ? aoRow.sink.description : ""
                             color: Theme.text
+                            font.family: Theme.fontFamily
                             font.pixelSize: 13
                             font.weight: aoRow.sink && aoRow.sink.isDefault ? Font.DemiBold : Font.Normal
                         }

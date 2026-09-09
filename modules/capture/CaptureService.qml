@@ -18,19 +18,28 @@ Item {
 
     property string lastPath: ""
     property string lastTimestamp: ""
+    // drives the floating ScreenshotPreview window (bottom-right thumbnail)
     property bool bannerVisible: false
-    property bool bannerHovered: false
 
     signal captured(string imagePath, string timestamp)
 
     function openBar() {
         console.log("[CaptureService] openBar()")
         root.barVisible = true
+        // Just show the picker - no auto-armed crosshair. Region/Window are
+        // armed only by the picker buttons or the R / W hotkeys.
+        root.windowSelectActive = false
+        root.regionSelectActive = false
+        root.pendingMode = ""
     }
 
     function closeBar() {
         console.log("[CaptureService] Bar closed")
         root.barVisible = false
+        // Tear down whatever selection overlay openBar()/triggerCapture armed so
+        // Esc / Cancel from the picker is a clean, single-press exit.
+        root.regionSelectActive = false
+        root.windowSelectActive = false
     }
 
     function triggerCapture(mode) {
@@ -61,6 +70,9 @@ Item {
 
     function completeRegionSelection(geometry) {
         root.regionSelectActive = false
+        // The picker may still be up (opened via openBar's default region mode).
+        if (root.barVisible)
+            root.closeBar()
 
         if (!geometry || !/^-?\d+,-?\d+ \d+x\d+$/.test(geometry)) {
             console.log("[CaptureService] Discarding invalid region geometry:", geometry)
@@ -74,10 +86,16 @@ Item {
     function cancelRegionSelection() {
         console.log("[CaptureService] Region selection cancelled")
         root.regionSelectActive = false
+        // If the picker is still up (openBar's default region mode), a plain
+        // click just backs the crosshair out and leaves the now-unobstructed
+        // picker so the user can choose Window / Screen / Cancel. A real exit
+        // goes through the picker's own Esc / Cancel -> closeBar().
     }
 
     function completeWindowSelection(geometry) {
         root.windowSelectActive = false
+        if (root.barVisible)
+            root.closeBar()
 
         if (!geometry || !/^-?\d+,-?\d+ \d+x\d+$/.test(geometry)) {
             console.log("[CaptureService] Discarding invalid window geometry:", geometry)
@@ -91,6 +109,7 @@ Item {
     function cancelWindowSelection() {
         console.log("[CaptureService] Window selection cancelled")
         root.windowSelectActive = false
+        // Same as region: leave the picker up if it is still open.
     }
 
     function _runCapture(mode, geometry) {
@@ -101,9 +120,16 @@ Item {
 
         const envPrefix = 'export WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-wayland-1}; export XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}; '
 
-        let cmd = envPrefix + 'mkdir -p ~/Pictures/Screenshots && f=~/Pictures/Screenshots/Screenshot_$(date +%Y%m%d_%H%M%S).png && grim "$f" && wl-copy --type image/png < "$f" && echo "$f"'
-        if (mode === "region" || mode === "window")
-            cmd = envPrefix + 'mkdir -p ~/Pictures/Screenshots && f=~/Pictures/Screenshots/Screenshot_$(date +%Y%m%d_%H%M%S).png && grim -g "' + geometry + '" "$f" && wl-copy --type image/png < "$f" && echo "$f"'
+        // Fire a desktop notification on success ("Screenshot saved / Copied to
+        // clipboard"). x-canonical-private-synchronous replaces the previous
+        // screenshot toast instead of stacking; tolerated if notify-send is
+        // missing, and never breaks the trailing `echo "$f"` stdout contract.
+        const notify = ' && { command -v notify-send >/dev/null 2>&1 && notify-send -a "Screenshot" -i "$f" -t 4000 -h string:x-canonical-private-synchronous:screenshot "Screenshot saved" "Copied to clipboard"; true; }'
+
+        const grab = (mode === "region" || mode === "window")
+            ? 'grim -g "' + geometry + '" "$f"'
+            : 'grim "$f"'
+        const cmd = envPrefix + 'mkdir -p ~/Pictures/Screenshots && f=~/Pictures/Screenshots/Screenshot_$(date +%Y%m%d_%H%M%S).png && ' + grab + ' && wl-copy --type image/png < "$f"' + notify + ' && echo "$f"'
 
         console.log("[CaptureService] Launching command for mode:", mode)
         console.log("[CaptureService] cmd:", cmd)
@@ -200,11 +226,6 @@ Item {
         command: ["true"]
     }
 
-    Timer {
-        id: dismissTimer
-
-        interval: 5000
-        running: root.bannerVisible && !root.bannerHovered
-        onTriggered: root.bannerVisible = false
-    }
+    // The floating ScreenshotPreview owns its own 3.5s auto-dismiss now, so
+    // there is no service-side dismiss timer.
 }

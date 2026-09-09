@@ -24,7 +24,15 @@ PanelWindow {
 
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.exclusionMode: ExclusionMode.Ignore
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
+    // Standalone selection (no picker) needs OnDemand focus for its own Esc
+    // handler. When the CaptureBar picker is up (openBar's default region mode)
+    // the overlay must NOT request keyboard focus: Hyprland would hand an
+    // OnDemand layer focus on map, pulling it off the Bar window (tripping that
+    // window's focus-grab) AND delivering it stray keystrokes from whatever the
+    // user was typing. The picker owns Esc/Cancel in that mode.
+    WlrLayershell.keyboardFocus: CaptureService.barVisible
+        ? WlrKeyboardFocus.None
+        : WlrKeyboardFocus.OnDemand
 
     anchors {
         top: true
@@ -34,7 +42,7 @@ PanelWindow {
     }
 
     color: "transparent"
-    focusable: true
+    focusable: !CaptureService.barVisible
 
     onVisibleChanged: {
         if (root.visible) {
@@ -42,7 +50,10 @@ PanelWindow {
             root.hoveredWindow = null
             if (CaptureService.windowSelectActive)
                 Hyprland.refreshToplevels()
-            overlayRoot.forceActiveFocus()
+            // Only claim keyboard focus when running without the picker; with the
+            // picker up the Bar window keeps focus (see keyboardFocus above).
+            if (!CaptureService.barVisible)
+                overlayRoot.forceActiveFocus()
         }
     }
 
@@ -129,14 +140,16 @@ PanelWindow {
         anchors.fill: parent
         focus: true
 
-        Keys.onPressed: (event) => {
-            if (event.key === Qt.Key_Escape) {
-                if (CaptureService.regionSelectActive)
-                    CaptureService.cancelRegionSelection()
-                else if (CaptureService.windowSelectActive)
-                    CaptureService.cancelWindowSelection()
-                event.accepted = true
-            }
+        // Esc cancels the active selection immediately (and, as a catch-all,
+        // tears down the capture bar too).
+        Keys.onEscapePressed: (event) => {
+            if (CaptureService.regionSelectActive)
+                CaptureService.cancelRegionSelection()
+            else if (CaptureService.windowSelectActive)
+                CaptureService.cancelWindowSelection()
+            else
+                CaptureService.closeBar()
+            event.accepted = true
         }
 
         Rectangle {
@@ -149,7 +162,10 @@ PanelWindow {
             id: selectionArea
 
             anchors.fill: parent
-            cursorShape: Qt.CrossCursor
+            // cursor is enforced window-wide by `cursorLayer` (top of the
+            // stack) - a MouseArea.cursorShape here would lose the window's
+            // cursor-resolution race to a higher sibling.
+            hoverEnabled: true
             enabled: CaptureService.regionSelectActive
 
             property bool selecting: false
@@ -261,7 +277,7 @@ PanelWindow {
 
             anchors.fill: parent
             hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
+            // cursor enforced by `cursorLayer` below (not here - see selectionArea)
             enabled: CaptureService.windowSelectActive
 
             onPositionChanged: (mouse) => {
@@ -328,6 +344,24 @@ PanelWindow {
                 color: Theme.text
                 font.pixelSize: 12
                 font.weight: Font.DemiBold
+            }
+        }
+
+        // ---- window-wide cursor enforcement --------------------------------
+        // Declared last so it is the top-most item in the stack, and uses a
+        // (non-grabbing, non-consuming) HoverHandler so every MouseArea above
+        // still gets its press/drag/hover. Qt's window cursor resolution picks
+        // the top-most hovered item that declares a cursor, so this wins
+        // outright - no sibling MouseArea can revert it to the arrow.
+        Item {
+            id: cursorLayer
+            anchors.fill: parent
+            z: 999
+
+            HoverHandler {
+                cursorShape: CaptureService.regionSelectActive
+                    ? Qt.CrossCursor
+                    : (CaptureService.windowSelectActive ? Qt.PointingHandCursor : Qt.ArrowCursor)
             }
         }
     }

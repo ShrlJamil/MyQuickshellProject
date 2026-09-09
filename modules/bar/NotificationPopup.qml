@@ -26,9 +26,22 @@ PanelWindow {
 
     visible: root.items.length > 0
 
+    // Automatic toasts must be keyboard-focus NEUTRAL — a popup that appears
+    // while the user is typing in another app must never steal focus. The layer
+    // surface therefore requests NO keyboard focus by default, and only asks for
+    // OnDemand focus while an inline reply is actively in use (a real text input
+    // that needs keystrokes). It drops back to None the instant the reply ends.
+    // Pointer interaction (hover, close, action, reply taps) never depends on
+    // keyboard focus, so it keeps working in both states.
+    property int replyFocusHolders: 0
+    readonly property bool wantKeyboard: root.replyFocusHolders > 0
+
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.exclusionMode: ExclusionMode.Ignore
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
+    WlrLayershell.keyboardFocus: root.wantKeyboard
+        ? WlrKeyboardFocus.OnDemand
+        : WlrKeyboardFocus.None
+    focusable: root.wantKeyboard
 
     anchors {
         top: true
@@ -299,51 +312,57 @@ PanelWindow {
                             width: parent.width
                             notifId: slot.modelData.id
                             notification: slot.modelData.notification
+
+                            // Raise the window's keyboard-focus demand only while
+                            // this reply is actually in use. Idempotent via
+                            // _counted so a toast torn down mid-reply still
+                            // balances the count. No state leaves this card.
+                            property bool _counted: false
+                            onActiveChanged: {
+                                if (replyWidget.active === replyWidget._counted)
+                                    return
+                                replyWidget._counted = replyWidget.active
+                                root.replyFocusHolders += replyWidget.active ? 1 : -1
+                            }
+                            Component.onDestruction: {
+                                if (replyWidget._counted)
+                                    root.replyFocusHolders -= 1
+                            }
                         }
 
-                        // Generic action buttons — only when the sender supplied
-                        // any (with non-empty text). Wraps within the toast width.
+                        // Generic actions — text only, no card/border/fill. Hover
+                        // only recolours the label. Still consumes its own tap so
+                        // the card body handler does not also fire, and still runs
+                        // the existing invokeAction(...).
                         Flow {
                             width: parent.width
-                            spacing: 6
+                            spacing: 16
                             visible: slot.actionItems.length > 0
 
                             Repeater {
                                 model: slot.actionItems
 
-                                delegate: Rectangle {
-                                    id: actBtn
+                                delegate: Text {
+                                    id: actLabel
 
                                     required property var modelData
 
-                                    implicitWidth: Math.min(actLabel.implicitWidth + 20, card.width - 28)
-                                    implicitHeight: 28
-                                    radius: 8
-                                    clip: true
-                                    color: actHover.hovered ? Qt.lighter(Theme.surface, 1.2)
-                                                            : Theme.surface
-
-                                    Text {
-                                        id: actLabel
-                                        anchors.centerIn: parent
-                                        width: Math.min(implicitWidth, actBtn.width - 12)
-                                        text: actBtn.modelData.action.text
-                                        color: Theme.text
-                                        font.pixelSize: 11
-                                        elide: Text.ElideRight
-                                        horizontalAlignment: Text.AlignHCenter
-                                    }
+                                    width: Math.min(implicitWidth, card.width - 28)
+                                    height: 28
+                                    verticalAlignment: Text.AlignVCenter
+                                    text: actLabel.modelData.action.text
+                                    color: actHover.hovered ? Theme.accent : Theme.text
+                                    font.pixelSize: 11
+                                    elide: Text.ElideRight
 
                                     HoverHandler {
                                         id: actHover
                                         cursorShape: Qt.PointingHandCursor
                                     }
-                                    // Consume the tap so the card body handler
-                                    // does not also fire.
                                     TapHandler {
                                         gesturePolicy: TapHandler.ReleaseWithinBounds
                                         onTapped: NotificationService.invokeAction(
-                                            slot.modelData.id, actBtn.modelData.index)
+                                            slot.modelData.id, actLabel.modelData.index)
                                     }
                                 }
                             }

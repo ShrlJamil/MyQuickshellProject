@@ -9,12 +9,28 @@ import "../../components"
 Item {
     id: root
 
+    // Natural size DynamicCenter fits its frame to (the monitor-arrangement
+    // canvas genuinely needs the full standard width). Constant -> no loop.
+    implicitWidth: 680
     width: parent ? parent.width : 460
     implicitHeight: 500
     height: root.implicitHeight
     clip: true
 
+    // Raised by Cancel so the host (DynamicCenter -> Bar) tears the surface down.
+    signal closeRequested()
+
     readonly property var selectedInfo: DisplayService.layout[DisplayService.selectedMonitor]
+
+    // Cancel: throw away un-applied local edits and close. No `hyprctl eval`, no
+    // monitors.lua write, no reload - just rebuild the model straight from the
+    // live Hyprland state (which, with nothing Applied, is exactly the config
+    // that was active before editing) and dismiss the panel.
+    function cancelEdits() {
+        DisplayService.suspendSync = false
+        DisplayService.syncFromHyprland()
+        root.closeRequested()
+    }
 
     // ---- Logical geometry (Hyprland coordinate space) -----------------------
     // Hyprland positions monitors in LOGICAL pixels: mode size / scale, with
@@ -174,7 +190,30 @@ Item {
         DisplayService.setPosition(name, Math.round(rx.pos), Math.round(ry.pos))
     }
 
-    onVisibleChanged: if (root.visible) DisplayService.syncFromHyprland()
+    onVisibleChanged: {
+        if (root.visible) {
+            DisplayService.syncFromHyprland()
+            // Take focus so Esc lands here and the bar's HyprlandFocusGrab is
+            // armed for click-outside dismiss.
+            root.forceActiveFocus()
+        }
+    }
+
+    // Esc discards un-applied edits and closes (matches the Cancel button).
+    Keys.onShortcutOverride: (e) => {
+        if (e.key === Qt.Key_Escape) {
+            root.cancelEdits()
+            e.accepted = true
+        }
+    }
+
+    // Window-level backstop for when a child control (canvas / resolution
+    // combo) holds focus instead of the root.
+    Shortcut {
+        sequences: ["Escape"]
+        enabled: root.visible
+        onActivated: root.cancelEdits()
+    }
 
     Shape {
         id: background
@@ -698,12 +737,15 @@ Item {
 
     }
 
+    // Action bar, left-aligned with the content column. Apply (apply live +
+    // persist to monitors.lua) and Cancel (discard un-applied edits + close).
     Row {
         id: actionFooter
 
         anchors {
             bottom: parent.bottom
-            horizontalCenter: parent.horizontalCenter
+            left: parent.left
+            leftMargin: 48
             bottomMargin: 16
         }
 
@@ -731,7 +773,7 @@ Item {
         }
 
         Rectangle {
-            id: saveButton
+            id: cancelButton
 
             width: 90
             height: 34
@@ -741,12 +783,12 @@ Item {
             border.color: Theme.accent
 
             TapHandler {
-                onTapped: DisplayService.saveConfig()
+                onTapped: root.cancelEdits()
             }
 
             Text {
                 anchors.centerIn: parent
-                text: "Save"
+                text: "Cancel"
                 color: Theme.accent
                 font.pixelSize: 12
                 font.weight: Font.DemiBold

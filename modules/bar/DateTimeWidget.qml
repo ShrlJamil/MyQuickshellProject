@@ -35,17 +35,12 @@ Item {
 
         Text {
             anchors.verticalCenter: parent.verticalCenter
-            text: Qt.formatDateTime(clock.date, "hh:mm")
+            // e.g. "Tue 2 Apr, 17:23"
+            text: Qt.formatDateTime(clock.date, "ddd d MMM, HH:mm")
             color: Theme.text
-            font.weight: Font.DemiBold
+            font.family: Theme.fontFamily
+            font.weight: Font.Black
             font.pixelSize: 14
-        }
-
-        Text {
-            anchors.verticalCenter: parent.verticalCenter
-            text: Qt.formatDateTime(clock.date, "MMM d")
-            color: Theme.textDim
-            font.pixelSize: 12
         }
     }
 

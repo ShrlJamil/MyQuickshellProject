@@ -1,4 +1,5 @@
 import QtQuick
+import Qt5Compat.GraphicalEffects
 import Quickshell.Widgets
 import "../../components"
 
@@ -7,10 +8,15 @@ Item {
 
     property string label: ""
     property string iconSource: ""
+    // Colour a local file: SVG glyph is tinted to (theme icons draw as-is).
+    property color iconColor: Theme.text
+
+    // A local `file:` SVG is a solid #000 glyph -> Image + ColorOverlay so it
+    // tints; a Quickshell.iconPath theme icon already arrives coloured.
+    readonly property bool _localIcon: root.iconSource.startsWith("file:")
     property real value: 0
     property real from: 0
     property real to: 100
-    property real knobRadius: 8
     property string rightText: ""
 
     signal moved(int value)
@@ -26,26 +32,59 @@ Item {
 
     implicitHeight: 28
 
+    // Inner horizontal padding so the icon / track / value sit clear of the
+    // curved ends of the pill background they're drawn on. 28px clears the
+    // full-pill (radius 50) arc into the flat centre band.
+    property real edgeInset: 28
+
     Item {
         id: iconSlot
 
         anchors {
             left: parent.left
+            leftMargin: root.edgeInset
             verticalCenter: parent.verticalCenter
         }
 
         width: 28
         height: 28
 
+        // theme icon (already coloured)
         IconImage {
             anchors.centerIn: parent
 
             width: 22
             height: 22
 
-            source: root.iconSource
+            source: root._localIcon ? "" : root.iconSource
             asynchronous: true
-            visible: root.iconSource !== ""
+            visible: !root._localIcon && root.iconSource !== ""
+        }
+
+        // custom solid-#000 SVG, tinted to iconColor
+        Image {
+            id: sliderSvg
+
+            anchors.centerIn: parent
+
+            width: 22
+            height: 22
+
+            source: root._localIcon ? root.iconSource : ""
+            sourceSize.width: 44
+            sourceSize.height: 44
+            fillMode: Image.PreserveAspectFit
+            asynchronous: true
+            smooth: true
+            mipmap: true
+            visible: false
+        }
+
+        ColorOverlay {
+            anchors.fill: sliderSvg
+            source: sliderSvg
+            visible: root._localIcon && sliderSvg.status === Image.Ready
+            color: root.iconColor
         }
 
         MouseArea {
@@ -62,6 +101,7 @@ Item {
 
         anchors {
             right: parent.right
+            rightMargin: root.edgeInset
             verticalCenter: parent.verticalCenter
         }
 
@@ -85,10 +125,10 @@ Item {
         }
 
         anchors.leftMargin: 12
-        anchors.rightMargin: root.rightText !== "" ? 12 : 0
+        anchors.rightMargin: root.rightText !== "" ? 12 : root.edgeInset
 
-        height: 6
-        radius: 3
+        height: 10
+        radius: 5
         color: Theme.surface
 
         Rectangle {
@@ -101,20 +141,23 @@ Item {
             }
 
             width: track.width * root.clampedFraction
-            radius: 3
+            radius: track.radius
             color: Theme.accent
         }
 
+        // Horizontal pill thumb, centred on the track, clamped so it never
+        // clips past either end.
         Rectangle {
             id: knob
 
             anchors.verticalCenter: track.verticalCenter
 
-            x: Math.max(0, Math.min(track.width - root.knobRadius * 2, fill.width - root.knobRadius))
-            width: root.knobRadius * 2
-            height: root.knobRadius * 2
-            radius: root.knobRadius
+            width: 22
+            height: 12
+            radius: 6
             color: Theme.text
+
+            x: Math.max(0, Math.min(track.width - width, fill.width - width / 2))
         }
 
         MouseArea {

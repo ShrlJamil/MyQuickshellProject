@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell
+import Quickshell.Io
 import Quickshell.Hyprland
 import Quickshell.Wayland
 import Quickshell.Widgets
@@ -24,18 +25,97 @@ PanelWindow {
     WlrLayershell.exclusionMode: ExclusionMode.Ignore
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
 
+    // Lock the panel's top edge 1:1 under the real bar strip via an async
+    // `hyprctl -j layers` probe (identical mechanism to ControlCenter) instead
+    // of a hardcoded offset. Any missing / implausible result falls back to the
+    // fixed default so the window can never fly off-screen.
+    readonly property real barStripHeight: 40
+    readonly property real barGap: 8
+    readonly property int barTopMarginDefault: 48
+    // Max the probe may move the panel off the default before its result is
+    // treated as garbage (stale / incomplete JSON) and discarded.
+    readonly property int barTopMarginMaxDelta: 120
+    property int topMargin: root.barTopMarginDefault
+    property int barSurfaceTop: 0
+
+    // Span from just under the bar to near the bottom edge, so the panel is
+    // almost full-height. Height comes from the top+bottom anchors against the
+    // real panel geometry — never a hardcoded screen resolution.
     anchors {
         top: true
         right: true
+        bottom: true
     }
 
+    // top is probed (see below); bottom leaves an aesthetic breathing gap
+    // balanced with the right inset so the panel reads as floating.
     margins {
-        top: 48
+        top: root.topMargin
         right: 12
+        bottom: 20
     }
 
     implicitWidth: 380
-    implicitHeight: 560
+
+    function probeBarSurface() {
+        if (!barProbe.running) barProbe.running = true
+    }
+
+    function updateBarSurface() {
+        // topMargin is written ONLY here. Runs off an async process, so a stale
+        // or incomplete result must never fling the window off-screen - any
+        // implausible value falls back to the fixed default.
+        const def = root.barTopMarginDefault
+        try {
+            const layers = JSON.parse(barProbe.stdout.text)
+            const mon = layers[root.screen.name]
+            if (mon == null || mon.levels == null) {
+                root.topMargin = def
+                return
+            }
+
+            root.barSurfaceTop = 0
+
+            for (const key of Object.keys(mon.levels)) {
+                const arr = mon.levels[key]
+                if (!Array.isArray(arr)) continue
+
+                const level = parseInt(key, 10)
+
+                for (const surf of arr) {
+                    if (surf.namespace !== "quickshell" || surf.pid !== Quickshell.processId) continue
+                    if (level === 2) root.barSurfaceTop = surf.y
+                }
+            }
+
+            // Only shift when the bar's own strip surface was actually located,
+            // and only by a small sane amount; otherwise keep the default.
+            if (root.barSurfaceTop > 0) {
+                const target = root.barSurfaceTop + root.barStripHeight + root.barGap
+                const screenY = root.screen.y ? root.screen.y : 0
+                const candidate = Math.max(8, target - screenY)
+                root.topMargin = (Math.abs(candidate - def) <= root.barTopMarginMaxDelta) ? candidate : def
+            } else {
+                root.topMargin = def
+            }
+        } catch (e) {
+            root.topMargin = def
+        }
+    }
+
+    Process {
+        id: barProbe
+
+        command: ["hyprctl", "-j", "layers"]
+
+        stdout: StdioCollector {
+            waitForEnd: true
+        }
+
+        onExited: root.updateBarSurface()
+    }
+
+    Component.onCompleted: root.probeBarSurface()
 
     color: "transparent"
 
@@ -47,6 +127,7 @@ PanelWindow {
         if (root.open) {
             root.closing = false
             hideTimer.stop()
+            root.probeBarSurface()
             panel.forceActiveFocus()
         } else if (root.visible) {
             root.closing = true
@@ -56,7 +137,8 @@ PanelWindow {
 
     Timer {
         id: hideTimer
-        interval: 200
+        // Keep the window mapped just past the ~110ms scale-fade close.
+        interval: 140
         onTriggered: root.closing = false
     }
 
@@ -76,10 +158,57 @@ PanelWindow {
         border.width: 1
         border.color: Theme.surfaceHover
 
-        opacity: root.open ? 1 : 0
-        Behavior on opacity {
-            NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+        // Fast scale-fade from the bar's top-right corner + a tiny -8px drift.
+        // No full-height slide.
+        opacity: 0
+        scale: 0.92
+        transformOrigin: Item.TopRight
+
+        transform: Translate {
+            id: drift
+
+            y: -8
         }
+
+        states: State {
+            name: "open"
+            when: root.open
+
+            PropertyChanges {
+                target: panel
+                opacity: 1
+                scale: 1
+            }
+
+            PropertyChanges {
+                target: drift
+                y: 0
+            }
+        }
+
+        transitions: [
+            Transition {
+                from: ""
+                to: "open"
+
+                ParallelAnimation {
+                    NumberAnimation { target: panel; property: "opacity"; duration: 150; easing.type: Easing.OutQuad }
+                    NumberAnimation { target: panel; property: "scale"; duration: 160; easing.type: Easing.OutCubic }
+                    NumberAnimation { target: drift; property: "y"; duration: 160; easing.type: Easing.OutCubic }
+                }
+            },
+
+            Transition {
+                from: "open"
+                to: ""
+
+                ParallelAnimation {
+                    NumberAnimation { target: panel; property: "opacity"; duration: 100; easing.type: Easing.InQuad }
+                    NumberAnimation { target: panel; property: "scale"; duration: 110; easing.type: Easing.InCubic }
+                    NumberAnimation { target: drift; property: "y"; duration: 110; easing.type: Easing.InCubic }
+                }
+            }
+        ]
 
         Keys.onPressed: (event) => {
             if (event.key === Qt.Key_Escape) {
@@ -483,39 +612,30 @@ PanelWindow {
                         notification: notifCard.modelData.notification
                     }
 
-                    // Generic action buttons — same data & semantics as the popup.
+                    // Generic actions — text only, no card/border/fill. Hover
+                    // only recolours the label. Same data & semantics as the
+                    // popup; still runs the existing invokeAction(...).
                     Flow {
                         width: parent.width
-                        spacing: 6
+                        spacing: 16
                         topPadding: 4
                         visible: notifCard.actionItems.length > 0
 
                         Repeater {
                             model: notifCard.actionItems
 
-                            delegate: Rectangle {
-                                id: centerActBtn
+                            delegate: Text {
+                                id: centerActLabel
 
                                 required property var modelData
 
-                                implicitWidth: Math.min(centerActLabel.implicitWidth + 20,
-                                                        notifCard.width - 28)
-                                implicitHeight: 28
-                                radius: 8
-                                clip: true
-                                color: centerActHover.hovered ? Qt.lighter(Theme.surface, 1.25)
-                                                              : Qt.lighter(Theme.surface, 1.1)
-
-                                Text {
-                                    id: centerActLabel
-                                    anchors.centerIn: parent
-                                    width: Math.min(implicitWidth, centerActBtn.width - 12)
-                                    text: centerActBtn.modelData.action.text
-                                    color: Theme.text
-                                    font.pixelSize: 11
-                                    elide: Text.ElideRight
-                                    horizontalAlignment: Text.AlignHCenter
-                                }
+                                width: Math.min(implicitWidth, notifCard.width - 28)
+                                height: 28
+                                verticalAlignment: Text.AlignVCenter
+                                text: centerActLabel.modelData.action.text
+                                color: centerActHover.hovered ? Theme.accent : Theme.text
+                                font.pixelSize: 11
+                                elide: Text.ElideRight
 
                                 HoverHandler {
                                     id: centerActHover
@@ -524,7 +644,7 @@ PanelWindow {
                                 TapHandler {
                                     gesturePolicy: TapHandler.ReleaseWithinBounds
                                     onTapped: NotificationService.invokeAction(
-                                        notifCard.modelData.id, centerActBtn.modelData.index)
+                                        notifCard.modelData.id, centerActLabel.modelData.index)
                                 }
                             }
                         }

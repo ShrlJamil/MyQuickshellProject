@@ -9,6 +9,7 @@ Item {
     property string actionId: ""
     property string label: ""
     property string iconSource: ""
+    property string shortcutKey: ""
     property bool selected: false
     property int holdDuration: 1000
     property bool isHolding: false
@@ -63,6 +64,12 @@ Item {
             clip: true
             color: root.selected || hover.hovered || root.isHolding ? Theme.surfaceHover : "transparent"
 
+            // High-contrast hover: subtle outline so the focused tile pops
+            // against the dark menu background.
+            readonly property bool active: root.selected || hover.hovered || root.isHolding
+            border.width: tileBase.active ? 1 : 0
+            border.color: Qt.rgba(1, 1, 1, 0.15)
+
             Rectangle {
                 id: progressFill
 
@@ -73,7 +80,15 @@ Item {
                 }
 
                 width: parent.width * root.progress
+
+                readonly property bool full: root.progress >= 0.999
+
+                // Left edge hugs the frame's 12px corners; the advancing right
+                // edge stays a flat 90 line until the fill is complete, then it
+                // rounds too so the full bar seals cleanly inside the frame.
                 radius: parent.radius
+                topRightRadius: progressFill.full ? parent.radius : 0
+                bottomRightRadius: progressFill.full ? parent.radius : 0
 
                 visible: root.isHolding || root.progress > 0
 
@@ -114,7 +129,7 @@ Item {
                     anchors.fill: iconImage
 
                     source: iconImage
-                    color: "white"
+                    color: Theme.text
                     visible: root.iconSource !== ""
                 }
             }
@@ -129,6 +144,24 @@ Item {
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight
             }
+        }
+
+        // Hold-shortcut hint, tucked in the corner so it never disturbs the
+        // centred icon + label.
+        Text {
+            anchors {
+                top: parent.top
+                right: parent.right
+                topMargin: 8
+                rightMargin: 10
+            }
+
+            visible: root.shortcutKey !== ""
+            text: root.shortcutKey.toUpperCase()
+            color: Theme.textMuted
+            font.family: Theme.fontFamily
+            font.pixelSize: 10
+            font.weight: Font.Bold
         }
     }
 

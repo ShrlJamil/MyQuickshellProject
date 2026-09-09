@@ -1,4 +1,5 @@
 import QtQuick
+import Qt5Compat.GraphicalEffects
 import Quickshell.Widgets
 import "../../components"
 
@@ -10,7 +11,17 @@ Item {
     property bool active: false
     property bool round: false
 
-    readonly property real cornerRadius: root.round ? Math.min(root.width, root.height) / 2 : 22
+    // Opt-in radius override (e.g. a full pill on a non-round tile). Negative =
+    // use the default (min-dimension/2 when `round`, else 22).
+    property real radiusOverride: -1
+
+    // Theme-icon sources (Quickshell.iconPath) already arrive coloured and are
+    // drawn as-is. A local `file:` SVG is a solid #000 glyph, so it goes through
+    // an Image + ColorOverlay instead and tints with the tile's active state.
+    readonly property bool _localIcon: root.iconSource.startsWith("file:")
+
+    readonly property real cornerRadius: root.radiusOverride >= 0 ? root.radiusOverride
+        : root.round ? Math.min(root.width, root.height) / 2 : 22
     readonly property real radius: root.cornerRadius
 
     readonly property real iconSlotSize: root.round ? Math.max(26, Math.round(Math.min(root.width, root.height) * 0.4)) : 34
@@ -25,9 +36,11 @@ Item {
         radius: root.cornerRadius
         border.width: 0
         border.color: "transparent"
+        // Active  -> solid white (Theme.text) surface, Theme.accent contents.
+        // Inactive -> standard dark surface (Theme.background).
         color: {
             if (root.active)
-                return hover.hovered ? Qt.lighter(Theme.accent, 1.1) : Theme.accent
+                return hover.hovered ? Qt.darker(Theme.text, 1.06) : Theme.text
             return hover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
         }
 
@@ -43,15 +56,42 @@ Item {
             width: root.iconSlotSize
             height: root.iconSlotSize
 
+            // ---- theme icon (already coloured) ----
             IconImage {
                 anchors.centerIn: parent
 
                 width: root.iconSize
                 height: root.iconSize
 
-                source: root.iconSource
+                source: root._localIcon ? "" : root.iconSource
                 asynchronous: true
-                visible: root.iconSource !== ""
+                visible: !root._localIcon && root.iconSource !== ""
+            }
+
+            // ---- custom solid-#000 SVG, tinted to follow the tile state ----
+            Image {
+                id: svgIcon
+
+                anchors.centerIn: parent
+
+                width: root.iconSize
+                height: root.iconSize
+
+                source: root._localIcon ? root.iconSource : ""
+                sourceSize.width: root.iconSize * 2
+                sourceSize.height: root.iconSize * 2
+                fillMode: Image.PreserveAspectFit
+                asynchronous: true
+                smooth: true
+                mipmap: true
+                visible: false
+            }
+
+            ColorOverlay {
+                anchors.fill: svgIcon
+                source: svgIcon
+                visible: root._localIcon && svgIcon.status === Image.Ready
+                color: root.active ? Theme.accent : Theme.text
             }
         }
     }

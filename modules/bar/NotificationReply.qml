@@ -37,6 +37,13 @@ Column {
     function _enter() {
         root.replyMode = true
         input.forceActiveFocus()
+        // Entering reply mode may flip the host popup's layer surface from
+        // "no keyboard focus" to OnDemand; re-assert once that reconfigure has
+        // been sent so the field actually receives keystrokes.
+        Qt.callLater(function () {
+            if (root.replyMode)
+                input.forceActiveFocus()
+        })
     }
 
     function _cancel() {

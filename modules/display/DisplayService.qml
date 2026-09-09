@@ -12,12 +12,196 @@ Item {
     property var layout: ({})
     property string statusMessage: ""
     property bool statusIsError: false
-    property bool _pendingReload: false
 
     // Set by the canvas while a monitor is being dragged, so a late-arriving
     // Hyprland refresh does not overwrite the in-progress edit.
     property bool suspendSync: false
     onSuspendSyncChanged: if (root.suspendSync) resyncTimer.stop()
+
+    // ---- Instant Extend <-> Mirror toggle (Control Center tile) --------------
+    // Reuses applyPreset() + applyLive() (live `hyprctl eval` + monitors.lua
+    // persist) - no second mirror code path.
+
+    // Authoritative mirror state. Hyprland DROPS a mirroring output from
+    // `hyprctl monitors` (only `monitors all` shows it), so once mirrored it
+    // cannot be re-derived from the live model - this flag is the source of
+    // truth for the tile. Set optimistically by the toggle, rolled back if the
+    // apply fails, and seeded on boot from monitors.lua.
+    property bool _mirrorEngaged: false
+    readonly property bool mirrorActive: root._mirrorEngaged
+
+    // Full pre-mirror layout (every output), so toggle-off can restore exact
+    // position/scale/mode AND emit a spec for the now-hidden mirroring output
+    // to un-mirror it. In-memory; a shell restart mid-mirror falls back to the
+    // plain extend preset on toggle-off.
+    property var _extendSnapshot: null
+
+    // Snapshot of { layout, engaged, snapshot } taken before a toggle; restored
+    // wholesale if that toggle's applyLive() fails so the tile never lies. Only
+    // the toggle sets this - DisplayManager's Apply is unaffected.
+    property var _toggleRevert: null
+
+    // Enabled whenever a 2nd output exists, OR a mirror is engaged (so it can be
+    // switched back off even though only one output is then visible).
+    readonly property bool canMirror: root._mirrorEngaged || Object.keys(root.layout).length >= 2
+
+    property int _monCount: 0
+    property bool _seededMirrorFlag: false
+
+    Component.onCompleted: {
+        root._monCount = Hyprland.monitors.values.length
+        // Populate the model from live Hyprland (refreshMonitors + rebuild +
+        // the resync catch-up) so the tile's state is right from the first open.
+        root.syncFromHyprland()
+    }
+
+    // Hotplug: rebuild when the output count changes so `canMirror` and the
+    // model track connect/disconnect. Count-gated so the churn Hyprland emits
+    // after our own `hyprctl eval` (same count, stale lastIpcObject) does not
+    // clobber a layout we just applied. No new polling.
+    Connections {
+        target: Hyprland.monitors
+        function onValuesChanged() {
+            const n = Hyprland.monitors.values.length
+            if (n === root._monCount)
+                return
+            root._monCount = n
+            if (!root.suspendSync)
+                root.syncFromHyprland()
+        }
+    }
+
+    // Extend <-> Mirror. Mirrors every other output onto the focused one;
+    // toggling back restores the saved Extend layout. Live + persisted via
+    // applyLive() - exactly DisplayManager's Apply path, no second writer.
+    //
+    // A single `hyprctl monitors all -j` (mirroring outputs are hidden from the
+    // plain list / Quickshell's Hyprland.monitors, and no event fires after our
+    // own `hyprctl eval`) is the authoritative read each toggle acts on. One
+    // one-shot process per click - not polling.
+    function toggleMirror() {
+        if (monQueryProc.running)
+            return
+        monQueryProc.running = true
+    }
+
+    Process {
+        id: monQueryProc
+
+        command: ["hyprctl", "monitors", "all", "-j"]
+        stdout: StdioCollector { waitForEnd: true }
+
+        onExited: (exitCode) => {
+            let list = null
+            if (exitCode === 0) {
+                try {
+                    list = JSON.parse(monQueryProc.stdout.text)
+                } catch (e) {
+                    list = null
+                }
+            }
+            if (!list || !Array.isArray(list)) {
+                root.statusIsError = true
+                root.statusMessage = "Could not read displays"
+                statusTimer.restart()
+                return
+            }
+            root._toggleMirrorWith(list)
+        }
+    }
+
+    // Build a working-model entry from one `hyprctl monitors all` object.
+    function _monEntry(m) {
+        return {
+            x: m.x, y: m.y,
+            width: m.width, height: m.height,
+            refresh: m.refreshRate ? Math.round(m.refreshRate * 100) / 100 : 60,
+            scale: m.scale || 1,
+            transform: typeof m.transform === "number" ? m.transform : 0,
+            disabled: !!m.disabled,
+            mirrorOf: (m.mirrorOf && m.mirrorOf !== "none") ? m.mirrorOf : "",
+            availableModes: m.availableModes || [],
+            internal: m.name.indexOf("eDP") === 0
+        }
+    }
+
+    function _toggleMirrorWith(list) {
+        const full = {}
+        for (let i = 0; i < list.length; i++)
+            full[list[i].name] = root._monEntry(list[i])
+
+        const fullNames = Object.keys(full).sort()
+        const anyMirror = fullNames.some(n => full[n].mirrorOf)
+
+        if (anyMirror) {
+            // ---- Mirror -> Extend ---------------------------------------------
+            root._toggleRevert = {
+                layout: JSON.parse(JSON.stringify(root.layout)),
+                engaged: root._mirrorEngaged,
+                snapshot: root._extendSnapshot ? JSON.parse(JSON.stringify(root._extendSnapshot)) : null
+            }
+
+            let next
+            if (root._extendSnapshot) {
+                // Exact restore of the pre-mirror layout, with mirror cleared.
+                next = {}
+                const snapNames = Object.keys(root._extendSnapshot)
+                for (let i = 0; i < snapNames.length; i++) {
+                    const n = snapNames[i]
+                    next[n] = Object.assign({}, root._extendSnapshot[n], { mirrorOf: "" })
+                }
+            } else {
+                // No snapshot (booted mirrored) - un-mirror every real output and
+                // lay them left-to-right so none is lost from the persisted file.
+                next = {}
+                let cursor = 0
+                for (let i = 0; i < fullNames.length; i++) {
+                    const n = fullNames[i]
+                    const e = Object.assign({}, full[n], { mirrorOf: "", disabled: false, x: cursor, y: 0 })
+                    next[n] = e
+                    const w = e.transform === 1 || e.transform === 3 ? e.height : e.width
+                    cursor += Math.max(1, Math.round((w || 1) / (e.scale || 1)))
+                }
+            }
+
+            root.layout = next
+            root._extendSnapshot = null
+            root._mirrorEngaged = false
+            root.applyLive()
+            return
+        }
+
+        // ---- Extend -> Mirror -----------------------------------------------
+        if (fullNames.length < 2) {
+            root.statusIsError = true
+            root.statusMessage = "Mirror needs 2+ displays"
+            statusTimer.restart()
+            return
+        }
+        for (let i = 0; i < fullNames.length; i++) {
+            const e = full[fullNames[i]]
+            if (!(e.width > 0) || !(e.height > 0)) {
+                root.statusIsError = true
+                root.statusMessage = "Display info not ready — try again"
+                statusTimer.restart()
+                return
+            }
+        }
+
+        root._toggleRevert = {
+            layout: JSON.parse(JSON.stringify(root.layout)),
+            engaged: false,
+            snapshot: root._extendSnapshot ? JSON.parse(JSON.stringify(root._extendSnapshot)) : null
+        }
+        root._extendSnapshot = JSON.parse(JSON.stringify(full))
+        root.layout = JSON.parse(JSON.stringify(full))
+
+        const focused = Hyprland.focusedMonitor
+        const source = (focused && full[focused.name]) ? focused.name : fullNames[0]
+        root.applyPreset("mirror", { source: source })
+        root._mirrorEngaged = true
+        root.applyLive()
+    }
 
     function monitorNames() {
         return Object.keys(root.layout).sort()
@@ -225,7 +409,7 @@ Item {
         root.setPosition(name, Math.round(cur.x), Math.round(cur.y))
     }
 
-    function applyPreset(preset) {
+    function applyPreset(preset, opts) {
         const names = root.monitorNames()
         if (names.length === 0)
             return
@@ -237,10 +421,16 @@ Item {
                 cursorX += root.logicalSize(names[i]).width
             }
         } else if (preset === "mirror") {
-            const primary = names[0]
+            // Optional opts.source picks which output the rest mirror onto;
+            // defaults to names[0] so the 1-arg DisplayManager calls are
+            // unchanged.
+            const primary = (opts && opts.source && root.layout[opts.source]) ? opts.source : names[0]
             root.updateMonitor(primary, { disabled: false, mirrorOf: "", x: 0, y: 0 })
-            for (let i = 1; i < names.length; i++)
+            for (let i = 0; i < names.length; i++) {
+                if (names[i] === primary)
+                    continue
                 root.updateMonitor(names[i], { disabled: false, mirrorOf: primary, x: 0, y: 0 })
+            }
         } else if (preset === "internalOnly") {
             for (let i = 0; i < names.length; i++)
                 root.updateMonitor(names[i], { disabled: !root.layout[names[i]].internal, mirrorOf: "" })
@@ -316,6 +506,12 @@ Item {
         return "{ " + fields.join(", ") + " }"
     }
 
+    // Apply = push the layout live AND persist it. `applyProc` does the live
+    // `hyprctl eval hl.monitor(...)`; on success its onExited calls
+    // _persistConfig() to write the identical spec to monitors.lua. There is no
+    // separate Save action - the two were always meant to happen together, and
+    // splitting them let an "Applied" layout silently vanish on the next
+    // Hyprland/laptop restart (which re-reads monitors.lua verbatim).
     function applyLive() {
         const names = root.monitorNames()
         if (names.length === 0)
@@ -335,7 +531,14 @@ Item {
         applyProc.running = true
     }
 
-    function saveConfig() {
+    // Persist the current layout to ~/.config/hypr/monitors.lua so it is
+    // re-applied on every `hyprctl reload` AND on a full Hyprland / laptop
+    // restart - hyprland.lua does `require("monitors")` -> hl.monitor() at
+    // startup. Same HL.MonitorSpec table literals as the live apply, so the
+    // saved layout is byte-for-byte the one just applied. No `hyprctl reload`
+    // here: the live apply already set the running state; a reload would only
+    // add a redundant re-layout flash.
+    function _persistConfig() {
         const names = root.monitorNames()
         const lines = ["return {"]
 
@@ -345,7 +548,6 @@ Item {
         lines.push("}")
         lines.push("")
 
-        root._pendingReload = true
         monitorsFile.setText(lines.join("\n"))
     }
 
@@ -358,39 +560,29 @@ Item {
         onExited: (exitCode) => {
             root.statusIsError = exitCode !== 0
             if (exitCode === 0) {
-                root.statusMessage = "Applied live"
+                // Live apply landed -> write the same layout to monitors.lua so
+                // it survives reload / restart / reboot. monitorsFile.onSaved /
+                // onSaveFailed finalises the status message.
+                root.statusMessage = "Applying…"
+                root._toggleRevert = null
+                root._persistConfig()
             } else {
+                // A failed Control Center mirror toggle must not leave the tile
+                // claiming the wrong state - roll layout + flag + snapshot back.
+                // (Only toggleMirror() arms _toggleRevert; DisplayManager's
+                // Apply leaves it null and is unaffected.)
+                if (root._toggleRevert) {
+                    root.layout = root._toggleRevert.layout
+                    root._mirrorEngaged = root._toggleRevert.engaged
+                    root._extendSnapshot = root._toggleRevert.snapshot
+                    root._toggleRevert = null
+                }
                 const raw = ((applyProc.stdout.text || "") + (applyProc.stderr.text || "")).trim()
                 const errLine = raw.split("\n").filter(l => /error/i.test(l))[0]
                 root.statusMessage = "Apply failed: " + (errLine || raw.split("\n").pop() || ("exit " + exitCode))
                 console.warn("[DisplayService] apply failed (" + exitCode + "):\n" + raw)
+                statusTimer.restart()
             }
-            statusTimer.restart()
-        }
-    }
-
-    // Save = write monitors.lua, then `hyprctl reload` so the persisted config
-    // becomes the live config (and stays applied across later reloads).
-    Process {
-        id: reloadProc
-
-        command: ["sh", "-c", "hyprctl reload && hyprctl configerrors"]
-        stdout: StdioCollector { waitForEnd: true }
-        stderr: StdioCollector { waitForEnd: true }
-
-        onExited: (exitCode) => {
-            const errText = (reloadProc.stdout.text || "").replace(/^ok\s*/i, "").trim()
-            if (exitCode === 0 && errText === "") {
-                root.statusIsError = false
-                root.statusMessage = "Saved + reloaded"
-            } else {
-                root.statusIsError = true
-                const detail = errText || (reloadProc.stderr.text || "").trim() || ("exit " + exitCode)
-                root.statusMessage = "Reload error: " + detail.split("\n")[0]
-                console.warn("[DisplayService] hyprctl reload failed (" + exitCode + "):\n"
-                    + (reloadProc.stdout.text || "") + (reloadProc.stderr.text || ""))
-            }
-            statusTimer.restart()
         }
     }
 
@@ -401,23 +593,27 @@ Item {
         printErrors: true
         atomicWrites: true
 
+        // On the first load, seed the mirror flag if we booted with a persisted
+        // mirror (Hyprland then hides the mirroring output, so the tile state
+        // can't be recovered from live monitor data).
+        onLoaded: {
+            if (root._seededMirrorFlag)
+                return
+            root._seededMirrorFlag = true
+            const t = monitorsFile.text()
+            if (t && /\bmirror\s*=/.test(t))
+                root._mirrorEngaged = true
+        }
+
         onSaved: {
-            if (root._pendingReload) {
-                root._pendingReload = false
-                root.statusIsError = false
-                root.statusMessage = "Saved, reloading…"
-                reloadProc.running = true
-            } else {
-                root.statusIsError = false
-                root.statusMessage = "Saved to monitors.lua"
-                statusTimer.restart()
-            }
+            root.statusIsError = false
+            root.statusMessage = "Applied & saved"
+            statusTimer.restart()
         }
 
         onSaveFailed: {
-            root._pendingReload = false
             root.statusIsError = true
-            root.statusMessage = "Save failed"
+            root.statusMessage = "Applied live — save to monitors.lua failed"
             statusTimer.restart()
         }
     }
