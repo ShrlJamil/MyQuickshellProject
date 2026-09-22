@@ -61,16 +61,15 @@ ShellRoot {
         property string mode: ""
         property ShellScreen screen: null
         // true when "media" mode was opened by the user clicking the bar
-        // preview (vs auto-expand). Both modes take keyboard focus (so Escape /
-        // click-outside dismiss either); manual just suppresses the 4s auto-hide.
+        // preview (vs auto-expand). Gates the focus grab (Bar) + focus routing
+        // (DynamicCenter/MediaPlayer) and suppresses the auto-hide timer:
+        // manual is a persistent interactive surface, auto is focus-free.
         property bool mediaManual: false
 
         // Escape / click-outside clear `mode` -> kill the auto-hide timer in the
         // same turn so a stale tick can't fire after an early dismiss.
         onModeChanged: if (mode !== "media") mediaAutoHide.stop()
-        // Pinning the panel (manual click) must kill any auto-hide already
-        // counting - including one whose declarative `running` binding was
-        // broken by an earlier restart() from an auto-expand.
+        // Manual open pins the panel: kill any auto-hide already counting.
         onMediaManualChanged: if (mediaManual) mediaAutoHide.stop()
     }
 
@@ -83,8 +82,8 @@ ShellRoot {
     }
 
     // Run the cava spectrum analyzer (-> CavaService.bars, consumed by the bar
-    // MediaPreview mini-viz and the expanded MediaPlayer radial ring) only while
-    // something is actually playing; pausing releases its capture stream.
+    // MediaPreview mini-viz) only while something is actually playing; pausing
+    // releases its capture stream.
     Binding {
         target: CavaService
         property: "active"
@@ -93,11 +92,10 @@ ShellRoot {
 
     Timer {
         id: mediaAutoHide
-        interval: 4000
+        interval: 3000
         running: barState.mode === "media" && !barState.mediaManual
         onTriggered: {
-            // Never close a pinned (manual) panel, even if the timer was left
-            // running by a broken binding.
+            // Manual-open never auto-hides; it closes via Escape/outside-click.
             if (barState.mode === "media" && !barState.mediaManual) {
                 barState.screen = null
                 barState.mode = ""
@@ -129,9 +127,8 @@ ShellRoot {
             mediaAutoHide.restart()
         }
 
-        // User is interacting with the expanded player -> keep it open. Only
-        // relevant to an auto-expanded preview; a pinned (manual) panel has no
-        // timer to postpone.
+        // User is interacting with the auto-expanded player -> keep it open by
+        // postponing the auto-hide timer. Manual-open has no timer running.
         function onInteraction() {
             if (barState.mode === "media" && !barState.mediaManual)
                 mediaAutoHide.restart()

@@ -377,7 +377,7 @@ Item {
                 }
                 onCloseRequested: root.closeRequested()
             }
-            onLoaded: if (root.activeSurface === "media") root._focusSurface("media")
+            onLoaded: if (root.activeSurface === "media" && root.mediaManual) root._focusSurface("media")
         }
     }
 
@@ -455,10 +455,9 @@ Item {
             root._focusSurface("display")
         } else if (root.activeSurface === "media") {
             root._mediaLatched = true
-            // Same story - no grab of its own. Focus here + the bar's
-            // surfaceActive (true for auto-expand too now) let Esc / click
-            // outside close it before the 4s auto-hide.
-            root._focusSurface("media")
+            // Manual open only: route focus so Escape works. Auto-expand never
+            // takes focus and relies on the 3s auto-hide timer instead.
+            if (root.mediaManual) root._focusSurface("media")
         }
     }
 }

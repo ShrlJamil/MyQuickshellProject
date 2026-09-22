@@ -30,11 +30,12 @@ PanelWindow {
         && root.screen
         && Hyprland.focusedMonitor
         && root.screen.name === Hyprland.focusedMonitor.name
-    // `mediaExpanded` (auto-expand OR manual) now arms the focus grab so Escape
-    // and click-outside dismiss the preview early; `mediaManual` no longer gates
-    // this, only the 4s auto-hide timer in shell.qml.
+    // Media arms the focus grab on manual open only: `mediaExpanded && manual`
+    // makes the surface interactive (Escape + outside-click close it) while an
+    // auto-expand stays fully focus-free and closes via the 3s auto-hide timer
+    // in shell.qml. The input mask below covers the card in both modes.
     property bool surfaceActive: (barState.screen === root.screen && (barState.mode === "power" || barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact")) || root.isCaptureActive
-        || root.mediaExpanded
+        || (root.mediaExpanded && barState.mediaManual)
 
     onIsCaptureActiveChanged: console.log("[Bar] isCaptureActive ->", root.isCaptureActive, "screen =", (root.screen ? root.screen.name : "null"))
 

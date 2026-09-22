@@ -1,13 +1,12 @@
 import QtQuick
 import QtQuick.Shapes
 import Qt5Compat.GraphicalEffects
-import "../services"
 import "../../components"
 
 // Expanded media player, rendered as a DynamicCenter surface (no PanelWindow of
-// its own). Vinyl on the left wrapped in a 360-degree radial wave halo; to the
-// right a compact vertical stack: title / artist, a playback controls row, and
-// the progress / seek line directly below it. `active` is set true by
+// its own). Vinyl on the left; to the right a compact vertical stack: title /
+// artist, a playback controls row, and the progress / seek line directly below
+// it. `active` is set true by
 // DynamicCenter only while this surface is on screen, so nothing animates
 // otherwise.
 Item {
@@ -15,9 +14,9 @@ Item {
 
     required property var mediaService
     property bool active: false
-    // True when opened by clicking the bar preview (vs auto-expand). Only gates
-    // the 4s auto-hide timer now (shell.qml) - both modes take keyboard focus
-    // so Escape / click-outside close either.
+    // True when opened by clicking the bar preview (vs auto-expand). Gates all
+    // focus behavior (focus flag + explicit grabs) and suppresses the 3s
+    // auto-hide timer in shell.qml - auto-expand stays fully focus-free.
     property bool manual: false
 
     signal closeRequested()
@@ -29,12 +28,6 @@ Item {
     readonly property bool hasMedia: root.mediaService && root.mediaService.hasMedia
     readonly property bool playing: root.hasMedia && root.mediaService.playing
     readonly property bool spinning: root.active && root.playing
-
-    // Real spectrum feed for the radial visualizer: CavaService streams 26
-    // normalized 0..1 magnitudes while audio plays. Each radial bar is driven
-    // by spectrumData[i]; an empty array (cava offline/crashed) makes the
-    // delegates fall back to the procedural sine simulation below.
-    property var spectrumData: CavaService.bars
 
     // narrower than the full DynamicCenter surface width
     readonly property int surfaceW: Math.min(470, width)
@@ -66,16 +59,18 @@ Item {
         return (h > 0 ? h + ":" : "") + mm + ":" + (r < 10 ? "0" + r : r)
     }
 
-    // Take keyboard focus whenever the surface is on screen - auto-expand
-    // included, not just a manual click-open - so Escape and an outside click
-    // dismiss it immediately instead of waiting out the 4s auto-hide. `manual`
-    // now only decides whether that auto-hide timer runs (see shell.qml).
-    focus: root.active
+    // Focus is strictly manual-only: the flag and both explicit grabs are gated
+    // on `manual`, so an auto-expand never takes keyboard focus while a manual
+    // open behaves as an interactive focused surface (Escape works).
+    focus: root.active && root.manual
     onActiveChanged: {
-        if (root.active) root.forceActiveFocus()
-        else root.playerMenuOpen = false
+        if (root.active) {
+            if (root.manual) root.forceActiveFocus()
+        } else {
+            root.playerMenuOpen = false
+        }
     }
-    onVisibleChanged: if (root.visible) root.forceActiveFocus()
+    onVisibleChanged: if (root.visible && root.manual) root.forceActiveFocus()
     Keys.onPressed: (event) => {
         if (event.key === Qt.Key_Escape) {
             if (root.playerMenuOpen)
@@ -210,114 +205,17 @@ Item {
             anchors.centerIn: parent
             spacing: 26
 
-            // vinyl + radial wave halo. vinylWrap is sized to the full halo
-            // extent (disc diameter + outward bar reach).
+            // vinyl disc on the left.
             Item {
                 id: vinylWrap
-                width: 128
-                height: 128
+                width: 138
+                height: 138
                 anchors.verticalCenter: parent.verticalCenter
-
-                // ---- radial wave halo -----------------------------------
-                // A dense 360-degree ring of thick, near-seamless bars bursting
-                // from the vinyl rim. Decorative only: NO audio capture / FFT /
-                // analyzer / extra timer - one FrameAnimation advances `phase`
-                // and each bar's length follows sin(phase + i). radialViz
-                // itself never rotates (static angular distribution) while
-                // `disc` spins inside it, so the ring reads as a pulsing
-                // equalizer. Follows the ACTUAL playback state (root.spinning):
-                // on pause/stop `amp` -> 0 and every bar retracts to length 0,
-                // fully hidden behind the disc (radialViz is z:-1, inner ends
-                // pinned inside the disc radius).
-                Item {
-                    id: radialViz
-                    anchors.centerIn: parent
-                    width: parent.width
-                    height: parent.height
-                    // full-strength accent, matching the compact bar visualizer.
-                    opacity: 1.0
-                    // sits behind the vinyl: retracted (paused) bars park inside
-                    // the disc radius and are fully hidden by it.
-                    z: -1
-
-                    readonly property bool live: root.spinning
-                    property real phase: 0
-                    // 0..1 envelope: eases up while playing, eases to 0 (bars
-                    // shrink to stubs) on pause/stop.
-                    property real amp: 0
-                    Behavior on amp { NumberAnimation { duration: 360; easing.type: Easing.InOutQuad } }
-                    onLiveChanged: radialViz.amp = radialViz.live ? 1 : 0
-                    Component.onCompleted: radialViz.amp = radialViz.live ? 1 : 0
-
-                    FrameAnimation {
-                        running: radialViz.live
-                        onTriggered: radialViz.phase = (radialViz.phase + frameTime * 3.0) % (Math.PI * 2)
-                    }
-
-                    readonly property int barCount: 26
-                    // inner end of every bar, pinned just INSIDE the disc rim
-                    // (disc r 46) so a retracted bar is completely covered.
-                    readonly property real innerRadius: 43
-                    // paused -> 0: bars collapse entirely behind the vinyl.
-                    readonly property real barMin: 0
-                    readonly property real barMax: 20
-                    readonly property real barThickness: 9
-
-                    Repeater {
-                        model: radialViz.barCount
-
-                        delegate: Item {
-                            id: rBar
-                            required property int index
-
-                            anchors.centerIn: parent
-                            width: radialViz.barThickness
-                            height: radialViz.height
-                            rotation: rBar.index * (360 / radialViz.barCount)
-
-                            // static per-bar "character" so lengths vary bar to bar
-                            readonly property real seed: 0.55 + 0.45 * Math.sin(rBar.index * 2.399)
-                            // per-frame 0..1 wobble while playing (depends on phase)
-                            readonly property real wobble: 0.5 + 0.5 * Math.sin(radialViz.phase + rBar.index * 0.9)
-                            // procedural 0..1 magnitude (the always-available sim)
-                            readonly property real simMag: (0.35 + 0.65 * rBar.seed) * (0.35 + 0.65 * rBar.wobble)
-                            // real analyzer bin for this bar, or -1 when no feed.
-                            readonly property real specMag: (root.spectrumData && root.spectrumData.length > 0)
-                                ? Math.max(0, Math.min(1, root.spectrumData[rBar.index % root.spectrumData.length]))
-                                : -1
-                            // Cava feed wins when present; sine sim is the fallback.
-                            // `amp` still gates both so play/stop stays smooth.
-                            readonly property real barLen: radialViz.barMin
-                                + (radialViz.barMax - radialViz.barMin)
-                                  * (rBar.specMag >= 0 ? rBar.specMag : rBar.simMag)
-                                  * radialViz.amp
-
-                            Rectangle {
-                                anchors.horizontalCenter: parent.horizontalCenter
-                                // bottom pinned at innerRadius above centre; the
-                                // bar grows outward (upward) as barLen rises.
-                                anchors.bottom: parent.verticalCenter
-                                anchors.bottomMargin: radialViz.innerRadius
-                                width: radialViz.barThickness
-                                height: Math.max(0, rBar.barLen)
-                                radius: 2
-                                color: Theme.accent
-
-                                // ease only while NOT playing - a Behavior during
-                                // playback would low-pass the per-frame motion away.
-                                Behavior on height {
-                                    enabled: !radialViz.live
-                                    NumberAnimation { duration: 300; easing.type: Easing.OutQuad }
-                                }
-                            }
-                        }
-                    }
-                }
 
                 Item {
                     id: vinyl
-                    width: 92
-                    height: 92
+                    width: 138
+                    height: 138
                     anchors.centerIn: parent
 
                     Rectangle {
