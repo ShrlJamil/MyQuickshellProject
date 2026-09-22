@@ -1,7 +1,6 @@
 import QtQuick
 import QtQuick.Shapes
 import Qt5Compat.GraphicalEffects
-import Qt.labs.folderlistmodel
 import Quickshell
 import Quickshell.Io
 import "../../components"
@@ -27,12 +26,18 @@ Item {
     implicitWidth: 680
     implicitHeight: 140
 
-    onVisibleChanged: if (root.visible) root.forceActiveFocus()
+    onVisibleChanged: if (root.visible) {
+        root.forceActiveFocus()
+        root._reloadWallpapers()
+    }
+
+    Component.onCompleted: root._reloadWallpapers()
 
     function _pathAt(i) {
         if (i < 0 || i >= wallModel.count)
             return ""
-        const u = String(wallModel.get(i, "fileUrl"))
+        const o = wallModel.get(i)
+        const u = String((o && o.fileUrl) || "")
         return decodeURIComponent(u.replace(/^file:\/\//, ""))
     }
 
@@ -81,16 +86,59 @@ Item {
         }
     }
 
-    FolderListModel {
+    property bool _rebuilding: false
+
+    ListModel {
         id: wallModel
 
-        folder: "file://" + root.wallpaperDir
-        nameFilters: ["*.jpg", "*.jpeg", "*.png", "*.webp"]
-        showDirs: false
-        showHidden: false
-        sortField: FolderListModel.Name
+        onCountChanged: if (!root._rebuilding && strip.currentIndex < 0 && wallModel.count > 0) strip.currentIndex = 0
+    }
 
-        onCountChanged: if (strip.currentIndex < 0 && wallModel.count > 0) strip.currentIndex = 0
+    Process {
+        id: dirProc
+
+        command: ["find", root.wallpaperDir, "-maxdepth", "1", "-type", "f", "-printf", "%f\n"]
+        stdout: StdioCollector { id: dirOut; waitForEnd: true }
+
+        onExited: (code) => {
+            if (code === 0)
+                root._populate(dirOut.text)
+        }
+    }
+
+    function _reloadWallpapers() {
+        if (!dirProc.running)
+            dirProc.running = true
+    }
+
+    function _populate(text) {
+        var keep = root.selectedPath
+        var rows = String(text || "").split("\n")
+        var items = []
+        for (var i = 0; i < rows.length; i++) {
+            var nm = rows[i].trim()
+            if (nm.length === 0 || nm.charAt(0) === ".")
+                continue
+            if (!/\.(jpe?g|png|webp)$/i.test(nm))
+                continue
+            items.push(nm)
+        }
+        items.sort()
+        root._rebuilding = true
+        wallModel.clear()
+        for (var j = 0; j < items.length; j++)
+            wallModel.append({ fileUrl: "file://" + encodeURI(root.wallpaperDir + "/" + items[j]) })
+        root._rebuilding = false
+        if (strip.currentIndex < 0 && wallModel.count > 0)
+            strip.currentIndex = 0
+        if (keep !== "" && wallModel.count > 0) {
+            for (var k = 0; k < wallModel.count; k++) {
+                if (root._pathAt(k) === keep) {
+                    strip.currentIndex = k
+                    break
+                }
+            }
+        }
     }
 
     // Inline wallpaper + theme apply. $1 == image path.

@@ -46,11 +46,11 @@ Item {
     // per-mode magic numbers live here anymore.
     readonly property Item _activeItem: {
         switch (root.activeSurface) {
-        case "power": return powerMenuSurface
-        case "display": return displaySurface
-        case "wallpapers": return wallpaperSurface
-        case "capture": return captureBarSurface
-        case "media": return mediaPlayerSurface
+        case "power": return powerLoader.item
+        case "display": return displayLoader.item
+        case "wallpapers": return wallpaperLoader.item
+        case "capture": return captureLoader.item
+        case "media": return mediaLoader.item
         default: return null
         }
     }
@@ -162,7 +162,7 @@ Item {
                     // (== allocatedHeight, still 0 when this transition starts on
                     // open) and NOT targetHeight (0 while activeSurface is idle).
                     y: (root.activeSurface === "display" || root._lastSurface === "display")
-                        ? -displaySurface.implicitHeight : -80
+                        ? -(displayLoader.item ? displayLoader.item.implicitHeight : 0) : -80
                 }
             },
             State {
@@ -259,59 +259,90 @@ Item {
         //   opacity  = 1 while active or closing-linger, else 0
         //   Behavior = only runs while _prevSurface is set (a live switch), so
         //              open / close never fade - they're the pure y slide.
-        PowerMenu {
-            id: powerMenuSurface
+        //
+        // Each surface lives behind a latched Loader: nothing is instantiated
+        // at startup; the first open creates it synchronously (no async pop,
+        // geometry valid on the opening frame) and it stays loaded afterwards.
+        // Loader.active honors the existing visibility conditions plus a
+        // one-way load latch (see below) - the mode remains solely
+        // `activeSurface` (+ the transient `_prevSurface`/`_lastSurface`).
+        Loader {
+            id: powerLoader
             width: parent.width
-            visible: root.activeSurface === "power" || root._prevSurface === "power"
+            active: root._powerLatched || root.activeSurface === "power" || root._prevSurface === "power"
                 || (root.allocatedHeight > 0 && root._lastSurface === "power")
-            opacity: (root.activeSurface === "power"
-                || (root.activeSurface === "idle" && root.allocatedHeight > 0 && root._lastSurface === "power")) ? 1 : 0
-            Behavior on opacity {
-                enabled: root._prevSurface !== ""
-                NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+            sourceComponent: PowerMenu {
+                width: parent.width
+                visible: root.activeSurface === "power" || root._prevSurface === "power"
+                    || (root.allocatedHeight > 0 && root._lastSurface === "power")
+                opacity: (root.activeSurface === "power"
+                    || (root.activeSurface === "idle" && root.allocatedHeight > 0 && root._lastSurface === "power")) ? 1 : 0
+                Behavior on opacity {
+                    enabled: root._prevSurface !== ""
+                    NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+                }
+                onCloseRequested: root.closeRequested()
             }
-            onCloseRequested: root.closeRequested()
+            onLoaded: if (root.activeSurface === "power") root._focusSurface("power")
         }
 
-        CaptureBar {
-            id: captureBarSurface
+        Loader {
+            id: captureLoader
             anchors.horizontalCenter: parent.horizontalCenter
-            visible: root.activeSurface === "capture" || root._prevSurface === "capture"
+            active: root._captureLatched || root.activeSurface === "capture" || root._prevSurface === "capture"
                 || (root.allocatedHeight > 0 && root._lastSurface === "capture")
-            opacity: (root.activeSurface === "capture"
-                || (root.activeSurface === "idle" && root.allocatedHeight > 0 && root._lastSurface === "capture")) ? 1 : 0
-            Behavior on opacity {
-                enabled: root._prevSurface !== ""
-                NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+            sourceComponent: CaptureBar {
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: root.activeSurface === "capture" || root._prevSurface === "capture"
+                    || (root.allocatedHeight > 0 && root._lastSurface === "capture")
+                opacity: (root.activeSurface === "capture"
+                    || (root.activeSurface === "idle" && root.allocatedHeight > 0 && root._lastSurface === "capture")) ? 1 : 0
+                Behavior on opacity {
+                    enabled: root._prevSurface !== ""
+                    NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+                }
             }
+            onLoaded: if (root.activeSurface === "capture") root._focusSurface("capture")
         }
 
-        DisplayManager {
-            id: displaySurface
+        Loader {
+            id: displayLoader
             width: parent.width
-            visible: root.activeSurface === "display" || root._prevSurface === "display"
+            active: root._displayLatched || root.activeSurface === "display" || root._prevSurface === "display"
                 || (root.allocatedHeight > 0 && root._lastSurface === "display")
-            opacity: (root.activeSurface === "display"
-                || (root.activeSurface === "idle" && root.allocatedHeight > 0 && root._lastSurface === "display")) ? 1 : 0
-            Behavior on opacity {
-                enabled: root._prevSurface !== ""
-                NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+            sourceComponent: DisplayManager {
+                width: parent.width
+                visible: root.activeSurface === "display" || root._prevSurface === "display"
+                    || (root.allocatedHeight > 0 && root._lastSurface === "display")
+                opacity: (root.activeSurface === "display"
+                    || (root.activeSurface === "idle" && root.allocatedHeight > 0 && root._lastSurface === "display")) ? 1 : 0
+                Behavior on opacity {
+                    enabled: root._prevSurface !== ""
+                    NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+                }
+                onCloseRequested: root.closeRequested()
             }
-            onCloseRequested: root.closeRequested()
+            onLoaded: if (root.activeSurface === "display") root._focusSurface("display")
         }
 
-        WallpaperPicker {
-            id: wallpaperSurface
+        Loader {
+            id: wallpaperLoader
             width: parent.width
-            visible: root.activeSurface === "wallpapers" || root._prevSurface === "wallpapers"
+            active: root._wallpapersLatched || root.activeSurface === "wallpapers" || root._prevSurface === "wallpapers"
                 || (root.allocatedHeight > 0 && root._lastSurface === "wallpapers")
-            opacity: (root.activeSurface === "wallpapers"
-                || (root.activeSurface === "idle" && root.allocatedHeight > 0 && root._lastSurface === "wallpapers")) ? 1 : 0
-            Behavior on opacity {
-                enabled: root._prevSurface !== ""
-                NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+            sourceComponent: WallpaperPicker {
+                width: parent.width
+                visible: root.activeSurface === "wallpapers" || root._prevSurface === "wallpapers"
+                    || (root.allocatedHeight > 0 && root._lastSurface === "wallpapers")
+                opacity: (root.activeSurface === "wallpapers"
+                    || (root.activeSurface === "idle" && root.allocatedHeight > 0 && root._lastSurface === "wallpapers")) ? 1 : 0
+                Behavior on opacity {
+                    enabled: root._prevSurface !== ""
+                    NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+                }
+                onCloseRequested: root.closeRequested()
             }
-            onCloseRequested: root.closeRequested()
+            onLoaded: if (root.activeSurface === "wallpapers") root._focusSurface("wallpapers")
         }
 
         Item {
@@ -326,22 +357,57 @@ Item {
             visible: root.activeSurface === "mediaCompact"
         }
 
-        MediaPlayer {
-            id: mediaPlayerSurface
+        Loader {
+            id: mediaLoader
             width: parent.width
-            mediaService: root.mediaService
-            manual: root.mediaManual
-            active: root.activeSurface === "media"
-            visible: root.activeSurface === "media" || root._prevSurface === "media"
+            active: root._mediaLatched || root.activeSurface === "media" || root._prevSurface === "media"
                 || (root.allocatedHeight > 0 && root._lastSurface === "media")
-            opacity: (root.activeSurface === "media"
-                || (root.activeSurface === "idle" && root.allocatedHeight > 0 && root._lastSurface === "media")) ? 1 : 0
-            Behavior on opacity {
-                enabled: root._prevSurface !== ""
-                NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+            sourceComponent: MediaPlayer {
+                width: parent.width
+                mediaService: root.mediaService
+                manual: root.mediaManual
+                active: root.activeSurface === "media"
+                visible: root.activeSurface === "media" || root._prevSurface === "media"
+                    || (root.allocatedHeight > 0 && root._lastSurface === "media")
+                opacity: (root.activeSurface === "media"
+                    || (root.activeSurface === "idle" && root.allocatedHeight > 0 && root._lastSurface === "media")) ? 1 : 0
+                Behavior on opacity {
+                    enabled: root._prevSurface !== ""
+                    NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+                }
+                onCloseRequested: root.closeRequested()
             }
-            onCloseRequested: root.closeRequested()
+            onLoaded: if (root.activeSurface === "media") root._focusSurface("media")
         }
+    }
+
+    // One-way load latches: set when a surface first becomes active, never
+    // cleared. These are load-lifecycle flags, not mode state - the mode
+    // remains solely `activeSurface` (+ `_prevSurface`/`_lastSurface`).
+    property bool _powerLatched: false
+    property bool _captureLatched: false
+    property bool _displayLatched: false
+    property bool _wallpapersLatched: false
+    property bool _mediaLatched: false
+
+    function _surfaceItem(name) {
+        switch (name) {
+        case "power": return powerLoader.item
+        case "capture": return captureLoader.item
+        case "display": return displayLoader.item
+        case "wallpapers": return wallpaperLoader.item
+        case "media": return mediaLoader.item
+        default: return null
+        }
+    }
+
+    function _focusSurface(name) {
+        var it = root._surfaceItem(name)
+        if (!it)
+            return
+        if (name === "power" && it.reset)
+            it.reset()
+        it.forceActiveFocus()
     }
 
     onActiveSurfaceChanged: {
@@ -374,21 +440,25 @@ Item {
             root._lastSurface = root.activeSurface
 
         if (root.activeSurface === "power") {
-            powerMenuSurface.reset()
-            powerMenuSurface.forceActiveFocus()
+            root._powerLatched = true
+            root._focusSurface("power")
         } else if (root.activeSurface === "wallpapers") {
-            wallpaperSurface.forceActiveFocus()
+            root._wallpapersLatched = true
+            root._focusSurface("wallpapers")
         } else if (root.activeSurface === "capture") {
-            captureBarSurface.forceActiveFocus()
+            root._captureLatched = true
+            root._focusSurface("capture")
         } else if (root.activeSurface === "display") {
+            root._displayLatched = true
             // Arms the bar's HyprlandFocusGrab so Esc + click-outside dismiss
             // work (DisplayManager has no PanelWindow / grab of its own).
-            displaySurface.forceActiveFocus()
+            root._focusSurface("display")
         } else if (root.activeSurface === "media") {
+            root._mediaLatched = true
             // Same story - no grab of its own. Focus here + the bar's
             // surfaceActive (true for auto-expand too now) let Esc / click
             // outside close it before the 4s auto-hide.
-            mediaPlayerSurface.forceActiveFocus()
+            root._focusSurface("media")
         }
     }
 }
