@@ -15,6 +15,24 @@ Item {
     property color textDim: "#a6adc8"
     property color textMuted: "#888888"
     property color accent: "#89b4fa"
+    property color activeTile: "#c4c9d1"
+    property color border: "#45475a"
+
+    // Shared translucent-surface opacity, sourced from the Wallust-generated
+    // palette (`surfaceOpacity`, 0.5 in the template). Consumed by the static
+    // bar, DynamicCenter frame, ControlCenter panels, and OSD backgrounds.
+    // Falls back to 1 (fully opaque) while no palette provides it.
+    property real surfaceOpacity: 1
+
+    // Active/ON-state icon color (white, constant across wallpapers so icons
+    // stay readable). Sourced from the Wallust palette (`icon`).
+    property color icon: "#F2F4F5"
+
+    // Material prototype (static bar only): ultra-subtle directional top
+    // highlight + bottom edge key over the blurred backdrop. Neutral white at
+    // single-digit opacities; the surfaceOpacity tint does the heavy lifting.
+    property real materialHighlightOpacity: 0.05
+    property real materialBorderOpacity: 0.06
 
     // UI text typeface (`font.family: Theme.fontFamily` on Text elements).
     // "Google Sans Flex" is the variable-font build of Google Sans installed on
@@ -48,6 +66,10 @@ Item {
             property string textDim: ""
             property string textMuted: ""
             property string accent: ""
+            property string activeTile: ""
+            property string border: ""
+            property string icon: ""
+            property real surfaceOpacity: 0
         }
     }
 
@@ -58,6 +80,10 @@ Item {
         if (paletteAdapter.textDim) root.textDim = paletteAdapter.textDim
         if (paletteAdapter.textMuted) root.textMuted = paletteAdapter.textMuted
         if (paletteAdapter.accent) root.accent = paletteAdapter.accent
+        if (paletteAdapter.activeTile) root.activeTile = paletteAdapter.activeTile
+        if (paletteAdapter.border) root.border = paletteAdapter.border
+        if (paletteAdapter.icon) root.icon = paletteAdapter.icon
+        if (paletteAdapter.surfaceOpacity > 0) root.surfaceOpacity = paletteAdapter.surfaceOpacity
     }
 
     Connections {

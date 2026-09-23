@@ -87,7 +87,7 @@ Item {
             ColorOverlay {
                 anchors.fill: battImg
                 source: battImg
-                color: iconBox.attention ? Theme.accent : Theme.text
+                color: iconBox.attention ? Theme.accent : Theme.icon
 
                 // Subtle fade, fires only while the Image reloads on a
                 // threshold cross, never while idle.
@@ -101,7 +101,7 @@ Item {
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: Math.round(BatteryService.percent) + "%"
-            color: BatteryService.low ? Theme.accent : Theme.text
+            color: BatteryService.low ? Theme.accent : Theme.icon
             font.family: Theme.fontFamily
             font.weight: Font.Black
             font.pixelSize: 15
@@ -193,7 +193,7 @@ Item {
             anchors.fill: parent
             anchors.margins: 8
             radius: Theme.cornerRadius
-            color: Theme.background
+            color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
             border.width: 1
             border.color: Theme.surfaceHover
 

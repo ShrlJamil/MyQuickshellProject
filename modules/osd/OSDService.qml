@@ -204,4 +204,31 @@ Item {
             root._show("caps", 1400)
         }
     }
+
+    // Event-driven Caps Lock: one persistent python-evdev watcher over every
+    // *-event-kbd node prints a single `toggle` line per physical press.
+    // Exactly one instance (constant running, never restarted) - if it dies,
+    // the 1 Hz sysfs poll above keeps working as the fallback.
+    Process {
+        id: capsWatch
+        command: ["python3", Quickshell.shellPath("scripts/caps-watch.py")]
+        running: true
+        stdout: SplitParser {
+            onRead: (line) => root._onCapsToggle(line)
+        }
+    }
+
+    function _onCapsToggle(line) {
+        if ((line || "").trim() !== "toggle")
+            return
+        // Not yet synced from sysfs: let the file read establish truth.
+        if (!root._capsPrimed) {
+            capsFile.reload()
+            return
+        }
+        // Primary trigger: flip locally and show. The poll then reads the
+        // same state and stays silent - no double popup, no debounce timer.
+        root.capsOn = !root.capsOn
+        root._show("caps", 1400)
+    }
 }

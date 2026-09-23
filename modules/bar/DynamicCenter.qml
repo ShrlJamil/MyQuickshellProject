@@ -19,7 +19,7 @@ Item {
     property bool mediaManual: false
 
     // True while the expanded media surface exists on screen, including its
-    // slide-out animation tail - used by Bar to keep the bar MediaPreview
+    // close animation tail - used by Bar to keep the bar MediaPreview
     // hidden until the surface is fully gone (no overlap/flicker).
     readonly property bool mediaSurfacePresent: root.activeSurface === "media"
         || root._prevSurface === "media"
@@ -73,17 +73,29 @@ Item {
     implicitHeight: allocatedHeight
     height: implicitHeight
 
-    // Morph the frame height ONLY on a direct surface->surface switch:
-    // _lastSurface / activeSurface both non-idle, AND the panel is already open
-    // (allocatedHeight > 0 - the assignment in onTargetHeightChanged is read
-    // against the OLD value, so this is still 0 on the opening frame -> snap +
-    // pure slide-in; and targetHeight is 0 on close -> snap + pure slide-out).
+    // Height reveal: open grows 0 -> target, close shrinks target -> 0, and a
+    // direct surface->surface switch morphs between heights. The top edge
+    // never moves (surfaceWrapper.y is permanently 0); the wrapper clip
+    // reveals the static-size content as the frame grows. Durations mirror the
+    // old slide: 220 OutCubic open / 160 InCubic close (display 300 / 220),
+    // 180 InOutCubic switch. Conditions are stable mid-flight: _prevSurface is
+    // set only during a live switch, activeSurface only flips on open/close.
     Behavior on allocatedHeight {
-        enabled: root._lastSurface !== "idle" && root.activeSurface !== "idle"
-            && root.allocatedHeight > 0 && root.targetHeight > 0
         NumberAnimation {
-            duration: 180
-            easing.type: Easing.InOutCubic
+            duration: {
+                if (root._prevSurface !== "")
+                    return 180
+                if (root.activeSurface === "idle")
+                    return root._lastSurface === "display" ? 220 : 160
+                return root.activeSurface === "display" ? 300 : 220
+            }
+            easing.type: {
+                if (root._prevSurface !== "")
+                    return Easing.InOutCubic
+                if (root.activeSurface === "idle")
+                    return Easing.InCubic
+                return Easing.OutCubic
+            }
             onFinished: root._prevSurface = ""
         }
     }
@@ -98,10 +110,21 @@ Item {
         NumberAnimation { duration: 180; easing.type: Easing.InOutCubic }
     }
 
+    // Content materialization for the height reveal. Surfaces fade in while
+    // the frame grows (no sliced-content flash at open) and fade out fast at
+    // close start so the shrink reads clean; a live switch keeps its 150ms
+    // crossfade. Used by every Loader item's opacity Behavior below.
+    function _contentFadeDuration() {
+        if (root._prevSurface !== "")
+            return 150
+        if (root.targetHeight === 0)
+            return 90
+        return 140
+    }
+
     onTargetWidthChanged: {
         // Only track while a surface is active; on close the width is reset by
-        // hideTimer once the panel is fully gone (avoids "widen while sliding
-        // out").
+        // hideTimer once the panel is fully gone (avoids "widen while closing").
         if (root.activeSurface !== "idle")
             root.allocatedWidth = root.targetWidth
     }
@@ -111,13 +134,18 @@ Item {
             hideTimer.stop()
             allocatedHeight = targetHeight + gap
         } else if (allocatedHeight > 0) {
+            // Shrink visibly to 0 through the Behavior above (160ms, 220 for
+            // display) - hideTimer below only resets width + re-zeroes safely.
+            allocatedHeight = 0
             hideTimer.restart()
         }
     }
 
     Timer {
         id: hideTimer
-        interval: 200
+        // Past the longest close shrink (220ms display) so the timer never
+        // cuts the visible animation with a snap.
+        interval: 250
         onTriggered: {
             root.allocatedHeight = 0
             root.allocatedWidth = root.maxWidth
@@ -149,39 +177,8 @@ Item {
         // the cross-dissolve.
         height: root.allocatedHeight
 
-        state: root.activeSurface === "idle" ? "hidden" : "visible"
-
-        states: [
-            State {
-                name: "hidden"
-                PropertyChanges {
-                    target: surfaceWrapper
-                    // Display slides its whole height. Use displaySurface's own
-                    // implicitHeight directly (valid even while hidden, and
-                    // correct on both open and close) - NOT surfaceWrapper.height
-                    // (== allocatedHeight, still 0 when this transition starts on
-                    // open) and NOT targetHeight (0 while activeSurface is idle).
-                    y: (root.activeSurface === "display" || root._lastSurface === "display")
-                        ? -(displayLoader.item ? displayLoader.item.implicitHeight : 0) : -80
-                }
-            },
-            State {
-                name: "visible"
-                PropertyChanges { target: surfaceWrapper; y: 0 }
-            }
-        ]
-
-        transitions: [
-            Transition {
-                to: "visible"
-                NumberAnimation { property: "y"; duration: root.activeSurface === "display" ? 300 : 220; easing.type: Easing.OutCubic }
-            },
-            Transition {
-                to: "hidden"
-                NumberAnimation { property: "y"; duration: root._lastSurface === "display" ? 220 : 160; easing.type: Easing.InCubic }
-            }
-        ]
-
+        // y is permanently 0: open/close is a top-anchored height reveal driven
+        // by the allocatedHeight Behavior above, never a slide.
         // Single unified frame background: one Shape, anchored 1:1 to
         // surfaceWrapper, drawing the concave top notches + rounded bottom in one
         // path. Morphs with the wrapper (a brief 1-frame re-tessellation on a
@@ -198,9 +195,26 @@ Item {
 
             readonly property real notchSize: 18
             readonly property real bottomRadius: Theme.cornerRadius
+            // Notch interpolation factor: 0 at zero height (flat top) -> 1 once
+            // the frame is tall enough to contain the full 18px notch. Purely
+            // derived from the animated height, so open/close stay symmetric
+            // with no threshold snap, timer, or extra animation.
+            // Notch reveal progress, purely derived from the animated height.
+            // Open/active: flat below 32px, full notch at/above 56px. Close
+            // (idle): full notch down to 48px, flat at/below 24px. No timer,
+            // no animation, symmetric by height except the open/close bands.
+            readonly property real notchRevealT: {
+                const h = frameBackground.height
+                if (root.activeSurface === "idle")
+                    return Math.max(0, Math.min(1, (h - 24) / 24))
+                return Math.max(0, Math.min(1, (h - 32) / 24))
+            }
+            // Integer pixel notch {0..18}: single source for every animated notch
+            // coordinate (mirrored both sides) so joins land on whole pixels.
+            readonly property int notchPx: Math.round(frameBackground.notchSize * frameBackground.notchRevealT)
 
             ShapePath {
-                fillColor: Theme.background
+                fillColor: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
                 strokeColor: "transparent"
                 strokeWidth: 0
 
@@ -208,41 +222,41 @@ Item {
                 startY: 0
 
                 PathCubic {
-                    control1X: frameBackground.notchSize * 0.5
+                    control1X: frameBackground.notchPx / 2
                     control1Y: 0
-                    control2X: frameBackground.notchSize
-                    control2Y: frameBackground.notchSize * 0.5
-                    x: frameBackground.notchSize
-                    y: frameBackground.notchSize
+                    control2X: frameBackground.notchPx
+                    control2Y: frameBackground.notchPx / 2
+                    x: frameBackground.notchPx
+                    y: frameBackground.notchPx
                 }
                 PathLine {
-                    x: frameBackground.notchSize
+                    x: frameBackground.notchPx
                     y: frameBackground.height - frameBackground.bottomRadius
                 }
                 PathQuad {
-                    controlX: frameBackground.notchSize
+                    controlX: frameBackground.notchPx
                     controlY: frameBackground.height
-                    x: frameBackground.notchSize + frameBackground.bottomRadius
+                    x: frameBackground.notchPx + frameBackground.bottomRadius
                     y: frameBackground.height
                 }
                 PathLine {
-                    x: frameBackground.width - frameBackground.notchSize - frameBackground.bottomRadius
+                    x: frameBackground.width - frameBackground.notchPx - frameBackground.bottomRadius
                     y: frameBackground.height
                 }
                 PathQuad {
-                    controlX: frameBackground.width - frameBackground.notchSize
+                    controlX: frameBackground.width - frameBackground.notchPx
                     controlY: frameBackground.height
-                    x: frameBackground.width - frameBackground.notchSize
+                    x: frameBackground.width - frameBackground.notchPx
                     y: frameBackground.height - frameBackground.bottomRadius
                 }
                 PathLine {
-                    x: frameBackground.width - frameBackground.notchSize
-                    y: frameBackground.notchSize
+                    x: frameBackground.width - frameBackground.notchPx
+                    y: frameBackground.notchPx
                 }
                 PathCubic {
-                    control1X: frameBackground.width - frameBackground.notchSize
-                    control1Y: frameBackground.notchSize * 0.5
-                    control2X: frameBackground.width - frameBackground.notchSize * 0.5
+                    control1X: frameBackground.width - frameBackground.notchPx
+                    control1Y: frameBackground.notchPx / 2
+                    control2X: frameBackground.width - frameBackground.notchPx / 2
                     control2Y: 0
                     x: frameBackground.width
                     y: 0
@@ -275,11 +289,12 @@ Item {
                 width: parent.width
                 visible: root.activeSurface === "power" || root._prevSurface === "power"
                     || (root.allocatedHeight > 0 && root._lastSurface === "power")
-                opacity: (root.activeSurface === "power"
-                    || (root.activeSurface === "idle" && root.allocatedHeight > 0 && root._lastSurface === "power")) ? 1 : 0
+                opacity: root.activeSurface === "power" ? 1 : 0
                 Behavior on opacity {
-                    enabled: root._prevSurface !== ""
-                    NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+                    NumberAnimation {
+                        duration: root._contentFadeDuration()
+                        easing.type: Easing.OutCubic
+                    }
                 }
                 onCloseRequested: root.closeRequested()
             }
@@ -295,11 +310,12 @@ Item {
                 anchors.horizontalCenter: parent.horizontalCenter
                 visible: root.activeSurface === "capture" || root._prevSurface === "capture"
                     || (root.allocatedHeight > 0 && root._lastSurface === "capture")
-                opacity: (root.activeSurface === "capture"
-                    || (root.activeSurface === "idle" && root.allocatedHeight > 0 && root._lastSurface === "capture")) ? 1 : 0
+                opacity: root.activeSurface === "capture" ? 1 : 0
                 Behavior on opacity {
-                    enabled: root._prevSurface !== ""
-                    NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+                    NumberAnimation {
+                        duration: root._contentFadeDuration()
+                        easing.type: Easing.OutCubic
+                    }
                 }
             }
             onLoaded: if (root.activeSurface === "capture") root._focusSurface("capture")
@@ -314,11 +330,12 @@ Item {
                 width: parent.width
                 visible: root.activeSurface === "display" || root._prevSurface === "display"
                     || (root.allocatedHeight > 0 && root._lastSurface === "display")
-                opacity: (root.activeSurface === "display"
-                    || (root.activeSurface === "idle" && root.allocatedHeight > 0 && root._lastSurface === "display")) ? 1 : 0
+                opacity: root.activeSurface === "display" ? 1 : 0
                 Behavior on opacity {
-                    enabled: root._prevSurface !== ""
-                    NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+                    NumberAnimation {
+                        duration: root._contentFadeDuration()
+                        easing.type: Easing.OutCubic
+                    }
                 }
                 onCloseRequested: root.closeRequested()
             }
@@ -334,11 +351,12 @@ Item {
                 width: parent.width
                 visible: root.activeSurface === "wallpapers" || root._prevSurface === "wallpapers"
                     || (root.allocatedHeight > 0 && root._lastSurface === "wallpapers")
-                opacity: (root.activeSurface === "wallpapers"
-                    || (root.activeSurface === "idle" && root.allocatedHeight > 0 && root._lastSurface === "wallpapers")) ? 1 : 0
+                opacity: root.activeSurface === "wallpapers" ? 1 : 0
                 Behavior on opacity {
-                    enabled: root._prevSurface !== ""
-                    NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+                    NumberAnimation {
+                        duration: root._contentFadeDuration()
+                        easing.type: Easing.OutCubic
+                    }
                 }
                 onCloseRequested: root.closeRequested()
             }
@@ -369,11 +387,12 @@ Item {
                 active: root.activeSurface === "media"
                 visible: root.activeSurface === "media" || root._prevSurface === "media"
                     || (root.allocatedHeight > 0 && root._lastSurface === "media")
-                opacity: (root.activeSurface === "media"
-                    || (root.activeSurface === "idle" && root.allocatedHeight > 0 && root._lastSurface === "media")) ? 1 : 0
+                opacity: root.activeSurface === "media" ? 1 : 0
                 Behavior on opacity {
-                    enabled: root._prevSurface !== ""
-                    NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+                    NumberAnimation {
+                        duration: root._contentFadeDuration()
+                        easing.type: Easing.OutCubic
+                    }
                 }
                 onCloseRequested: root.closeRequested()
             }

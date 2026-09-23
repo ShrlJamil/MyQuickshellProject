@@ -386,7 +386,10 @@ PanelWindow {
                     // Full pill. The outer capsule ALWAYS stays dark - only the
                     // inner wifiActiveCircle reflects the on/off state.
                     radius: height / 2
-                    color: wifiHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+                    color: {
+                        const c = wifiHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+                        return Qt.rgba(c.r, c.g, c.b, Theme.surfaceOpacity)
+                    }
 
                     HoverHandler {
                         id: wifiHover
@@ -425,8 +428,8 @@ PanelWindow {
                                 width: 64
                                 height: 64
                                 radius: width / 2
-                                // ON -> solid white, OFF -> subtle dark surface.
-                                color: wifiTile.wifiOn ? Theme.text : Theme.surfaceHover
+                                // ON -> light muted tile, OFF -> subtle dark surface.
+                                color: wifiTile.wifiOn ? Theme.activeTile : Theme.surfaceHover
                             }
 
                             IconImage {
@@ -442,12 +445,12 @@ PanelWindow {
                             }
 
                             // network-wireless-symbolic is a monochrome glyph;
-                            // overlay it so it reads as accent on the white ON
+                            // overlay it so it reads as accent on the light ON
                             // circle and as Theme.text when OFF.
                             ColorOverlay {
                                 anchors.fill: wifiIcon
                                 source: wifiIcon
-                                color: wifiTile.wifiOn ? Theme.accent : Theme.text
+                                color: wifiTile.wifiOn ? Theme.accent : Theme.icon
                             }
 
                             MouseArea {
@@ -606,7 +609,7 @@ PanelWindow {
                             ColorOverlay {
                                 anchors.fill: focusIconImg
                                 source: focusIconImg
-                                color: focusTile.active ? Theme.accent : Theme.text
+                                color: focusTile.active ? Theme.accent : Theme.icon
 
                                 Behavior on color {
                                     ColorAnimation { duration: 120; easing.type: Easing.OutCubic }
@@ -654,7 +657,10 @@ PanelWindow {
 
                 // Elevated (softer, still rectangular - not a pill).
                 radius: 29
-                color: mediaHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+                color: {
+                    const c = mediaHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+                    return Qt.rgba(c.r, c.g, c.b, Theme.surfaceOpacity)
+                }
 
                 HoverHandler {
                     id: mediaHover
@@ -909,7 +915,10 @@ PanelWindow {
 
             // Full pill.
             radius: height / 2
-            color: displayHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+            color: {
+                const c = displayHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+                return Qt.rgba(c.r, c.g, c.b, Theme.surfaceOpacity)
+            }
 
             HoverHandler {
                 id: displayHover
@@ -983,7 +992,10 @@ PanelWindow {
 
             // Full pill.
             radius: height / 2
-            color: soundHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+            color: {
+                const c = soundHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+                return Qt.rgba(c.r, c.g, c.b, Theme.surfaceOpacity)
+            }
 
             HoverHandler {
                 id: soundHover
@@ -1036,7 +1048,7 @@ PanelWindow {
                     return "file://" + Quickshell.shellPath("assets/volume/volume-high-svgrepo-com.svg")
                 }
                 // dim the glyph when muted / silent, matching the OSD
-                iconColor: (audioService.muted || audioService.volume === 0) ? Theme.textMuted : Theme.text
+                iconColor: (audioService.muted || audioService.volume === 0) ? Theme.textMuted : Theme.icon
                 from: 0
                 to: 100
                 value: audioService.volume

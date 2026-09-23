@@ -154,7 +154,7 @@ PanelWindow {
         anchors.fill: parent
         anchors.margins: 8
         radius: Theme.cornerRadius
-        color: Theme.background
+        color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
         border.width: 1
         border.color: Theme.surfaceHover
 
