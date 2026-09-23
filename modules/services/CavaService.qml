@@ -4,8 +4,8 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Real-time audio spectrum from `cava` (raw / ascii mode). Singleton, shared by
-// the compact MediaPreview mini-viz and the expanded MediaPlayer radial ring.
+// Real-time audio spectrum from `cava` (raw / ascii mode). Singleton, consumed
+// by the compact MediaPreview mini-viz in the static bar.
 //
 // cava runs with an inline-generated config: 26 mono bars, ascii range 0..100,
 // 30 fps, auto-detected input (PipeWire / Pulse / ALSA), plus a [smoothing]

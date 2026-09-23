@@ -109,7 +109,7 @@ PanelWindow {
         height: 40
         width: Math.max(120, body.implicitWidth + 36)
         radius: 16
-        color: Theme.background
+        color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
         border.width: 1
         border.color: Theme.surfaceHover
 
@@ -157,7 +157,8 @@ PanelWindow {
                 readonly property int pct: meterRow.isVol ? OSDService.volumePercent : OSDService.brightnessPercent
                 readonly property real frac: Math.max(0, Math.min(1, (meterRow.muted ? 0 : meterRow.pct) / 100))
 
-                // speaker glyph - dynamic SVG (assets/volume/), tinted by state
+                // speaker glyph - dynamic SVG (assets/volume/), tinted Theme.icon
+                // (glyph itself still swaps by level/mute state)
                 Item {
                     id: volIcon
 
@@ -195,7 +196,7 @@ PanelWindow {
                     ColorOverlay {
                         anchors.fill: volIconImg
                         source: volIconImg
-                        color: volIcon.off ? Theme.textMuted : Theme.text
+                        color: Theme.icon
                     }
                 }
 
@@ -234,7 +235,7 @@ PanelWindow {
                     ColorOverlay {
                         anchors.fill: brightIconImg
                         source: brightIconImg
-                        color: Theme.text
+                        color: Theme.icon
                     }
                 }
 

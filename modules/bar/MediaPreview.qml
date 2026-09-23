@@ -108,7 +108,7 @@ Item {
                 Text {
                     id: titleText
                     text: root.active ? root.mediaService.title : ""
-                    color: Theme.text
+                    color: Theme.icon
                     font.pixelSize: 12
                     font.weight: Font.DemiBold
 
@@ -140,7 +140,7 @@ Item {
             Text {
                 width: Math.min(implicitWidth, root.textMax)
                 text: root.active ? root.mediaService.artist : ""
-                color: Theme.textDim
+                color: Theme.icon
                 font.pixelSize: 10
                 elide: Text.ElideRight
                 maximumLineCount: 1

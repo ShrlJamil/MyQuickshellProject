@@ -36,12 +36,15 @@ Item {
         radius: root.cornerRadius
         border.width: 0
         border.color: "transparent"
-        // Active  -> solid white (Theme.text) surface, Theme.accent contents.
+        // Active  -> light muted (Theme.activeTile) surface, Theme.accent contents.
         // Inactive -> standard dark surface (Theme.background).
         color: {
+            // Active tiles are solid state surfaces: no surfaceOpacity alpha.
+            // Inactive tiles stay translucent material.
             if (root.active)
-                return hover.hovered ? Qt.darker(Theme.text, 1.06) : Theme.text
-            return hover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+                return hover.hovered ? Qt.darker(Theme.activeTile, 1.06) : Theme.activeTile
+            const c = hover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+            return Qt.rgba(c.r, c.g, c.b, Theme.surfaceOpacity)
         }
 
         HoverHandler {
@@ -91,7 +94,7 @@ Item {
                 anchors.fill: svgIcon
                 source: svgIcon
                 visible: root._localIcon && svgIcon.status === Image.Ready
-                color: root.active ? Theme.accent : Theme.text
+                color: root.active ? Theme.accent : Theme.icon
             }
         }
     }
