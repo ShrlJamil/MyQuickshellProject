@@ -81,6 +81,13 @@ ShellRoot {
         positionActive: barState.mode === "media"
     }
 
+    // Own AudioService for the volume keybind IPC below. ControlCenter keeps
+    // its own per-window instance; both track PipeWire reactively, so volume
+    // and mute converge through the backend with no wpctl involved.
+    AudioService {
+        id: audioService
+    }
+
     // Run the cava spectrum analyzer (-> CavaService.bars, consumed by the bar
     // MediaPreview mini-viz) only while something is actually playing; pausing
     // releases its capture stream.
@@ -252,6 +259,15 @@ ShellRoot {
             if (barState.mode === "mediaCompact") hide()
             else show()
         }
+    }
+
+    IpcHandler {
+        target: "volume"
+
+        // Relative steps off the reactive backend value; AudioService clamps
+        // and writes natively via PipeWire (no wpctl anywhere in this path).
+        function up(): void { audioService.setVolume(audioService.volume + 5) }
+        function down(): void { audioService.setVolume(audioService.volume - 5) }
     }
 
     IpcHandler {

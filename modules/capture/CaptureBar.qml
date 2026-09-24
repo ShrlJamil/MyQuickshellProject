@@ -154,7 +154,7 @@ Item {
                 width: 100
                 height: 46
                 radius: 12
-                color: Theme.background
+                color: "transparent"
 
                 MouseArea {
                     id: btnMouse

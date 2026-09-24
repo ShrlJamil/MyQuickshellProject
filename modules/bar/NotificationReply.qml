@@ -23,6 +23,11 @@ Column {
     // Card-local state — never lifted into NotificationService.
     property bool replyMode: false
 
+    // Hosts that render their own Reply affordance (e.g. inside the generic
+    // actions row) set this false to hide the built-in collapsed button.
+    // Defaults true so existing hosts (popup) are unaffected.
+    property bool showAffordance: true
+
     // Host should suppress popup auto-dismiss while this is true.
     readonly property bool active: root.replyMode || input.activeFocus
 
@@ -36,6 +41,14 @@ Column {
 
     function _enter() {
         root.replyMode = true
+    }
+
+    // Focus follows the open flag (not the caller): whoever opens the form —
+    // the built-in affordance, a host row, or a future caller — gets identical
+    // focus behavior. Guarded so closing never steals focus.
+    onReplyModeChanged: {
+        if (!root.replyMode)
+            return
         input.forceActiveFocus()
         // Entering reply mode may flip the host popup's layer surface from
         // "no keyboard focus" to OnDemand; re-assert once that reconfigure has
@@ -69,7 +82,7 @@ Column {
 
     // ---- collapsed affordance ----
     Rectangle {
-        visible: !root.replyMode
+        visible: !root.replyMode && root.showAffordance
         implicitWidth: replyLabel.implicitWidth + 20
         implicitHeight: 28
         radius: 8

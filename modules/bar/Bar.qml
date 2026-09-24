@@ -81,8 +81,9 @@ PanelWindow {
     // Bar-local scoop span, clamped to the bar. Inactive collapses to the
     // corners so the same path draws today's plain rectangle. The y guard
     // keeps the scoop attached to the bar (a gapped window means no hug).
+    // Window-state only: DynamicCenter must not kill the concave. DC paints
+    // below the bar (y>=40) while these Shapes live at y=40..60 beside it.
     readonly property bool _scoopOn: root._haveSolo && root._geoValid && !root._winFloat
-        && dynamicCenter.activeSurface === "idle"
         && root._winY <= 44 && root._scoopW > 40
     readonly property real _scoopL0: Math.max(0, Math.min(barContent.width, root._winX))
     readonly property real _scoopR0: Math.max(0, Math.min(barContent.width, root._winX + root._winW))

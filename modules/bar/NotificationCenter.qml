@@ -472,6 +472,9 @@ PanelWindow {
         ListView {
             id: notifList
 
+            interactive: true
+            acceptedButtons: Qt.NoButton
+
             anchors {
                 top: dndRow.bottom
                 left: parent.left
@@ -604,14 +607,6 @@ PanelWindow {
                         textFormat: Text.PlainText
                     }
 
-                    // Generic inline-reply affordance — same widget & semantics
-                    // as the popup. Visible only when hasInlineReply.
-                    NotificationReply {
-                        width: parent.width
-                        notifId: notifCard.modelData.id
-                        notification: notifCard.modelData.notification
-                    }
-
                     // Generic actions — text only, no card/border/fill. Hover
                     // only recolours the label. Same data & semantics as the
                     // popup; still runs the existing invokeAction(...).
@@ -620,6 +615,31 @@ PanelWindow {
                         spacing: 16
                         topPadding: 4
                         visible: notifCard.actionItems.length > 0
+                            || (replyWidget.available && !replyWidget.replyMode)
+
+                        // Reply as a generic action: identical metrics/style
+                        // to the delegates after this; opens the input below.
+                        Text {
+                            id: replyActLabel
+
+                            visible: replyWidget.available && !replyWidget.replyMode
+                            width: replyActLabel.implicitWidth
+                            height: 28
+                            verticalAlignment: Text.AlignVCenter
+                            text: "Reply"
+                            color: replyActHover.hovered ? Theme.accent : Theme.text
+                            font.pixelSize: 11
+                            elide: Text.ElideRight
+
+                            HoverHandler {
+                                id: replyActHover
+                                cursorShape: Qt.PointingHandCursor
+                            }
+                            TapHandler {
+                                gesturePolicy: TapHandler.ReleaseWithinBounds
+                                onTapped: replyWidget.replyMode = true
+                            }
+                        }
 
                         Repeater {
                             model: notifCard.actionItems
@@ -648,6 +668,20 @@ PanelWindow {
                                 }
                             }
                         }
+                    }
+
+                    // Generic inline-reply affordance — same widget & semantics
+                    // as the popup. Visible only when hasInlineReply. The
+                    // collapsed button is hidden here (showAffordance: false);
+                    // Reply is rendered as the first item of the actions Flow
+                    // above, same style as generic actions. The expanded input
+                    // form lives here, below the whole action row.
+                    NotificationReply {
+                        id: replyWidget
+                        width: parent.width
+                        showAffordance: false
+                        notifId: notifCard.modelData.id
+                        notification: notifCard.modelData.notification
                     }
                 }
             }

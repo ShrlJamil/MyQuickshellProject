@@ -1072,37 +1072,22 @@ PanelWindow {
             spacing: root.circleGap
 
             ControlTile {
-                id: screenCaptureTile
-
-                property bool pulse: false
+                id: ecoTile
 
                 width: root.circleSize
                 height: root.circleSize
 
                 round: true
-                active: screenCaptureTile.pulse
-                label: "Capture"
-                iconSource: "file://" + Quickshell.shellPath("assets/capture.svg")
-
-                Timer {
-                    id: capturePulseTimer
-
-                    interval: 200
-                    onTriggered: screenCaptureTile.pulse = false
-                }
+                active: EcoService.ecoMode
+                label: "Eco Mode"
+                iconSource: "file://" + Quickshell.shellPath("assets/leaf-svgrepo-com.svg")
 
                 MouseArea {
                     anchors.fill: parent
 
                     cursorShape: Qt.PointingHandCursor
 
-                    onClicked: {
-                        console.log("[Tile Click] Capture tile pressed")
-                        screenCaptureTile.pulse = true
-                        capturePulseTimer.restart()
-                        root.pendingCaptureOpen = true
-                        root.close()
-                    }
+                    onClicked: EcoService.toggle()
                 }
             }
 

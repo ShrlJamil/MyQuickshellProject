@@ -116,6 +116,18 @@ Item {
         blReconcile.restart()
     }
 
+    // Optimistic brightness display for an absolute value (slider path).
+    // Same UI half as brightnessStep; the hardware write stays with the
+    // caller. Reconcile converges to the real sysfs value afterwards.
+    function brightnessShow(pct) {
+        if (root._blMax <= 0)
+            return
+        root._blRaw = Math.max(1, Math.round(root._blMax * Math.max(0, Math.min(100, pct)) / 100))
+        root._blPrimed = true
+        root._show("brightness", 1500)
+        blReconcile.restart()
+    }
+
     // Pull the true hardware value a beat after the last keypress so any drift
     // from rapid relative steps is corrected.
     Timer {
