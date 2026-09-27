@@ -34,6 +34,7 @@ Item {
 
     property int _triesLeft: 0
     property bool _writePending: false
+    property int _attemptNo: 0
 
     function toggle() {
         if (root.ecoMode) {
@@ -95,13 +96,24 @@ Item {
         root._writePending = false
         retryTimer.stop()
         root._triesLeft = 2
+        root._attemptNo = 0
         root._doWrite()
     }
 
     function _doWrite() {
-        if (!root.ecoMode && !root._haveSnap)
+        if (!root.ecoMode && !root._haveSnap) {
+            console.log("[ECO DEBUG] write skipped target=OFF no-snapshot")
             return
-        writeProc.command = ["hyprctl", "eval", root._evalFor()]
+        }
+        root._attemptNo++
+        const cmd = ["hyprctl", "eval", root._evalFor()]
+        console.log("[ECO DEBUG] write target=" + (root.ecoMode ? "ON" : "OFF")
+            + " ecoMode=" + root.ecoMode
+            + " blurSnap=" + root._snap[root._keys[0]]
+            + " shadowSnap=" + root._snap[root._keys[1]]
+            + " attempt=" + root._attemptNo)
+        console.log("[ECO DEBUG] argv=" + JSON.stringify(cmd))
+        writeProc.command = cmd
         writeProc.running = true
     }
 
@@ -144,7 +156,16 @@ Item {
     Process {
         id: writeProc
 
+        stderr: StdioCollector { waitForEnd: true }
+
         onExited: function (exitCode) {
+            const err = writeProc.stderr.text.trim()
+            console.log("[ECO DEBUG] exited code=" + exitCode
+                + " target=" + (root.ecoMode ? "ON" : "OFF")
+                + " attempt=" + root._attemptNo
+                + " triesLeft=" + root._triesLeft
+                + " pending=" + root._writePending
+                + (err.length > 0 ? " stderr=" + err : ""))
             if (exitCode === 0) {
                 if (root._writePending)
                     root._requestWrite()
