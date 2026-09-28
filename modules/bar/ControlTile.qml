@@ -53,6 +53,32 @@ Item {
             cursorShape: Qt.PointingHandCursor
         }
 
+        // Shared glass highlight: same language as the static bar top light
+        // (soft vertical falloff, never a hard line). Full-bleed rect with
+        // the tile's own corner radius (a short rect would have its radius
+        // clamped to half its height); the 40%-to-transparent stops shape
+        // the falloff instead. Peak alpha comes from the shared
+        // Theme.materialHighlightOpacity token; static (hover already lifts
+        // the base fill above).
+        Rectangle {
+            anchors.fill: parent
+            radius: root.cornerRadius
+            gradient: Gradient {
+                GradientStop {
+                    position: 0
+                    color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                }
+                GradientStop {
+                    position: 0.4
+                    color: "transparent"
+                }
+                GradientStop {
+                    position: 1
+                    color: "transparent"
+                }
+            }
+        }
+
         Item {
             anchors.centerIn: parent
 

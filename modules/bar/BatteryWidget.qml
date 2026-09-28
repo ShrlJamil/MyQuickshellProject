@@ -217,6 +217,28 @@ Item {
                 }
             }
 
+            // Shared glass highlight (see ControlTile): full-bleed rect with
+            // the card's own corner radius; falloff shaped by stops. Below
+            // the info content.
+            Rectangle {
+                anchors.fill: parent
+                radius: Theme.cornerRadius
+                gradient: Gradient {
+                    GradientStop {
+                        position: 0
+                        color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                    }
+                    GradientStop {
+                        position: 0.4
+                        color: "transparent"
+                    }
+                    GradientStop {
+                        position: 1
+                        color: "transparent"
+                    }
+                }
+            }
+
             Column {
                 id: col
 

@@ -378,7 +378,7 @@ PanelWindow {
             x: 0
             y: 0
             width: parent.width
-            height: 8
+            height: 18
             gradient: Gradient {
                 GradientStop {
                     position: 0
@@ -570,6 +570,28 @@ PanelWindow {
                         if (event.key === Qt.Key_Escape) {
                             archPop.open = false
                             event.accepted = true
+                        }
+                    }
+
+                    // Shared glass highlight (see ControlTile): full-bleed
+                    // rect with the card's own corner radius; falloff shaped
+                    // by stops. Below the info content.
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: Theme.cornerRadius
+                        gradient: Gradient {
+                            GradientStop {
+                                position: 0
+                                color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                            }
+                            GradientStop {
+                                position: 0.4
+                                color: "transparent"
+                            }
+                            GradientStop {
+                                position: 1
+                                color: "transparent"
+                            }
                         }
                     }
 
@@ -1306,6 +1328,28 @@ PanelWindow {
                         if (event.key === Qt.Key_Escape) {
                             wifiPop.open = false
                             event.accepted = true
+                        }
+                    }
+
+                    // Shared glass highlight (see ControlTile): full-bleed
+                    // rect with the card's own corner radius; falloff shaped
+                    // by stops. Below the info content.
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: Theme.cornerRadius
+                        gradient: Gradient {
+                            GradientStop {
+                                position: 0
+                                color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                            }
+                            GradientStop {
+                                position: 0.4
+                                color: "transparent"
+                            }
+                            GradientStop {
+                                position: 1
+                                color: "transparent"
+                            }
                         }
                     }
 

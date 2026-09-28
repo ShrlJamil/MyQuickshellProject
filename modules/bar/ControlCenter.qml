@@ -397,6 +397,27 @@ PanelWindow {
                         cursorShape: Qt.PointingHandCursor
                     }
 
+                    // Shared glass highlight (see ControlTile): full-bleed
+                    // rect with the tile's own pill radius; falloff by stops.
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: height / 2
+                        gradient: Gradient {
+                            GradientStop {
+                                position: 0
+                                color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                            }
+                            GradientStop {
+                                position: 0.4
+                                color: "transparent"
+                            }
+                            GradientStop {
+                                position: 1
+                                color: "transparent"
+                            }
+                        }
+                    }
+
                     Row {
                         anchors {
                             left: parent.left
@@ -668,6 +689,28 @@ PanelWindow {
                     cursorShape: Qt.PointingHandCursor
                 }
 
+                // Shared glass highlight (see ControlTile): full-bleed rect
+                // with the tile's own radius; falloff shaped by stops. Below
+                // the artwork/info content.
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 29
+                    gradient: Gradient {
+                        GradientStop {
+                            position: 0
+                            color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                        }
+                        GradientStop {
+                            position: 0.4
+                            color: "transparent"
+                        }
+                        GradientStop {
+                            position: 1
+                            color: "transparent"
+                        }
+                    }
+                }
+
                 MouseArea {
                     anchors.fill: parent
 
@@ -926,6 +969,27 @@ PanelWindow {
                 cursorShape: Qt.PointingHandCursor
             }
 
+            // Shared glass highlight (see ControlTile): full-bleed rect
+            // with the tile's own pill radius; falloff shaped by stops.
+            Rectangle {
+                anchors.fill: parent
+                radius: height / 2
+                gradient: Gradient {
+                    GradientStop {
+                        position: 0
+                        color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                    }
+                    GradientStop {
+                        position: 0.4
+                        color: "transparent"
+                    }
+                    GradientStop {
+                        position: 1
+                        color: "transparent"
+                    }
+                }
+            }
+
             Text {
                 id: displayLabel
 
@@ -1001,6 +1065,27 @@ PanelWindow {
                 id: soundHover
 
                 cursorShape: Qt.PointingHandCursor
+            }
+
+            // Shared glass highlight (see ControlTile): full-bleed rect
+            // with the tile's own pill radius; falloff shaped by stops.
+            Rectangle {
+                anchors.fill: parent
+                radius: height / 2
+                gradient: Gradient {
+                    GradientStop {
+                        position: 0
+                        color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                    }
+                    GradientStop {
+                        position: 0.4
+                        color: "transparent"
+                    }
+                    GradientStop {
+                        position: 1
+                        color: "transparent"
+                    }
+                }
             }
 
             Text {

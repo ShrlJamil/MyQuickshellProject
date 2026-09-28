@@ -31,7 +31,7 @@ Item {
     // Material prototype (static bar only): ultra-subtle directional top
     // highlight + bottom edge key over the blurred backdrop. Neutral white at
     // single-digit opacities; the surfaceOpacity tint does the heavy lifting.
-    property real materialHighlightOpacity: 0.05
+    property real materialHighlightOpacity: 0.28
     property real materialBorderOpacity: 0.06
 
     // UI text typeface (`font.family: Theme.fontFamily` on Text elements).
