@@ -9,7 +9,29 @@ Rectangle {
 
     radius: 40
 
-    color: Theme.background
+    color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
+
+    // Shared glass highlight (see ControlTile): full-bleed rect with the
+    // panel's own radius (no border, so no inset is needed); falloff shaped
+    // by stops. Below content.
+    Rectangle {
+        anchors.fill: parent
+        radius: 40
+        gradient: Gradient {
+            GradientStop {
+                position: 0
+                color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+            }
+            GradientStop {
+                position: 0.4
+                color: "transparent"
+            }
+            GradientStop {
+                position: 1
+                color: "transparent"
+            }
+        }
+    }
 
     property var appProvider
 

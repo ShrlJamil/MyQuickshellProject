@@ -145,7 +145,7 @@ PanelWindow {
                     width: parent.width
                     implicitHeight: layout.implicitHeight + 24
                     radius: 16
-                    color: Theme.background
+                    color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
                     border.width: 1
                     border.color: Theme.surfaceHover
 
@@ -174,6 +174,30 @@ PanelWindow {
                     TapHandler {
                         acceptedButtons: Qt.LeftButton
                         onTapped: slot.beginClose()
+                    }
+
+                    // Shared glass highlight (see ControlTile): inset by the
+                    // 1px border so the peak never paints over the border
+                    // stroke; radius reduced to match. Falloff shaped by
+                    // stops. Below content.
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.margins: 1
+                        radius: 15
+                        gradient: Gradient {
+                            GradientStop {
+                                position: 0
+                                color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                            }
+                            GradientStop {
+                                position: 0.4
+                                color: "transparent"
+                            }
+                            GradientStop {
+                                position: 1
+                                color: "transparent"
+                            }
+                        }
                     }
 
                     // Close button.

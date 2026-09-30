@@ -108,24 +108,53 @@ PanelWindow {
 
         height: 40
         width: Math.max(120, body.implicitWidth + 36)
+        Behavior on width {
+            NumberAnimation {
+                duration: 130
+                easing.type: Easing.OutCubic
+            }
+        }
         radius: 16
         color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
         border.width: 1
         border.color: Theme.surfaceHover
 
+        // Shared glass highlight (see ControlTile): inset by the 1px border
+        // so the peak never paints over the border stroke; radius reduced
+        // to match. Falloff shaped by stops. Below content.
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: 15
+            gradient: Gradient {
+                GradientStop {
+                    position: 0
+                    color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                }
+                GradientStop {
+                    position: 0.4
+                    color: "transparent"
+                }
+                GradientStop {
+                    position: 1
+                    color: "transparent"
+                }
+            }
+        }
+
         opacity: root.shown ? 1 : 0
         Behavior on opacity {
             OpacityAnimator {
-                duration: 200
-                easing.type: Easing.OutCubic
+                duration: root.shown ? 130 : 100
+                easing.type: root.shown ? Easing.OutCubic : Easing.InCubic
             }
         }
 
         transform: Translate {
-            y: root.shown ? 0 : 12
+            y: root.shown ? 0 : 8
             Behavior on y {
                 NumberAnimation {
-                    duration: root.shown ? 190 : 150
+                    duration: root.shown ? 140 : 110
                     easing.type: root.shown ? Easing.OutCubic : Easing.InCubic
                 }
             }

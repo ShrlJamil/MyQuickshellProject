@@ -16,7 +16,6 @@ Item {
     property color textMuted: "#888888"
     property color accent: "#89b4fa"
     property color activeTile: "#c4c9d1"
-    property color border: "#45475a"
 
     // Shared translucent-surface opacity, sourced from the Wallust-generated
     // palette (`surfaceOpacity`, 0.5 in the template). Consumed by the static
@@ -67,7 +66,6 @@ Item {
             property string textMuted: ""
             property string accent: ""
             property string activeTile: ""
-            property string border: ""
             property string icon: ""
             property real surfaceOpacity: 0
         }
@@ -81,7 +79,6 @@ Item {
         if (paletteAdapter.textMuted) root.textMuted = paletteAdapter.textMuted
         if (paletteAdapter.accent) root.accent = paletteAdapter.accent
         if (paletteAdapter.activeTile) root.activeTile = paletteAdapter.activeTile
-        if (paletteAdapter.border) root.border = paletteAdapter.border
         if (paletteAdapter.icon) root.icon = paletteAdapter.icon
         if (paletteAdapter.surfaceOpacity > 0) root.surfaceOpacity = paletteAdapter.surfaceOpacity
     }

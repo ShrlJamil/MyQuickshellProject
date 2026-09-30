@@ -224,7 +224,7 @@ Item {
                         anchors.fill: parent
                         radius: width / 2
                         color: "#0e0e0e"
-                        border.color: Qt.rgba(1, 1, 1, 0.06)
+                        border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
                         border.width: 1
 
                         Repeater {
@@ -236,7 +236,7 @@ Item {
                                 height: width
                                 radius: width / 2
                                 color: "transparent"
-                                border.color: Qt.rgba(1, 1, 1, 0.045)
+                                border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
                                 border.width: 1
                             }
                         }
@@ -483,7 +483,7 @@ Item {
                             width: progress.scrubbing ? 8 : 6
                             height: 14
                             radius: 4
-                            color: "#ffffff"
+                            color: Theme.icon
                             anchors.verticalCenter: parent.verticalCenter
                             x: Math.max(0, Math.min(parent.width - width, fill.width - width / 2))
                             Behavior on x {

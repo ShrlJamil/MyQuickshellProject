@@ -19,6 +19,11 @@ PanelWindow {
     readonly property bool open: NotificationService.centerScreen === modelData.screen
     property bool closing: false
 
+    // Panel-only glass boost (scratch-verified): the main panel needs a
+    // stronger peak than the shared token to read as sheen; cards keep the
+    // pure token. Single local factor, no global token change.
+    readonly property real panelHighlightBoost: 1.55
+
     visible: root.open || root.closing
 
     WlrLayershell.layer: WlrLayer.Overlay
@@ -157,6 +162,30 @@ PanelWindow {
         color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
         border.width: 1
         border.color: Theme.surfaceHover
+
+        // Shared glass highlight (see ControlTile): inset by the 1px border
+        // so the peak never paints over the border stroke (which would read
+        // as an outline); radius reduced to match. Falloff shaped by stops.
+        // Peak uses the panel-only boost factor. Below content.
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: Theme.cornerRadius - 1
+            gradient: Gradient {
+                GradientStop {
+                    position: 0
+                    color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity * root.panelHighlightBoost)
+                }
+                GradientStop {
+                    position: 0.4
+                    color: "transparent"
+                }
+                GradientStop {
+                    position: 1
+                    color: "transparent"
+                }
+            }
+        }
 
         // Fast scale-fade from the bar's top-right corner + a tiny -8px drift.
         // No full-height slide.
@@ -514,9 +543,35 @@ PanelWindow {
                 width: notifList.width
                 height: cardCol.implicitHeight + 20
                 radius: 12
-                color: cardHover.hovered ? Qt.lighter(Theme.surface, 1.15) : Theme.surface
+                color: {
+                    const c = cardHover.hovered ? Qt.lighter(Theme.surface, 1.15) : Theme.surface
+                    return Qt.rgba(c.r, c.g, c.b, Theme.surfaceOpacity)
+                }
 
                 HoverHandler { id: cardHover }
+
+                // Shared glass highlight (see ControlTile): full-bleed rect
+                // with the card's own radius (the card has no border, so no
+                // inset is needed); falloff shaped by stops. Below icon,
+                // dismiss, and card content.
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 12
+                    gradient: Gradient {
+                        GradientStop {
+                            position: 0
+                            color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                        }
+                        GradientStop {
+                            position: 0.4
+                            color: "transparent"
+                        }
+                        GradientStop {
+                            position: 1
+                            color: "transparent"
+                        }
+                    }
+                }
 
                 IconImage {
                     id: cardIcon

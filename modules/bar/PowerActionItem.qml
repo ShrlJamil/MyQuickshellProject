@@ -68,7 +68,7 @@ Item {
             // against the dark menu background.
             readonly property bool active: root.selected || hover.hovered || root.isHolding
             border.width: tileBase.active ? 1 : 0
-            border.color: Qt.rgba(1, 1, 1, 0.15)
+            border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
 
             Rectangle {
                 id: progressFill
