@@ -1265,6 +1265,28 @@ PanelWindow {
         enabled: root.wifiPanelOpen
         visible: wifiPanel.opacity > 0
 
+        // Shared glass highlight (see ControlTile): full-bleed rect using
+        // the panel's live radius (it morphs on open/close); falloff shaped
+        // by stops. Below panel content; buttons/rows keep their own states.
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            gradient: Gradient {
+                GradientStop {
+                    position: 0
+                    color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                }
+                GradientStop {
+                    position: 0.4
+                    color: "transparent"
+                }
+                GradientStop {
+                    position: 1
+                    color: "transparent"
+                }
+            }
+        }
+
         // Freeze the position tween while the sub-panel is open: x/y are pinned
         // to 0 then, and leaving the Behavior live lets a transient bad
         // originPos (mapToItem re-evaluated every drift frame) animate the panel
@@ -1899,16 +1921,6 @@ PanelWindow {
             onClicked: wifiPanel.menuSsid = ""
         }
 
-        RectangularGlow {
-            visible: menuPopup.visible
-            anchors.fill: menuPopup
-            z: menuPopup.z
-            glowRadius: 16
-            spread: 0.35
-            color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.32)
-            cornerRadius: menuPopup.radius + glowRadius
-        }
-
         Rectangle {
             id: menuPopup
 
@@ -1923,8 +1935,8 @@ PanelWindow {
             width: 184
             height: menuPopupColumn.height + 12
 
-            // Separation from the dark list comes from the crisp accent hairline
-            // plus the outer RectangularGlow behind it; fill stays Theme.background.
+            // Separation from the dark list comes from the crisp accent hairline;
+            // fill stays Theme.background.
             radius: 10
             color: Theme.background
             border.width: 1
@@ -2034,16 +2046,6 @@ PanelWindow {
             }
         }
 
-        RectangularGlow {
-            visible: addNetworkModal.visible
-            anchors.fill: addNetworkModal
-            z: addNetworkModal.z
-            glowRadius: 18
-            spread: 0.35
-            color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.32)
-            cornerRadius: addNetworkModal.radius + glowRadius
-        }
-
         Rectangle {
             id: addNetworkModal
 
@@ -2061,8 +2063,8 @@ PanelWindow {
                 NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
             }
 
-            // Dialog card: Theme.background fill, crisp accent hairline, an outer
-            // RectangularGlow for lift, floating over the scrim (addBackdrop).
+            // Dialog card: Theme.background fill, crisp accent hairline,
+            // floating over the scrim (addBackdrop).
             radius: 10
             color: Theme.background
             border.width: 1
@@ -2437,6 +2439,28 @@ PanelWindow {
 
         enabled: root.bluetoothPanelOpen
         visible: bluetoothPanel.opacity > 0
+
+        // Shared glass highlight (see ControlTile): full-bleed rect using
+        // the panel's live radius (it morphs on open/close); falloff shaped
+        // by stops. Below panel content; buttons/rows keep their own states.
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            gradient: Gradient {
+                GradientStop {
+                    position: 0
+                    color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                }
+                GradientStop {
+                    position: 0.4
+                    color: "transparent"
+                }
+                GradientStop {
+                    position: 1
+                    color: "transparent"
+                }
+            }
+        }
 
         property string menuAddr: ""
         readonly property var menuDevice: bluetoothPanel.menuAddr !== "" ? bluetoothService.deviceByAddress(bluetoothPanel.menuAddr) : null
@@ -2936,16 +2960,6 @@ PanelWindow {
             onClicked: bluetoothPanel.menuAddr = ""
         }
 
-        RectangularGlow {
-            visible: btMenuPopup.visible
-            anchors.fill: btMenuPopup
-            z: btMenuPopup.z
-            glowRadius: 16
-            spread: 0.35
-            color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.32)
-            cornerRadius: btMenuPopup.radius + glowRadius
-        }
-
         Rectangle {
             id: btMenuPopup
 
@@ -2960,8 +2974,8 @@ PanelWindow {
             width: 180
             height: btMenuColumn.height + 12
 
-            // Separation from the dark list comes from the crisp accent hairline
-            // plus the outer RectangularGlow behind it; fill stays Theme.background.
+            // Separation from the dark list comes from the crisp accent hairline;
+            // fill stays Theme.background.
             radius: 10
             color: Theme.background
             border.width: 1
@@ -3087,6 +3101,28 @@ PanelWindow {
 
         enabled: root.hotspotPanelOpen
         visible: hotspotPanel.opacity > 0
+
+        // Shared glass highlight (see ControlTile): full-bleed rect using
+        // the panel's live radius (it morphs on open/close); falloff shaped
+        // by stops. Below panel content; buttons/rows keep their own states.
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            gradient: Gradient {
+                GradientStop {
+                    position: 0
+                    color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                }
+                GradientStop {
+                    position: 0.4
+                    color: "transparent"
+                }
+                GradientStop {
+                    position: 1
+                    color: "transparent"
+                }
+            }
+        }
 
         property bool revealPassword: false
 
@@ -3575,6 +3611,28 @@ PanelWindow {
 
         enabled: root.audioOutputPanelOpen
         visible: audioOutputPanel.opacity > 0
+
+        // Shared glass highlight (see ControlTile): full-bleed rect using
+        // the panel's live radius (it morphs on open/close); falloff shaped
+        // by stops. Below panel content; buttons/rows keep their own states.
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            gradient: Gradient {
+                GradientStop {
+                    position: 0
+                    color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                }
+                GradientStop {
+                    position: 0.4
+                    color: "transparent"
+                }
+                GradientStop {
+                    position: 1
+                    color: "transparent"
+                }
+            }
+        }
 
         // x/y tween so the panel morphs out of / back into the Output tile;
         // `enabled: root.open` snaps them during the CC's own open/close slide so
