@@ -52,12 +52,16 @@ Rectangle {
         }
     }
 
-    color:
-    selected
-    ? Theme.surface
-    : hover.hovered
-        ? Theme.surfaceHover
-        : "transparent"
+    color: {
+        // Selected keeps its surface RGB identity; fill alpha is
+        // Theme.surfaceOpacity scaled down (same approach as the panel
+        // fill). Hover and normal states are untouched.
+        if (root.selected) {
+            const c = Theme.surface
+            return Qt.rgba(c.r, c.g, c.b, Theme.surfaceOpacity * 0.65)
+        }
+        return hover.hovered ? Theme.surfaceHover : "transparent"
+    }
     Behavior on color {
         ColorAnimation {
             duration: 100

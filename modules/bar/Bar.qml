@@ -1,7 +1,9 @@
 import QtQuick
+import QtQuick.Shapes
 import Quickshell
 import Quickshell.Widgets
 import Quickshell.Hyprland
+import Quickshell.Io
 import Quickshell.Wayland
 import Quickshell.Services.SystemTray
 import Qt5Compat.GraphicalEffects
@@ -30,11 +32,274 @@ PanelWindow {
         && root.screen
         && Hyprland.focusedMonitor
         && root.screen.name === Hyprland.focusedMonitor.name
-    // `mediaExpanded` (auto-expand OR manual) now arms the focus grab so Escape
-    // and click-outside dismiss the preview early; `mediaManual` no longer gates
-    // this, only the 4s auto-hide timer in shell.qml.
+    // Media arms the focus grab on manual open only: `mediaExpanded && manual`
+    // makes the surface interactive (Escape + outside-click close it) while an
+    // auto-expand stays fully focus-free and closes via the 3s auto-hide timer
+    // in shell.qml. The input mask below covers the card in both modes.
     property bool surfaceActive: (barState.screen === root.screen && (barState.mode === "power" || barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact")) || root.isCaptureActive
-        || root.mediaExpanded
+        || (root.mediaExpanded && barState.mediaManual)
+
+    // ---- single-window concave (tiled hug) --------------------------------
+    // Reactive presence/count from the workspace model; floating + geometry
+    // from event-driven one-shot `hyprctl clients -j` (the Toplevel API
+    // exposes neither). No timers, no polling, no loops.
+    // Explicitly resolved, never a frozen method binding: _ccResolve() runs on
+    // startup (after refreshMonitors, DisplayService pattern) and on every
+    // refresh trigger, so a null-at-startup monitor/workspace recovers.
+    property var _ccMonitor: null
+    property var _ccWs: null
+    readonly property int _ccWsId: root._ccWs ? root._ccWs.id : -1
+
+    property string _soloAddr: ""
+    property string _soloTitle: ""
+    readonly property bool _haveSolo: root._soloAddr !== ""
+
+    // Single entry for every refresh trigger: resolve, recompute, re-query.
+    function _ccUpdate() {
+        root._ccResolve()
+        root._ccRefreshSolo()
+        root._requestGeo()
+    }
+
+    function _ccResolve() {
+        const mon = Hyprland.monitorFor(root.screen)
+        if (mon !== root._ccMonitor)
+            root._ccMonitor = mon
+        const ws = mon ? mon.activeWorkspace : null
+        if (ws !== root._ccWs)
+            root._ccWs = ws
+    }
+
+    property bool _geoValid: false
+    property bool _winFloat: true
+    property real _winX: 0
+    property real _winY: 0
+    property real _winW: 0
+    property real _winH: 0
+    property bool _geoDirty: false
+
+    // Bar-local scoop span, clamped to the bar. Inactive collapses to the
+    // corners so the same path draws today's plain rectangle. The y guard
+    // keeps the scoop attached to the bar (a gapped window means no hug).
+    // Window-state only: DynamicCenter must not kill the concave. DC paints
+    // below the bar (y>=40) while these Shapes live at y=40..60 beside it.
+    readonly property bool _scoopOn: root._haveSolo && root._geoValid && !root._winFloat
+        && root._winY <= 44 && root._scoopW > 40
+    readonly property real _scoopL0: Math.max(0, Math.min(barContent.width, root._winX))
+    readonly property real _scoopR0: Math.max(0, Math.min(barContent.width, root._winX + root._winW))
+    readonly property real _scoopW: root._scoopR0 - root._scoopL0
+
+    // TEMP DEBUG: final gate evaluation (remove after diagnosis).
+    on_ScoopOnChanged: console.log("[concave-dbg] scoopOn=" + root._scoopOn
+        + " haveSolo=" + root._haveSolo + " geoValid=" + root._geoValid
+        + " winFloat=" + root._winFloat + " dc=" + dynamicCenter.activeSurface
+        + " winY=" + root._winY + " scoopW=" + root._scoopW)
+
+    // Presence/count recompute over HyprlandToplevel items (address/title/
+    // workspace only - no appId/minimized assumption). Reads the model fresh
+    // on every trigger. A minimized window still counts: fail-safe OFF rather
+    // than invented filtering.
+    // Window source: global Hyprland.toplevels (proven populated; the
+    // workspace-level toplevels model is empty on 0.3.1), filtered by
+    // workspace id. Hidden excluded via lastIpcObject (CaptureOverlay
+    // pattern); HyprlandToplevel has no minimized property.
+    function _ccRefreshSolo() {
+        const wsId = root._ccWsId
+        const vals = Hyprland.toplevels ? Hyprland.toplevels.values : []
+        let n = 0
+        let addr = ""
+        let title = ""
+        for (let i = 0; i < vals.length; i++) {
+            const t = vals[i]
+            if (!t)
+                continue
+            const tws = t.workspace
+            if (!tws || tws.id !== wsId)
+                continue
+            const ipc = t.lastIpcObject
+            if (ipc && ipc.hidden)
+                continue
+            n++
+            if (n === 1) {
+                addr = t.address || ""
+                title = t.title || ""
+            }
+            if (n > 1)
+                break
+        }
+        if (n !== 1) {
+            addr = ""
+            title = ""
+        }
+        const changed = addr !== root._soloAddr || title !== root._soloTitle
+        root._soloAddr = addr
+        root._soloTitle = title
+        // TEMP DEBUG (workspaceId=-1 investigation): chain provenance.
+        console.log("[concave-dbg] screen=" + (root.screen ? root.screen.name : "null"))
+        console.log("[concave-dbg] monitor=" + (root._ccMonitor ? root._ccMonitor.name : "null"))
+        console.log("[concave-dbg] activeWorkspace=" + (root._ccWs ? root._ccWs.name : "null"))
+        console.log("[concave-dbg] workspaceId=" + root._ccWsId)
+        console.log("[concave-dbg] refresh ws=" + root._ccWsId + " n=" + n + " addr=" + addr + " title=" + title)
+        console.log("[concave-dbg] ws=" + wsId + " global=" + vals.length + " filtered=" + n)
+        if (n === 1)
+            console.log("[concave-dbg] solo addr=" + addr + " ws=" + wsId)
+        if (addr === "")
+            root._geoValid = false
+        else if (changed)
+            root._requestGeo()
+    }
+
+    function _requestGeo() {
+        if (root._soloAddr === "") {
+            root._geoValid = false
+            return
+        }
+        if (geoProc.running) {
+            root._geoDirty = true
+            return
+        }
+        root._geoDirty = false
+        geoProc.running = true
+    }
+
+    // Deterministic address match (hyprctl `address` vs HyprlandToplevel
+    // `address`); workspace-scoped. No class/title heuristics.
+    // Address formats differ between sources (HyprlandToplevel gives bare
+    // hex, hyprctl gives 0x-prefixed): normalize both sides, fail-safe null.
+    function _normalizeAddress(value) {
+        return String(value || "").toLowerCase().replace(/^0x/, "")
+    }
+
+    function _matchClient(clients) {
+        const addr = root._normalizeAddress(root._soloAddr)
+        // TEMP DEBUG (nomatch investigation).
+        console.log("[concave-dbg] solo addr=" + addr + " ws=" + root._ccWsId)
+        if (addr === "")
+            return null
+        for (let i = 0; i < clients.length; i++) {
+            const c = clients[i]
+            const ca = c ? root._normalizeAddress(c.address) : ""
+            const cw = (c && c.workspace) ? c.workspace.id : -1
+            const eq = ca !== "" && ca === addr
+            // TEMP DEBUG.
+            console.log("[concave-dbg] client addr=" + ca + " ws=" + cw
+                + " class=" + (c ? c.class : "") + " title=" + (c ? c.title : "")
+                + " | equal=" + eq + " wsEqual=" + (cw === root._ccWsId))
+            if (c && eq && c.workspace && c.workspace.id === root._ccWsId)
+                return c
+        }
+        return null
+    }
+
+    function _applyGeo(c) {
+        const bad = !c || c.floating !== false
+            || !c.at || !c.size
+            || !isFinite(c.at[0]) || !isFinite(c.at[1])
+            || !isFinite(c.size[0]) || !isFinite(c.size[1])
+            || !(c.size[0] > 0) || !(c.size[1] > 0)
+        if (bad) {
+            console.log("[concave-dbg] geo REJECTED nomatch=" + (!c))
+            root._geoValid = false
+            return
+        }
+        const mon = root._ccMonitor
+        if (!mon) {
+            root._geoValid = false
+            return
+        }
+        console.log("[concave-dbg] geo float=" + c.floating + " at=" + c.at + " size=" + c.size
+            + " mon=" + mon.name + "(" + mon.x + "," + mon.y + ")")
+        root._winX = c.at[0] - mon.x
+        root._winY = c.at[1] - mon.y
+        root._winW = c.size[0]
+        root._winH = c.size[1]
+        root._winFloat = false
+        root._geoValid = true
+    }
+
+    Connections {
+        target: Hyprland
+        function onRawEvent(event) {
+            const n = (event && event.name) || ""
+            if (n === "openwindow" || n === "closewindow" || n === "movewindow"
+                || n === "changefloatingmode" || n === "fullscreen"
+                || n === "workspace" || n === "workspacev2" || n === "focusedmon"
+                || n === "minimize" || n === "monitoradded" || n === "monitorremoved") {
+                root._ccUpdate()
+            }
+        }
+    }
+
+    Connections {
+        target: Hyprland
+        function onFocusedMonitorChanged() {
+            root._ccUpdate()
+        }
+    }
+
+    Connections {
+        target: root._ccMonitor
+        function onActiveWorkspaceChanged() {
+            root._ccUpdate()
+        }
+    }
+
+    // Model add/remove backstop (toplevels + monitors): rows signals only.
+    Connections {
+        target: Hyprland.toplevels
+        function onRowsInserted() { root._ccUpdate() }
+        function onRowsRemoved() { root._ccUpdate() }
+    }
+
+    Connections {
+        target: Hyprland.monitors
+        function onRowsInserted() { root._ccUpdate() }
+        function onRowsRemoved() { root._ccUpdate() }
+    }
+
+    // Per-toplevel changes, HyprlandToplevel signals only (verified in 0.3.1
+    // qmltypes: title/activated/urgent/workspace/monitor/addressChanged).
+    // Removal is covered by the toplevels model rows above. Invisible only.
+    Instantiator {
+        model: Hyprland.toplevels
+        delegate: Item {
+            visible: false
+            required property var modelData
+            Connections {
+                target: modelData
+                function onTitleChanged() { root._ccUpdate() }
+                function onActivatedChanged() { root._ccUpdate() }
+                function onUrgentChanged() { root._ccUpdate() }
+                function onWorkspaceChanged() { root._ccUpdate() }
+                function onMonitorChanged() { root._ccUpdate() }
+                function onAddressChanged() { root._ccUpdate() }
+            }
+        }
+    }
+
+    Process {
+        id: geoProc
+        command: ["hyprctl", "clients", "-j"]
+        stdout: StdioCollector { id: geoOut; waitForEnd: true }
+        onExited: {
+            try {
+                root._applyGeo(root._matchClient(JSON.parse(geoOut.text || "[]")))
+            } catch (e) {
+                root._geoValid = false
+            }
+            if (root._geoDirty)
+                root._requestGeo()
+        }
+    }
+
+    Component.onCompleted: {
+        // Force the IPC models populated (DisplayService/CaptureOverlay
+        // pattern) before the first resolve - the onCompleted frame alone
+        // may run before the models arrive.
+        Hyprland.refreshMonitors()
+        Hyprland.refreshToplevels()
+        root._ccUpdate()
+    }
 
     onIsCaptureActiveChanged: console.log("[Bar] isCaptureActive ->", root.isCaptureActive, "screen =", (root.screen ? root.screen.name : "null"))
 
@@ -103,7 +368,56 @@ PanelWindow {
         clip: true
         z: 999
 
-        color: Theme.background
+        color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
+
+        // Material prototype: directional top light + bottom edge key.
+        // The top light is a short soft falloff (not a hard hairline) so it
+        // reads as light response rather than an edge artifact; peak uses the
+        // same highlight token. All content stays above both painters.
+        Rectangle {
+            x: 0
+            y: 0
+            width: parent.width
+            height: 18
+            gradient: Gradient {
+                GradientStop {
+                    position: 0
+                    color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                }
+                GradientStop {
+                    position: 1
+                    color: "transparent"
+                }
+            }
+        }
+        // Bottom edge: full line while closed; split side segments while a
+        // surface is open, so the shared span merges into the panel and only
+        // the outer edge stays bright. The two states are exact complements
+        // (no frame shows both or neither); widths track allocatedWidth live.
+        Rectangle {
+            x: 0
+            y: parent.height - 1
+            width: parent.width
+            height: 1
+            color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+            visible: dynamicCenter.activeSurface === "idle" && dynamicCenter.allocatedHeight <= 0
+        }
+        Rectangle {
+            x: 0
+            y: parent.height - 1
+            width: (parent.width - dynamicCenter.allocatedWidth) / 2
+            height: 1
+            color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+            visible: dynamicCenter.activeSurface !== "idle" || dynamicCenter.allocatedHeight > 0
+        }
+        Rectangle {
+            x: (parent.width + dynamicCenter.allocatedWidth) / 2
+            y: parent.height - 1
+            width: (parent.width - dynamicCenter.allocatedWidth) / 2
+            height: 1
+            color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+            visible: dynamicCenter.activeSurface !== "idle" || dynamicCenter.allocatedHeight > 0
+        }
 
         // Arch Linux logo, pinned to the very left edge. Click toggles a
         // fastfetch-style system summary popover (see archPop below).
@@ -147,7 +461,7 @@ PanelWindow {
             ColorOverlay {
                 anchors.fill: archImg
                 source: archImg
-                color: Theme.text
+                color: Theme.icon
             }
 
             HoverHandler {
@@ -232,7 +546,7 @@ PanelWindow {
                     anchors.fill: parent
                     anchors.margins: 8
                     radius: Theme.cornerRadius
-                    color: Theme.background
+                    color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
                     border.width: 1
                     border.color: Theme.surfaceHover
 
@@ -256,6 +570,28 @@ PanelWindow {
                         if (event.key === Qt.Key_Escape) {
                             archPop.open = false
                             event.accepted = true
+                        }
+                    }
+
+                    // Shared glass highlight (see ControlTile): full-bleed
+                    // rect with the card's own corner radius; falloff shaped
+                    // by stops. Below the info content.
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: Theme.cornerRadius
+                        gradient: Gradient {
+                            GradientStop {
+                                position: 0
+                                color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                            }
+                            GradientStop {
+                                position: 0.4
+                                color: "transparent"
+                            }
+                            GradientStop {
+                                position: 1
+                                color: "transparent"
+                            }
                         }
                     }
 
@@ -491,7 +827,7 @@ PanelWindow {
                 elide: Text.ElideRight
                 maximumLineCount: 1
                 // Match the DateTimeWidget clock text exactly.
-                color: Theme.text
+                color: Theme.icon
                 font.family: Theme.fontFamily
                 font.weight: Font.Black
                 font.pixelSize: 14
@@ -544,7 +880,7 @@ PanelWindow {
                 : barState.mode === "wallpapers" ? "Wallpapers"
                 : (barState.mode === "mediaPreview" || barState.mode === "mediaCompact") ? "Media"
                 : ""
-            color: Theme.text
+            color: Theme.icon
             font.family: Theme.fontFamily
             font.pixelSize: 15
             font.weight: Font.Bold
@@ -695,7 +1031,7 @@ PanelWindow {
             ColorOverlay {
                 anchors.fill: caffeineIndicatorImg
                 source: caffeineIndicatorImg
-                color: Theme.text
+                color: Theme.icon
             }
 
             HoverHandler {
@@ -818,7 +1154,7 @@ PanelWindow {
             ColorOverlay {
                 anchors.fill: micIndicatorImg
                 source: micIndicatorImg
-                color: Theme.text
+                color: Theme.icon
             }
 
             HoverHandler {
@@ -888,7 +1224,7 @@ PanelWindow {
             ColorOverlay {
                 anchors.fill: wifiBarIcon
                 source: wifiBarIcon
-                color: wifiIndicator.wifiOn ? Theme.text : Theme.textMuted
+                color: wifiIndicator.wifiOn ? Theme.icon : Theme.textMuted
             }
 
             HoverHandler {
@@ -970,7 +1306,7 @@ PanelWindow {
                     anchors.fill: parent
                     anchors.margins: 8
                     radius: Theme.cornerRadius
-                    color: Theme.background
+                    color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
                     border.width: 1
                     border.color: Theme.surfaceHover
 
@@ -992,6 +1328,28 @@ PanelWindow {
                         if (event.key === Qt.Key_Escape) {
                             wifiPop.open = false
                             event.accepted = true
+                        }
+                    }
+
+                    // Shared glass highlight (see ControlTile): full-bleed
+                    // rect with the card's own corner radius; falloff shaped
+                    // by stops. Below the info content.
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: Theme.cornerRadius
+                        gradient: Gradient {
+                            GradientStop {
+                                position: 0
+                                color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                            }
+                            GradientStop {
+                                position: 0.4
+                                color: "transparent"
+                            }
+                            GradientStop {
+                                position: 1
+                                color: "transparent"
+                            }
                         }
                     }
 
@@ -1130,6 +1488,46 @@ PanelWindow {
             }
         }
     }
+
+    // TEMP PROOF-OF-CONCEPT (visual test only): solid red corner markers
+        // proving scoop state/geometry reach the screen. Topmost on purpose.
+        // Remove after test; do NOT restyle into a final design.
+        Shape {
+            x: root._scoopL0
+            y: 40
+            width: 40
+            height: 20
+            z: 1000
+            visible: root._scoopOn
+            antialiasing: true
+            ShapePath {
+                fillColor: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
+                strokeColor: "transparent"
+                startX: 0
+                startY: 0
+                PathLine { x: 20; y: 0 }
+                PathArc { x: 0; y: 20; radiusX: 20; radiusY: 20; direction: PathArc.Counterclockwise; useLargeArc: false }
+                PathLine { x: 0; y: 20 }
+            }
+        }
+        Shape {
+            x: root._scoopR0 - 40
+            y: 40
+            width: 40
+            height: 20
+            z: 1000
+            visible: root._scoopOn
+            antialiasing: true
+            ShapePath {
+                fillColor: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
+                strokeColor: "transparent"
+                startX: 40
+                startY: 0
+                PathLine { x: 20; y: 0 }
+                PathArc { x: 40; y: 20; radiusX: 20; radiusY: 20; direction: PathArc.Clockwise; useLargeArc: false }
+                PathLine { x: 40; y: 20 }
+            }
+        }
 
     DynamicCenter {
         id: dynamicCenter

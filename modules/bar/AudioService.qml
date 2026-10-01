@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell.Io
+import Quickshell.Services.Pipewire
 
 Item {
     id: root
@@ -10,6 +11,25 @@ Item {
     property var sinks: []
 
     property int _target: -1
+
+    // Native PipeWire tracking (same pattern as OSDService): the backend is
+    // the source of truth for volume/muted; wpctl is no longer used here.
+    readonly property var sinkNode: Pipewire.defaultAudioSink
+    PwObjectTracker { objects: root.sinkNode ? [root.sinkNode] : [] }
+    readonly property var sinkAudio: (root.sinkNode && root.sinkNode.audio) ? root.sinkNode.audio : null
+
+    Connections {
+        target: root.sinkAudio
+        ignoreUnknownSignals: true
+        function onVolumesChanged() {
+            if (root.sinkAudio && root._target < 0)
+                root.volume = Math.round(root.sinkAudio.volume * 100)
+        }
+        function onMutedChanged() {
+            if (root.sinkAudio)
+                root.muted = root.sinkAudio.muted
+        }
+    }
 
     function setVolume(v) {
         root._target = Math.max(0, Math.min(100, Math.round(v)))
@@ -36,8 +56,8 @@ Item {
     }
 
     function refresh() {
+        if (!micQueryProc.running) micQueryProc.running = true
         if (!sinksProc.running) sinksProc.running = true
-        if (!queryProc.running) queryProc.running = true
     }
 
     Timer {
@@ -45,9 +65,14 @@ Item {
 
         interval: 45
         onTriggered: {
-            if (root._target < 0 || setProc.running) return
-            setProc.level = root._target / 100
-            setProc.running = true
+            if (root._target < 0)
+                return
+            // Native write (0..1 float); no process. Kept off when no sink so
+            // a later setVolume retries instead of dropping the request.
+            if (root.sinkAudio) {
+                root.sinkAudio.volume = root._target / 100
+                root._target = -1
+            }
         }
     }
 
@@ -58,42 +83,15 @@ Item {
         repeat: true
         running: true
         onTriggered: {
-            if (!queryProc.running && root._target < 0) queryProc.running = true
             if (!micQueryProc.running) micQueryProc.running = true
             if (!sinksProc.running) sinksProc.running = true
         }
     }
 
     Process {
-        id: setProc
-
-        property real level: 0
-
-        command: ["wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", setProc.level.toFixed(2)]
-
-        onExited: root._target = -1
-    }
-
-    Process {
         id: muteProc
 
         command: ["wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"]
-
-        onExited: queryProc.running = true
-    }
-
-    Process {
-        id: queryProc
-
-        command: ["wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"]
-        stdout: StdioCollector { waitForEnd: true }
-
-        onExited: {
-            const t = queryProc.stdout.text
-            const m = t.match(/Volume:\s*([0-9.]+)/)
-            if (m && root._target < 0) root.volume = Math.round(parseFloat(m[1]) * 100)
-            root.muted = t.indexOf("MUTED") !== -1
-        }
     }
 
     Process {
@@ -156,13 +154,11 @@ Item {
         command: ["wpctl", "set-default", "" + setDefaultProc.sinkId]
 
         onExited: {
-            queryProc.running = true
             sinksProc.running = true
         }
     }
 
     Component.onCompleted: {
-        queryProc.running = true
         micQueryProc.running = true
         sinksProc.running = true
     }

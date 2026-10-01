@@ -116,6 +116,18 @@ Item {
         blReconcile.restart()
     }
 
+    // Optimistic brightness display for an absolute value (slider path).
+    // Same UI half as brightnessStep; the hardware write stays with the
+    // caller. Reconcile converges to the real sysfs value afterwards.
+    function brightnessShow(pct) {
+        if (root._blMax <= 0)
+            return
+        root._blRaw = Math.max(1, Math.round(root._blMax * Math.max(0, Math.min(100, pct)) / 100))
+        root._blPrimed = true
+        root._show("brightness", 1500)
+        blReconcile.restart()
+    }
+
     // Pull the true hardware value a beat after the last keypress so any drift
     // from rapid relative steps is corrected.
     Timer {
@@ -203,5 +215,32 @@ Item {
             }
             root._show("caps", 1400)
         }
+    }
+
+    // Event-driven Caps Lock: one persistent python-evdev watcher over every
+    // *-event-kbd node prints a single `toggle` line per physical press.
+    // Exactly one instance (constant running, never restarted) - if it dies,
+    // the 1 Hz sysfs poll above keeps working as the fallback.
+    Process {
+        id: capsWatch
+        command: ["python3", Quickshell.shellPath("scripts/caps-watch.py")]
+        running: true
+        stdout: SplitParser {
+            onRead: (line) => root._onCapsToggle(line)
+        }
+    }
+
+    function _onCapsToggle(line) {
+        if ((line || "").trim() !== "toggle")
+            return
+        // Not yet synced from sysfs: let the file read establish truth.
+        if (!root._capsPrimed) {
+            capsFile.reload()
+            return
+        }
+        // Primary trigger: flip locally and show. The poll then reads the
+        // same state and stays silent - no double popup, no debounce timer.
+        root.capsOn = !root.capsOn
+        root._show("caps", 1400)
     }
 }

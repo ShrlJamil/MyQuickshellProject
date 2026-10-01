@@ -9,7 +9,7 @@ Item {
     property string label: ""
     property string iconSource: ""
     // Colour a local file: SVG glyph is tinted to (theme icons draw as-is).
-    property color iconColor: Theme.text
+    property color iconColor: Theme.icon
 
     // A local `file:` SVG is a solid #000 glyph -> Image + ColorOverlay so it
     // tints; a Quickshell.iconPath theme icon already arrives coloured.
@@ -155,7 +155,7 @@ Item {
             width: 22
             height: 12
             radius: 6
-            color: Theme.text
+            color: Theme.icon
 
             x: Math.max(0, Math.min(track.width - width, fill.width - width / 2))
         }

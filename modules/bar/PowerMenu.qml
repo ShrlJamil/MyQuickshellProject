@@ -187,7 +187,8 @@ Item {
         readonly property real bottomRadius: 16
 
         ShapePath {
-            fillColor: Theme.background
+            // Transparent: the DynamicCenter frame is the sole panel background.
+            fillColor: "transparent"
             strokeColor: "transparent"
             strokeWidth: 0
 

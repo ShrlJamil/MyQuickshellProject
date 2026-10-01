@@ -386,12 +386,36 @@ PanelWindow {
                     // Full pill. The outer capsule ALWAYS stays dark - only the
                     // inner wifiActiveCircle reflects the on/off state.
                     radius: height / 2
-                    color: wifiHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+                    color: {
+                        const c = wifiHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+                        return Qt.rgba(c.r, c.g, c.b, Theme.surfaceOpacity)
+                    }
 
                     HoverHandler {
                         id: wifiHover
 
                         cursorShape: Qt.PointingHandCursor
+                    }
+
+                    // Shared glass highlight (see ControlTile): full-bleed
+                    // rect with the tile's own pill radius; falloff by stops.
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: height / 2
+                        gradient: Gradient {
+                            GradientStop {
+                                position: 0
+                                color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                            }
+                            GradientStop {
+                                position: 0.4
+                                color: "transparent"
+                            }
+                            GradientStop {
+                                position: 1
+                                color: "transparent"
+                            }
+                        }
                     }
 
                     Row {
@@ -425,8 +449,8 @@ PanelWindow {
                                 width: 64
                                 height: 64
                                 radius: width / 2
-                                // ON -> solid white, OFF -> subtle dark surface.
-                                color: wifiTile.wifiOn ? Theme.text : Theme.surfaceHover
+                                // ON -> light muted tile, OFF -> subtle dark surface.
+                                color: wifiTile.wifiOn ? Theme.activeTile : Theme.surfaceHover
                             }
 
                             IconImage {
@@ -442,12 +466,12 @@ PanelWindow {
                             }
 
                             // network-wireless-symbolic is a monochrome glyph;
-                            // overlay it so it reads as accent on the white ON
+                            // overlay it so it reads as accent on the light ON
                             // circle and as Theme.text when OFF.
                             ColorOverlay {
                                 anchors.fill: wifiIcon
                                 source: wifiIcon
-                                color: wifiTile.wifiOn ? Theme.accent : Theme.text
+                                color: wifiTile.wifiOn ? Theme.accent : Theme.icon
                             }
 
                             MouseArea {
@@ -606,7 +630,7 @@ PanelWindow {
                             ColorOverlay {
                                 anchors.fill: focusIconImg
                                 source: focusIconImg
-                                color: focusTile.active ? Theme.accent : Theme.text
+                                color: focusTile.active ? Theme.accent : Theme.icon
 
                                 Behavior on color {
                                     ColorAnimation { duration: 120; easing.type: Easing.OutCubic }
@@ -654,12 +678,37 @@ PanelWindow {
 
                 // Elevated (softer, still rectangular - not a pill).
                 radius: 29
-                color: mediaHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+                color: {
+                    const c = mediaHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+                    return Qt.rgba(c.r, c.g, c.b, Theme.surfaceOpacity)
+                }
 
                 HoverHandler {
                     id: mediaHover
 
                     cursorShape: Qt.PointingHandCursor
+                }
+
+                // Shared glass highlight (see ControlTile): full-bleed rect
+                // with the tile's own radius; falloff shaped by stops. Below
+                // the artwork/info content.
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 29
+                    gradient: Gradient {
+                        GradientStop {
+                            position: 0
+                            color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                        }
+                        GradientStop {
+                            position: 0.4
+                            color: "transparent"
+                        }
+                        GradientStop {
+                            position: 1
+                            color: "transparent"
+                        }
+                    }
                 }
 
                 MouseArea {
@@ -909,12 +958,36 @@ PanelWindow {
 
             // Full pill.
             radius: height / 2
-            color: displayHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+            color: {
+                const c = displayHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+                return Qt.rgba(c.r, c.g, c.b, Theme.surfaceOpacity)
+            }
 
             HoverHandler {
                 id: displayHover
 
                 cursorShape: Qt.PointingHandCursor
+            }
+
+            // Shared glass highlight (see ControlTile): full-bleed rect
+            // with the tile's own pill radius; falloff shaped by stops.
+            Rectangle {
+                anchors.fill: parent
+                radius: height / 2
+                gradient: Gradient {
+                    GradientStop {
+                        position: 0
+                        color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                    }
+                    GradientStop {
+                        position: 0.4
+                        color: "transparent"
+                    }
+                    GradientStop {
+                        position: 1
+                        color: "transparent"
+                    }
+                }
             }
 
             Text {
@@ -983,12 +1056,36 @@ PanelWindow {
 
             // Full pill.
             radius: height / 2
-            color: soundHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+            color: {
+                const c = soundHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+                return Qt.rgba(c.r, c.g, c.b, Theme.surfaceOpacity)
+            }
 
             HoverHandler {
                 id: soundHover
 
                 cursorShape: Qt.PointingHandCursor
+            }
+
+            // Shared glass highlight (see ControlTile): full-bleed rect
+            // with the tile's own pill radius; falloff shaped by stops.
+            Rectangle {
+                anchors.fill: parent
+                radius: height / 2
+                gradient: Gradient {
+                    GradientStop {
+                        position: 0
+                        color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                    }
+                    GradientStop {
+                        position: 0.4
+                        color: "transparent"
+                    }
+                    GradientStop {
+                        position: 1
+                        color: "transparent"
+                    }
+                }
             }
 
             Text {
@@ -1036,7 +1133,7 @@ PanelWindow {
                     return "file://" + Quickshell.shellPath("assets/volume/volume-high-svgrepo-com.svg")
                 }
                 // dim the glyph when muted / silent, matching the OSD
-                iconColor: (audioService.muted || audioService.volume === 0) ? Theme.textMuted : Theme.text
+                iconColor: (audioService.muted || audioService.volume === 0) ? Theme.textMuted : Theme.icon
                 from: 0
                 to: 100
                 value: audioService.volume
@@ -1060,37 +1157,22 @@ PanelWindow {
             spacing: root.circleGap
 
             ControlTile {
-                id: screenCaptureTile
-
-                property bool pulse: false
+                id: ecoTile
 
                 width: root.circleSize
                 height: root.circleSize
 
                 round: true
-                active: screenCaptureTile.pulse
-                label: "Capture"
-                iconSource: "file://" + Quickshell.shellPath("assets/capture.svg")
-
-                Timer {
-                    id: capturePulseTimer
-
-                    interval: 200
-                    onTriggered: screenCaptureTile.pulse = false
-                }
+                active: EcoService.ecoMode
+                label: "Eco Mode"
+                iconSource: "file://" + Quickshell.shellPath("assets/leaf-svgrepo-com.svg")
 
                 MouseArea {
                     anchors.fill: parent
 
                     cursorShape: Qt.PointingHandCursor
 
-                    onClicked: {
-                        console.log("[Tile Click] Capture tile pressed")
-                        screenCaptureTile.pulse = true
-                        capturePulseTimer.restart()
-                        root.pendingCaptureOpen = true
-                        root.close()
-                    }
+                    onClicked: EcoService.toggle()
                 }
             }
 
@@ -1182,6 +1264,28 @@ PanelWindow {
 
         enabled: root.wifiPanelOpen
         visible: wifiPanel.opacity > 0
+
+        // Shared glass highlight (see ControlTile): full-bleed rect using
+        // the panel's live radius (it morphs on open/close); falloff shaped
+        // by stops. Below panel content; buttons/rows keep their own states.
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            gradient: Gradient {
+                GradientStop {
+                    position: 0
+                    color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                }
+                GradientStop {
+                    position: 0.4
+                    color: "transparent"
+                }
+                GradientStop {
+                    position: 1
+                    color: "transparent"
+                }
+            }
+        }
 
         // Freeze the position tween while the sub-panel is open: x/y are pinned
         // to 0 then, and leaving the Behavior live lets a transient bad
@@ -1817,16 +1921,6 @@ PanelWindow {
             onClicked: wifiPanel.menuSsid = ""
         }
 
-        RectangularGlow {
-            visible: menuPopup.visible
-            anchors.fill: menuPopup
-            z: menuPopup.z
-            glowRadius: 16
-            spread: 0.35
-            color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.32)
-            cornerRadius: menuPopup.radius + glowRadius
-        }
-
         Rectangle {
             id: menuPopup
 
@@ -1841,8 +1935,8 @@ PanelWindow {
             width: 184
             height: menuPopupColumn.height + 12
 
-            // Separation from the dark list comes from the crisp accent hairline
-            // plus the outer RectangularGlow behind it; fill stays Theme.background.
+            // Separation from the dark list comes from the crisp accent hairline;
+            // fill stays Theme.background.
             radius: 10
             color: Theme.background
             border.width: 1
@@ -1952,16 +2046,6 @@ PanelWindow {
             }
         }
 
-        RectangularGlow {
-            visible: addNetworkModal.visible
-            anchors.fill: addNetworkModal
-            z: addNetworkModal.z
-            glowRadius: 18
-            spread: 0.35
-            color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.32)
-            cornerRadius: addNetworkModal.radius + glowRadius
-        }
-
         Rectangle {
             id: addNetworkModal
 
@@ -1979,8 +2063,8 @@ PanelWindow {
                 NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
             }
 
-            // Dialog card: Theme.background fill, crisp accent hairline, an outer
-            // RectangularGlow for lift, floating over the scrim (addBackdrop).
+            // Dialog card: Theme.background fill, crisp accent hairline,
+            // floating over the scrim (addBackdrop).
             radius: 10
             color: Theme.background
             border.width: 1
@@ -2355,6 +2439,28 @@ PanelWindow {
 
         enabled: root.bluetoothPanelOpen
         visible: bluetoothPanel.opacity > 0
+
+        // Shared glass highlight (see ControlTile): full-bleed rect using
+        // the panel's live radius (it morphs on open/close); falloff shaped
+        // by stops. Below panel content; buttons/rows keep their own states.
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            gradient: Gradient {
+                GradientStop {
+                    position: 0
+                    color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                }
+                GradientStop {
+                    position: 0.4
+                    color: "transparent"
+                }
+                GradientStop {
+                    position: 1
+                    color: "transparent"
+                }
+            }
+        }
 
         property string menuAddr: ""
         readonly property var menuDevice: bluetoothPanel.menuAddr !== "" ? bluetoothService.deviceByAddress(bluetoothPanel.menuAddr) : null
@@ -2854,16 +2960,6 @@ PanelWindow {
             onClicked: bluetoothPanel.menuAddr = ""
         }
 
-        RectangularGlow {
-            visible: btMenuPopup.visible
-            anchors.fill: btMenuPopup
-            z: btMenuPopup.z
-            glowRadius: 16
-            spread: 0.35
-            color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.32)
-            cornerRadius: btMenuPopup.radius + glowRadius
-        }
-
         Rectangle {
             id: btMenuPopup
 
@@ -2878,8 +2974,8 @@ PanelWindow {
             width: 180
             height: btMenuColumn.height + 12
 
-            // Separation from the dark list comes from the crisp accent hairline
-            // plus the outer RectangularGlow behind it; fill stays Theme.background.
+            // Separation from the dark list comes from the crisp accent hairline;
+            // fill stays Theme.background.
             radius: 10
             color: Theme.background
             border.width: 1
@@ -3005,6 +3101,28 @@ PanelWindow {
 
         enabled: root.hotspotPanelOpen
         visible: hotspotPanel.opacity > 0
+
+        // Shared glass highlight (see ControlTile): full-bleed rect using
+        // the panel's live radius (it morphs on open/close); falloff shaped
+        // by stops. Below panel content; buttons/rows keep their own states.
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            gradient: Gradient {
+                GradientStop {
+                    position: 0
+                    color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                }
+                GradientStop {
+                    position: 0.4
+                    color: "transparent"
+                }
+                GradientStop {
+                    position: 1
+                    color: "transparent"
+                }
+            }
+        }
 
         property bool revealPassword: false
 
@@ -3493,6 +3611,28 @@ PanelWindow {
 
         enabled: root.audioOutputPanelOpen
         visible: audioOutputPanel.opacity > 0
+
+        // Shared glass highlight (see ControlTile): full-bleed rect using
+        // the panel's live radius (it morphs on open/close); falloff shaped
+        // by stops. Below panel content; buttons/rows keep their own states.
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            gradient: Gradient {
+                GradientStop {
+                    position: 0
+                    color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                }
+                GradientStop {
+                    position: 0.4
+                    color: "transparent"
+                }
+                GradientStop {
+                    position: 1
+                    color: "transparent"
+                }
+            }
+        }
 
         // x/y tween so the panel morphs out of / back into the Output tile;
         // `enabled: root.open` snaps them during the CC's own open/close slide so

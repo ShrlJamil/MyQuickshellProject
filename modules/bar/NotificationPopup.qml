@@ -145,7 +145,7 @@ PanelWindow {
                     width: parent.width
                     implicitHeight: layout.implicitHeight + 24
                     radius: 16
-                    color: Theme.background
+                    color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
                     border.width: 1
                     border.color: Theme.surfaceHover
 
@@ -174,6 +174,30 @@ PanelWindow {
                     TapHandler {
                         acceptedButtons: Qt.LeftButton
                         onTapped: slot.beginClose()
+                    }
+
+                    // Shared glass highlight (see ControlTile): inset by the
+                    // 1px border so the peak never paints over the border
+                    // stroke; radius reduced to match. Falloff shaped by
+                    // stops. Below content.
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.margins: 1
+                        radius: 15
+                        gradient: Gradient {
+                            GradientStop {
+                                position: 0
+                                color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                            }
+                            GradientStop {
+                                position: 0.4
+                                color: "transparent"
+                            }
+                            GradientStop {
+                                position: 1
+                                color: "transparent"
+                            }
+                        }
                     }
 
                     // Close button.
@@ -304,32 +328,6 @@ PanelWindow {
                             }
                         }
 
-                        // Generic inline-reply affordance — shown only when the
-                        // notification advertises hasInlineReply. Independent of
-                        // the generic action row below.
-                        NotificationReply {
-                            id: replyWidget
-                            width: parent.width
-                            notifId: slot.modelData.id
-                            notification: slot.modelData.notification
-
-                            // Raise the window's keyboard-focus demand only while
-                            // this reply is actually in use. Idempotent via
-                            // _counted so a toast torn down mid-reply still
-                            // balances the count. No state leaves this card.
-                            property bool _counted: false
-                            onActiveChanged: {
-                                if (replyWidget.active === replyWidget._counted)
-                                    return
-                                replyWidget._counted = replyWidget.active
-                                root.replyFocusHolders += replyWidget.active ? 1 : -1
-                            }
-                            Component.onDestruction: {
-                                if (replyWidget._counted)
-                                    root.replyFocusHolders -= 1
-                            }
-                        }
-
                         // Generic actions — text only, no card/border/fill. Hover
                         // only recolours the label. Still consumes its own tap so
                         // the card body handler does not also fire, and still runs
@@ -338,6 +336,31 @@ PanelWindow {
                             width: parent.width
                             spacing: 16
                             visible: slot.actionItems.length > 0
+                                || (replyWidget.available && !replyWidget.replyMode)
+
+                            // Reply as a generic action: identical metrics/style
+                            // to the delegates after this; opens the input below.
+                            Text {
+                                id: replyActLabel
+
+                                visible: replyWidget.available && !replyWidget.replyMode
+                                width: replyActLabel.implicitWidth
+                                height: 28
+                                verticalAlignment: Text.AlignVCenter
+                                text: "Reply"
+                                color: replyActHover.hovered ? Theme.accent : Theme.text
+                                font.pixelSize: 11
+                                elide: Text.ElideRight
+
+                                HoverHandler {
+                                    id: replyActHover
+                                    cursorShape: Qt.PointingHandCursor
+                                }
+                                TapHandler {
+                                    gesturePolicy: TapHandler.ReleaseWithinBounds
+                                    onTapped: replyWidget.replyMode = true
+                                }
+                            }
 
                             Repeater {
                                 model: slot.actionItems
@@ -365,6 +388,36 @@ PanelWindow {
                                             slot.modelData.id, actLabel.modelData.index)
                                     }
                                 }
+                            }
+                        }
+
+                        // Generic inline-reply affordance — shown only when the
+                        // notification advertises hasInlineReply. The collapsed
+                        // button is hidden here (showAffordance: false); Reply
+                        // is the first item of the actions Flow above, same
+                        // style as generic actions. The expanded input form
+                        // lives here, below the whole action row.
+                        NotificationReply {
+                            id: replyWidget
+                            width: parent.width
+                            showAffordance: false
+                            notifId: slot.modelData.id
+                            notification: slot.modelData.notification
+
+                            // Raise the window's keyboard-focus demand only while
+                            // this reply is actually in use. Idempotent via
+                            // _counted so a toast torn down mid-reply still
+                            // balances the count. No state leaves this card.
+                            property bool _counted: false
+                            onActiveChanged: {
+                                if (replyWidget.active === replyWidget._counted)
+                                    return
+                                replyWidget._counted = replyWidget.active
+                                root.replyFocusHolders += replyWidget.active ? 1 : -1
+                            }
+                            Component.onDestruction: {
+                                if (replyWidget._counted)
+                                    root.replyFocusHolders -= 1
                             }
                         }
                     }

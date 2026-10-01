@@ -1,5 +1,6 @@
 import QtQuick
 import Quickshell.Io
+import "../osd"
 
 Item {
     id: root
@@ -12,6 +13,7 @@ Item {
     function setBrightness(v) {
         root._target = Math.max(1, Math.min(100, Math.round(v)))
         root.brightness = root._target
+        OSDService.brightnessShow(root._target)
         applyTimer.restart()
     }
 

@@ -23,6 +23,7 @@ PanelWindow {
     visible: (CaptureService.regionSelectActive || CaptureService.windowSelectActive) && root.isFocusedScreen
 
     WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.namespace: "quickshell-capture"
     WlrLayershell.exclusionMode: ExclusionMode.Ignore
     // Standalone selection (no picker) needs OnDemand focus for its own Esc
     // handler. When the CaptureBar picker is up (openBar's default region mode)
