@@ -29,10 +29,57 @@ PanelWindow {
     readonly property string screenName: root.modelData.screen?.name ?? ""
     readonly property var ownMonitor: root.modelData.screen ? Hyprland.monitorFor(root.modelData.screen) : null
     readonly property int ownWorkspaceId: root.ownMonitor?.activeWorkspace?.id ?? -1
-    readonly property var ownWorkspaces: Hyprland.workspaces.values
-        .filter(w => (w.monitor?.name ?? "") === root.screenName)
-        .sort((a, b) => a.id - b.id)
-    readonly property int ownWorkspaceIndex: root.ownWorkspaces.findIndex(w => w.id === root.ownWorkspaceId)
+    // ---- workspace digit slider -------------------------------------------
+    // Minimal "Workspace N" indicator: static label + sliding badge. Only the
+    // badge (accent pill + digit, moving as one unit) animates, giving an
+    // infinite-carousel feel. Direction follows the id delta at switch time
+    // (+1 = ids increasing, new badge enters from the right).
+    property string wsDigitShown: "1"
+    property bool wsFrontIsA: true
+    property int wsDigitDir: 1
+
+    function _wsDigitInit(id) {
+        const s = String(id)
+        const R = badgeSlot.pad
+        root.wsDigitShown = s
+        root.wsFrontIsA = true
+        root.wsDigitDir = 1
+        badgeA.numText = s
+        badgeB.numText = s
+        badgeA.x = R
+        badgeB.x = R + badgeSlot.span
+    }
+
+    function _wsDigitGo(id, dir) {
+        const s = String(id)
+        const W = badgeSlot.span
+        const R = badgeSlot.pad
+        // Settle instantly to rest (covers mid-flight retriggers so a stale
+        // badge can never linger), then animate old-out / new-in.
+        badgeABeh.enabled = false
+        badgeBBeh.enabled = false
+        if (root.wsFrontIsA) {
+            badgeA.x = R
+            badgeB.numText = s
+            badgeB.x = R + dir * W
+        } else {
+            badgeB.x = R
+            badgeA.numText = s
+            badgeA.x = R + dir * W
+        }
+        badgeABeh.enabled = true
+        badgeBBeh.enabled = true
+        if (root.wsFrontIsA) {
+            badgeA.x = R - dir * W
+            badgeB.x = R
+        } else {
+            badgeB.x = R - dir * W
+            badgeA.x = R
+        }
+        root.wsFrontIsA = !root.wsFrontIsA
+        root.wsDigitShown = s
+        root.wsDigitDir = dir
+    }
 
     property int _lastSeenWorkspaceId: -1
     property bool wsVisible: false
@@ -48,10 +95,12 @@ PanelWindow {
             return
         if (root._lastSeenWorkspaceId < 0) {
             root._lastSeenWorkspaceId = root.ownWorkspaceId
+            root._wsDigitInit(root.ownWorkspaceId)
             return
         }
         if (root.ownWorkspaceId === root._lastSeenWorkspaceId)
             return
+        root._wsDigitGo(root.ownWorkspaceId, root.ownWorkspaceId >= root._lastSeenWorkspaceId ? 1 : -1)
         root._lastSeenWorkspaceId = root.ownWorkspaceId
         root.wsVisible = true
         wsTimer.restart()
@@ -328,69 +377,105 @@ PanelWindow {
                 }
             }
 
-            // ---------------- workspace strip ----------------
+            // ---------------- workspace label ----------------
             Item {
                 id: wsView
 
-                readonly property int slotW: 34
-                readonly property int activeW: 40
-                // Symmetric inner padding; `o` is how far the active pill spills
-                // past its own slot on each side.
-                readonly property int pad: 8
-                readonly property real o: (wsView.activeW - wsView.slotW) / 2
-                readonly property int viewportW: 5 * wsView.slotW
-                readonly property real contentW: root.ownWorkspaces.length * wsView.slotW
-                readonly property real rowX: {
-                    const idx = root.ownWorkspaceIndex >= 0 ? root.ownWorkspaceIndex : 0
-                    const centred = wsView.width / 2 - (idx * wsView.slotW + wsView.slotW / 2)
-                    // Workspace 1 -> active pill's left edge flush at `pad`;
-                    // last workspace -> pill's right edge flush at width - pad.
-                    const maxX = wsView.pad + wsView.o
-                    const minX = Math.min(maxX, (wsView.width - wsView.pad) - wsView.contentW - wsView.o)
-                    return Math.max(minX, Math.min(maxX, centred))
-                }
-
                 anchors.centerIn: parent
                 visible: root._renderMode === "workspace"
-                // Tight: just the visible slots + symmetric padding + pill spill.
-                width: Math.min(wsView.contentW, wsView.viewportW) + wsView.pad * 2 + wsView.o * 2
+                width: wsRow.implicitWidth
                 height: 24
-                clip: true
 
                 Row {
-                    y: 0
-                    x: wsView.rowX
-                    spacing: 0
+                    id: wsRow
 
-                    Behavior on x {
-                        NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+                    anchors.centerIn: parent
+                    spacing: 8
+
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "Workspace"
+                        color: Theme.text
+                        font.pixelSize: 13
+                        font.weight: Font.Bold
                     }
 
-                    Repeater {
-                        model: root.ownWorkspaces
+                    Item {
+                        id: badgeSlot
 
-                        delegate: Item {
-                            id: wsSlot
+                        // Slide travel stays 54px; symmetric 8px padding each
+                        // side keeps the badge clear of the wrapper edge.
+                        // Rest position is `pad`; park/fade derive from these.
+                        readonly property int pad: 8
+                        readonly property real span: 54
 
-                            required property var modelData
+                        width: 40 + pad * 2
+                        height: 24
+                        clip: true
 
-                            width: wsView.slotW
+                        Item {
+                            id: badgeA
+
+                            property string numText: "1"
+
+                            width: 40
                             height: 24
+                            x: badgeSlot.pad
+                            // Fade near the slot edge so the round badge never
+                            // shows a straight clip cut mid-slide; 1 at rest.
+                            opacity: 1 - Math.min(1, Math.abs(x - badgeSlot.pad) / (badgeSlot.span / 2))
 
                             Rectangle {
                                 anchors.centerIn: parent
-                                visible: wsSlot.modelData.active
-                                width: wsView.activeW
+                                width: 40
                                 height: 22
                                 radius: height / 2
                                 color: Theme.accent
                             }
+
                             Text {
                                 anchors.centerIn: parent
-                                text: wsSlot.modelData.id
-                                color: wsSlot.modelData.active ? Theme.background : Theme.textDim
-                                font.pixelSize: wsSlot.modelData.active ? 12 : 11
-                                font.weight: wsSlot.modelData.active ? Font.DemiBold : Font.Medium
+                                text: badgeA.numText
+                                color: Theme.background
+                                font.pixelSize: 13
+                                font.weight: Font.Bold
+                            }
+
+                            Behavior on x {
+                                id: badgeABeh
+                                NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+                            }
+                        }
+
+                        Item {
+                            id: badgeB
+
+                            property string numText: "1"
+
+                            width: 40
+                            height: 24
+                            x: badgeSlot.pad + badgeSlot.span
+                            opacity: 1 - Math.min(1, Math.abs(x - badgeSlot.pad) / (badgeSlot.span / 2))
+
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: 40
+                                height: 22
+                                radius: height / 2
+                                color: Theme.accent
+                            }
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: badgeB.numText
+                                color: Theme.background
+                                font.pixelSize: 13
+                                font.weight: Font.Bold
+                            }
+
+                            Behavior on x {
+                                id: badgeBBeh
+                                NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
                             }
                         }
                     }
