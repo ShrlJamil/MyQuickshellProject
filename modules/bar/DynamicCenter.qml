@@ -474,8 +474,8 @@ Item {
             root._focusSurface("display")
         } else if (root.activeSurface === "media") {
             root._mediaLatched = true
-            // Manual open only: route focus so Escape works. Auto-expand never
-            // takes focus and relies on the 3s auto-hide timer instead.
+            // The media surface always opens via an explicit user click, so it
+            // always takes focus (Escape works).
             if (root.mediaManual) root._focusSurface("media")
         }
     }

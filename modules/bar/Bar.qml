@@ -32,10 +32,8 @@ PanelWindow {
         && root.screen
         && Hyprland.focusedMonitor
         && root.screen.name === Hyprland.focusedMonitor.name
-    // Media arms the focus grab on manual open only: `mediaExpanded && manual`
-    // makes the surface interactive (Escape + outside-click close it) while an
-    // auto-expand stays fully focus-free and closes via the 3s auto-hide timer
-    // in shell.qml. The input mask below covers the card in both modes.
+    // Media arms the focus grab on open: `mediaExpanded && manual` makes the
+    // surface interactive (Escape + outside-click close it).
     property bool surfaceActive: (barState.screen === root.screen && (barState.mode === "power" || barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact")) || root.isCaptureActive
         || (root.mediaExpanded && barState.mediaManual)
 
@@ -893,7 +891,9 @@ PanelWindow {
             // hidden on every screen while media is expanded; and, on the
             // screen that hosts the surface, kept hidden through the slide-out
             // tail (mediaSurfacePresent) so the two never overlap/flicker.
-            visible: !holdLabel.visible && root.mediaService && root.mediaService.hasMedia
+            // Routed via `show` (not `visible`) so the exit shrink/fade can
+            // finish before the item hides.
+            show: !holdLabel.visible && root.mediaService && root.mediaService.hasMedia
                 && barState.mode !== "media"
                 && !dynamicCenter.mediaSurfacePresent
 

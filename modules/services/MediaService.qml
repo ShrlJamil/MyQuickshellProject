@@ -213,6 +213,25 @@ Item {
         ? (root.player.identity || "")
         : (root.lastMedia ? root.lastMedia.identity : "")
 
+    // Hidden artwork prefetch: starts fetching/decoding the current artwork
+    // URL even while no preview is open, so a later intro can show it
+    // immediately. Shares Qt Quick's image cache with the display Image
+    // (same URL + same 56px sourceSize as the bar preview art), so a hit
+    // means zero extra decode there. Single slot bound to the resolved URL:
+    // same-string assignments never reload, stale replies can't overwrite a
+    // newer URL, and "" requests nothing. Zero size, invisible: no layout,
+    // stacking, or input impact.
+    Image {
+        visible: false
+        width: 0
+        height: 0
+        asynchronous: true
+        cache: true
+        sourceSize.width: 56
+        sourceSize.height: 56
+        source: root.artwork || ""
+    }
+
     // ---------------------------------------------------------- capabilities
     readonly property bool canPlay: root.player ? root.player.canPlay : false
     readonly property bool canPause: root.player ? root.player.canPause : false
@@ -313,35 +332,56 @@ Item {
             root.lastMedia.position = s
     }
 
-    // ------------------------------------------------- auto-expand events
-    // Fired when playback goes stopped/paused -> playing, or when the track
-    // changes while already playing. Debounced so the metadata churn on a track
-    // change (title / artist / art / metadata arrive separately) fires once.
-    signal mediaEvent()
-    // Fired when the user touches the expanded player; consumer may reset its
-    // auto-hide timer.
+    // ------------------------------------------------- player events
+    // Fired when the user touches the player UI. Kept for future consumers;
+    // nothing in the shell auto-expands or auto-hides off it.
     signal interaction()
 
     property string _trackKey: ""
     property bool _prevPlaying: false
     property bool _primed: false
 
-    function _currentTrackKey() {
-        if (!root.player)
-            return ""
-        const m = root.player.metadata
-        if (m && m["mpris:trackid"] !== undefined && m["mpris:trackid"] !== null) {
-            const id = String(m["mpris:trackid"])
-            if (id.length > 0)
-                return id
-        }
-        return root._rawTitle + "" + root._rawArtist + "" + root._rawAlbum
-    }
+    // Stable track identity for consumers (MPRIS trackid when available,
+    // title/artist/album fallback). Changes only when the track itself
+    // changes - never on position, pause/play, or same-track metadata edits.
+    readonly property string trackKey: root._trackKey
 
-    Timer {
-        id: eventDebounce
-        interval: 700
-        onTriggered: root.mediaEvent()
+    property string _stickyKey: ""
+    property string _stickyTitle: ""
+    property string _stickyCombo: ""
+
+    function _currentTrackKey() {
+        if (!root.player) {
+            root._stickyKey = ""
+            root._stickyTitle = ""
+            root._stickyCombo = ""
+            return ""
+        }
+        const m = root.player.metadata
+        let id = ""
+        if (m && m["mpris:trackid"] !== undefined && m["mpris:trackid"] !== null)
+            id = String(m["mpris:trackid"])
+        const combo = root._rawTitle + "" + root._rawArtist + "" + root._rawAlbum
+        const title = root._rawTitle
+        // A usable trackid always wins and refreshes the sticky identity.
+        if (id.length > 0) {
+            root._stickyKey = id
+            root._stickyTitle = title
+            root._stickyCombo = combo
+            return id
+        }
+        // No trackid: the title anchors the identity. Pause/stop commonly thin
+        // (dropped id, emptied artist/album) or clear the surrounding metadata
+        // while the title stays put - that must not look like a new track.
+        // Only a genuinely different non-empty title adopts a new identity.
+        if (title.length > 0 && root._stickyTitle.length > 0 && title === root._stickyTitle)
+            return root._stickyKey
+        if (title.length === 0)
+            return root._stickyKey
+        root._stickyKey = combo
+        root._stickyTitle = title
+        root._stickyCombo = combo
+        return combo
     }
 
     function _evaluate() {
@@ -350,6 +390,9 @@ Item {
             root._trackKey = ""
             root._prevPlaying = false
             root._primed = false
+            root._stickyKey = ""
+            root._stickyTitle = ""
+            root._stickyCombo = ""
             return
         }
 
@@ -362,21 +405,15 @@ Item {
         // metadata does not wipe the cache.
         root._snapshotMedia()
 
-        // First observation of a (new) player: snapshot only, never fire. A
-        // player that is already playing when the shell starts must not pop the
-        // expanded view.
+        // First observation of a (new) player: snapshot only. State below is
+        // display bookkeeping (track key, sticky duration) only - it never
+        // triggers any expand.
         if (!root._primed) {
             root._trackKey = key
             root._prevPlaying = nowPlaying
             root._primed = true
             return
         }
-
-        let fire = false
-        if (nowPlaying && !root._prevPlaying)
-            fire = true
-        else if (nowPlaying && key.length > 0 && key !== root._trackKey)
-            fire = true
 
         // A real track change invalidates the sticky duration cache so the next
         // track can't inherit the previous one's length.
@@ -385,9 +422,6 @@ Item {
 
         root._trackKey = key
         root._prevPlaying = nowPlaying
-
-        if (fire)
-            eventDebounce.restart()
     }
 
     onPlayerChanged: {

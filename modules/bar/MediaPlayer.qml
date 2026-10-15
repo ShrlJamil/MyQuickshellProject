@@ -14,9 +14,8 @@ Item {
 
     required property var mediaService
     property bool active: false
-    // True when opened by clicking the bar preview (vs auto-expand). Gates all
-    // focus behavior (focus flag + explicit grabs) and suppresses the 3s
-    // auto-hide timer in shell.qml - auto-expand stays fully focus-free.
+    // True when opened by clicking the bar preview. All media opens are manual
+    // (click-to-expand); gates focus behavior for the interactive surface.
     property bool manual: false
 
     signal closeRequested()
@@ -59,9 +58,9 @@ Item {
         return (h > 0 ? h + ":" : "") + mm + ":" + (r < 10 ? "0" + r : r)
     }
 
-    // Focus is strictly manual-only: the flag and both explicit grabs are gated
-    // on `manual`, so an auto-expand never takes keyboard focus while a manual
-    // open behaves as an interactive focused surface (Escape works).
+    // Focus is manual-only: the flag and both explicit grabs are gated
+    // on `manual`, so the clicked-open surface behaves as an interactive
+    // focused surface (Escape works).
     focus: root.active && root.manual
     onActiveChanged: {
         if (root.active) {

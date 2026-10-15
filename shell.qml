@@ -61,21 +61,16 @@ ShellRoot {
         property string mode: ""
         property ShellScreen screen: null
         // true when "media" mode was opened by the user clicking the bar
-        // preview (vs auto-expand). Gates the focus grab (Bar) + focus routing
-        // (DynamicCenter/MediaPlayer) and suppresses the auto-hide timer:
-        // manual is a persistent interactive surface, auto is focus-free.
+        // preview. All "media" opens are manual (click-to-expand); there is no
+        // auto-expand. Gates the focus grab (Bar) + focus routing
+        // (DynamicCenter/MediaPlayer).
         property bool mediaManual: false
-
-        // Escape / click-outside clear `mode` -> kill the auto-hide timer in the
-        // same turn so a stale tick can't fire after an early dismiss.
-        onModeChanged: if (mode !== "media") mediaAutoHide.stop()
-        // Manual open pins the panel: kill any auto-hide already counting.
-        onMediaManualChanged: if (mediaManual) mediaAutoHide.stop()
     }
 
     // ---- Media: one service shared by every screen's bar preview + expanded
-    // player, plus the auto-expand / auto-hide lifecycle for the "media"
-    // DynamicCenter surface.
+    // player. The "media" DynamicCenter surface opens only via an explicit
+    // user click (MediaPreview.activateRequested); playback / track events
+    // never change barState.
     MediaService {
         id: mediaService
         positionActive: barState.mode === "media"
@@ -95,51 +90,6 @@ ShellRoot {
         target: CavaService
         property: "active"
         value: mediaService.playing
-    }
-
-    Timer {
-        id: mediaAutoHide
-        interval: 3000
-        running: barState.mode === "media" && !barState.mediaManual
-        onTriggered: {
-            // Manual-open never auto-hides; it closes via Escape/outside-click.
-            if (barState.mode === "media" && !barState.mediaManual) {
-                barState.screen = null
-                barState.mode = ""
-            }
-        }
-    }
-
-    Connections {
-        target: mediaService
-
-        // Playback started / track changed while playing -> briefly expand.
-        // (MediaService only fires mediaEvent on a real paused/stopped->playing
-        // transition or a track change; no need to re-check playing here, and a
-        // laggy player may still report paused for a beat after the command.)
-        function onMediaEvent() {
-            if (barState.mode !== "" && barState.mode !== "media")
-                return
-            // Already pinned open by an explicit user click -> a track change
-            // must NOT demote it into an auto-hiding preview.
-            if (barState.mode === "media" && barState.mediaManual)
-                return
-            focusState.inquire()
-            const screen = focusedScreen()
-            if (!screen)
-                return
-            barState.mediaManual = false
-            barState.screen = screen
-            barState.mode = "media"
-            mediaAutoHide.restart()
-        }
-
-        // User is interacting with the auto-expanded player -> keep it open by
-        // postponing the auto-hide timer. Manual-open has no timer running.
-        function onInteraction() {
-            if (barState.mode === "media" && !barState.mediaManual)
-                mediaAutoHide.restart()
-        }
     }
 
     IpcHandler {
