@@ -258,6 +258,10 @@ Item {
     // we tick once a second while playing.
     property real position: 0
     property bool positionActive: false
+    // Set by the DP-1 Dynamic Island while its expanded player is open, via a
+    // Binding it owns (shell.qml only ever writes positionActive, so the two
+    // never fight). Same 1 Hz tick, no new timer.
+    property bool islandPositionActive: false
 
     // Fully sanitized progress values - always finite, non-negative, in range.
     // Long-media MPRIS players (browsers) sometimes report length as 0, NaN or
@@ -300,7 +304,7 @@ Item {
         id: positionTimer
         interval: 1000
         repeat: true
-        running: root.positionActive && root.playing && root.positionSupported
+        running: (root.positionActive || root.islandPositionActive) && root.playing && root.positionSupported
         triggeredOnStart: true
         onTriggered: root._syncPosition()
     }

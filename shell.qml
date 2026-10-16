@@ -305,37 +305,58 @@ ShellRoot {
         }
     }
 
+    // External-monitor Dynamic Island. Internal = eDP* (same convention as
+    // DisplayService.layout[].internal); everything else is external. If no
+    // screen matches (renamed outputs), fall back to full bars everywhere so
+    // no monitor is ever left without a bar.
+    function isInternalScreen(s) {
+        return s && s.name && s.name.indexOf("eDP") === 0
+    }
+
     Variants {
-        model: Quickshell.screens.map(screen => ({ barState: barState, launcherController: launcherController, mediaService: mediaService, screen: screen }))
+        // Full bar on internal screens only (external ones get DynamicIsland
+        // below). Same fallback: if nothing matches eDP*, bar everywhere.
+        model: Quickshell.screens.filter(screen => isInternalScreen(screen) || !Quickshell.screens.some(isInternalScreen)).map(screen => ({ barState: barState, launcherController: launcherController, mediaService: mediaService, screen: screen }))
 
         delegate: Bar {}
     }
 
     Variants {
-        model: Quickshell.screens.map(screen => ({ barState: barState, screen: screen }))
+        model: Quickshell.screens.filter(screen => !isInternalScreen(screen) && Quickshell.screens.some(isInternalScreen)).map(screen => ({ mediaService: mediaService, screen: screen }))
+
+        delegate: DynamicIsland {}
+    }
+
+    Variants {
+        model: Quickshell.screens.filter(screen => isInternalScreen(screen) || !Quickshell.screens.some(isInternalScreen)).map(screen => ({ barState: barState, screen: screen }))
 
         delegate: ControlCenter {}
     }
 
     Variants {
-        model: Quickshell.screens.map(screen => ({ screen: screen }))
+        model: Quickshell.screens.filter(screen => isInternalScreen(screen) || !Quickshell.screens.some(isInternalScreen)).map(screen => ({ screen: screen }))
 
         delegate: NotificationCenter {}
     }
 
     Variants {
-        model: Quickshell.screens.map(screen => ({ screen: screen }))
+        model: Quickshell.screens.filter(screen => isInternalScreen(screen) || !Quickshell.screens.some(isInternalScreen)).map(screen => ({ screen: screen }))
 
         delegate: NotificationPopup {}
     }
 
     Variants {
-        model: Quickshell.screens.map(screen => ({ screen: screen }))
+        model: Quickshell.screens.filter(screen => isInternalScreen(screen) || !Quickshell.screens.some(isInternalScreen)).map(screen => ({ screen: screen }))
 
         delegate: CaptureOverlay {}
     }
 
     Variants {
+        // OSD stays on every screen by design: the volume/brightness/caps
+        // overlay renders on the focused screen only (see OSD.qml isFocused),
+        // so filtering it to internal would hide it whenever an external
+        // monitor is focused. Lightweight click-through window; only one ever
+        // shows at a time, never a duplicate.
         model: Quickshell.screens.map(screen => ({ screen: screen }))
 
         delegate: OSD {}
