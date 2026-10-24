@@ -518,7 +518,12 @@ PanelWindow {
             clip: true
             spacing: 8
             visible: NotificationService.count > 0
-            model: NotificationService.list
+            // Incremental model (see NotificationService's model notes):
+            // arrivals/removals only create/destroy the affected delegates,
+            // and content updates arrive via live bindings, so the scroll
+            // position survives new notifications. Reuse delegates too.
+            model: NotificationService.historyModel
+            reuseItems: true
 
             delegate: Rectangle {
                 id: notifCard
@@ -527,8 +532,11 @@ PanelWindow {
 
                 // Generic actions as {action, index} pairs, original index kept,
                 // empty-text actions dropped. Same semantics as the popup.
+                // Bound to the live Notification, so an action-set change on a
+                // replaced notification re-evaluates without a model operation.
                 readonly property var actionItems: {
-                    const src = notifCard.modelData.actions
+                    const n = notifCard.modelData.notification
+                    const src = n ? n.actions : null
                     if (!src)
                         return []
                     const out = []
@@ -599,11 +607,17 @@ PanelWindow {
                     width: 24
                     height: 24
                     asynchronous: true
+                    // Same priority as the popup: attached image first, then
+                    // the app icon, then an icon derived from the app name.
                     source: {
-                        const ic = notifCard.modelData.appIcon
+                        const n = notifCard.modelData.notification
+                        const img = n ? n.image : ""
+                        if (img && img.length > 0)
+                            return img.charAt(0) === "/" ? "file://" + img : img
+                        const ic = n ? n.appIcon : ""
                         if (ic && ic.charAt(0) === "/")
                             return "file://" + ic
-                        return Quickshell.iconPath(ic || notifCard.modelData.appName.toLowerCase(),
+                        return Quickshell.iconPath(ic || (n ? n.appName : "").toLowerCase(),
                                                   "dialog-information")
                     }
                 }
@@ -639,7 +653,7 @@ PanelWindow {
                         spacing: 6
 
                         Text {
-                            text: notifCard.modelData.appName
+                            text: notifCard.modelData.notification.appName
                             color: Theme.textDim
                             font.pixelSize: 10
                             font.weight: Font.DemiBold
@@ -657,8 +671,8 @@ PanelWindow {
 
                     Text {
                         width: parent.width
-                        visible: notifCard.modelData.summary.length > 0
-                        text: notifCard.modelData.summary
+                        visible: notifCard.modelData.notification.summary.length > 0
+                        text: notifCard.modelData.notification.summary
                         color: Theme.text
                         font.pixelSize: 12
                         font.weight: Font.DemiBold
@@ -668,8 +682,8 @@ PanelWindow {
 
                     Text {
                         width: parent.width
-                        visible: notifCard.modelData.body.length > 0
-                        text: notifCard.modelData.body
+                        visible: notifCard.modelData.notification.body.length > 0
+                        text: notifCard.modelData.notification.body
                         color: Theme.textDim
                         font.pixelSize: 11
                         wrapMode: Text.WordWrap

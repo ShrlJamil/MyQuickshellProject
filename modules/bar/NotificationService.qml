@@ -9,9 +9,12 @@ import Quickshell.Services.Notifications
 //    NotificationServer),
 //  - unread/notification count for the Date & Time badge,
 //  - Do Not Disturb state (shell-side suppression flag),
-//  - which screen the Notification Center panel is currently open on.
+//  - which screen the Notification Center panel is currently open on,
+//  - the incremental models (historyModel / popupModel) the UI binds to.
 //
-// No persistence, no grouping, no actions — deliberately minimal for now.
+// Deliberately absent: persistence across restarts and per-app grouping.
+// Actions and inline replies ARE supported generically (see invokeAction /
+// sendInlineReply) — the old "no actions" note was stale.
 Item {
     id: root
 
@@ -27,26 +30,32 @@ Item {
         root.centerScreen = null
     }
 
-    // ---- Do Not Disturb --------------------------------------------------------
-    // Shell-side flag. Incoming notifications are still recorded to history; this
-    // only exists for future popup/attention code to honour. Not persisted.
+    // ---- Do Not Disturb ------------------------------------------------------
+    // Shell-side flag, session-only (not persisted). While on:
+    //   - new arrivals are recorded to history but raise no toast — EXCEPT
+    //     critical ones, which always show (the usual desktop convention);
+    //   - toasts already on screen are hidden immediately (popup-level
+    //     removal only; history and the senders are untouched).
+    // Turning it back off never resurrects toasts that were suppressed.
     property bool doNotDisturb: false
     function toggleDnd() {
         root.doNotDisturb = !root.doNotDisturb
     }
 
+    onDoNotDisturbChanged: {
+        if (root.doNotDisturb)
+            root.popups = []
+    }
+
     // ---- History ------------------------------------------------------------
-    // Newest first. Each entry:
-    //   { id, notification, actions, appName, appIcon, summary, body, image,
-    //     urgency, critical, stackKey, time }
-    // `actions` is the notification's own list<NotificationAction> captured at
-    // arrival — the SAME NotificationAction objects, valid while the retained
-    // Notification is alive. Used generically: label = action.text, click =
-    // action.invoke(). No per-app interpretation.
-    // The snapshot fields are a cache, not a copy set in stone: when a sender
-    // replaces its notification (freedesktop replaces_id), Quickshell mutates
-    // the SAME Notification object in place and does NOT re-emit it, so each
-    // entry is kept in sync by _watchEntry()/_syncEntry() below.
+    // Newest first. Each entry is deliberately minimal:
+    //   { id, notification, stackKey, time }
+    // Display fields (appName, summary, body, image, actions, urgency, ...)
+    // are NOT copied here: delegates bind them directly to the live
+    // Notification object, which Quickshell mutates in place on a freedesktop
+    // replace (replaces_id) and never re-emits. That is what makes a replaced
+    // notification update on screen with no service-side sync code at all.
+    // `time` is the first-arrival time and never moves on replace.
     // `stackKey` identifies stack-tag replacement (see _stackKeyOf); "" when
     // the notification carries no stack tag.
     property var list: []
@@ -87,52 +96,29 @@ Item {
         return (n.appName || "") + "\n" + t
     }
 
-    // Re-read every snapshot field of an entry from its live Notification and
-    // re-publish both arrays (same entry objects, new array identities) so
-    // bound UI — history cards and any visible toast — rebuilds with the new
-    // content. The entry keeps its position; only its content and time move.
-    function _syncEntry(entry) {
-        const n = entry.notification
+    // Toast auto-dismiss policy for one live Notification, in milliseconds;
+    // 0 = never auto-dismiss. Public so delegates can evaluate it in a
+    // binding (which then tracks urgency/expireTimeout for free). This is a
+    // DISPLAY lifetime only — the history entry itself stays until the user
+    // or the sender clears it, whatever the sender asked for.
+    //   - critical: never (same as the original fixed behaviour);
+    //   - the sender's expireTimeout, honoured when positive. NOTE:
+    //     Quickshell passes the freedesktop value through raw, i.e. in
+    //     MILLISECONDS, even though its header doc says seconds (verified
+    //     against the 0.3.2 server: expire_timeout 2000 arrives as 2000);
+    //   - expireTimeout exactly 0: the sender asked for "never expire";
+    //   - expireTimeout negative (-1): the sender defers to the server, so
+    //     per-urgency defaults apply — Low shorter than Normal.
+    function autoDismissMsFor(n) {
         if (!n)
-            return
-        entry.actions = n.actions
-        entry.appName = n.appName || ""
-        entry.appIcon = n.appIcon || ""
-        entry.summary = n.summary || ""
-        entry.body = n.body || ""
-        entry.image = n.image || ""
-        entry.urgency = n.urgency
-        entry.critical = n.urgency === NotificationUrgency.Critical
-        entry.stackKey = root._stackKeyOf(n)
-        entry.time = new Date()
-        root.list = root.list.slice()
-        for (let i = 0; i < root.popups.length; i++) {
-            if (root.popups[i].id === entry.id) {
-                root.popups = root.popups.slice()
-                break
-            }
-        }
-    }
-
-    // Keep an entry's snapshot in sync with its Notification. A freedesktop
-    // replace (replaces_id) mutates the object and fires these property
-    // signals instead of producing a new notification, so without this hook a
-    // replaced notification would keep displaying its first-arrival content
-    // forever. Connected once per entry, in the same style as the n.closed
-    // hook in the server handler below.
-    function _watchEntry(entry) {
-        const n = entry.notification
-        if (!n)
-            return
-        const sync = function() { root._syncEntry(entry) }
-        n.appNameChanged.connect(sync)
-        n.appIconChanged.connect(sync)
-        n.summaryChanged.connect(sync)
-        n.bodyChanged.connect(sync)
-        n.imageChanged.connect(sync)
-        n.urgencyChanged.connect(sync)
-        n.actionsChanged.connect(sync)
-        n.hintsChanged.connect(sync)
+            return 5000
+        if (n.urgency === NotificationUrgency.Critical)
+            return 0
+        if (n.expireTimeout > 0)
+            return Math.round(n.expireTimeout)
+        if (n.expireTimeout === 0)
+            return 0
+        return n.urgency === NotificationUrgency.Low ? 3000 : 5000
     }
 
     // Evict the oldest entries (tail of the newest-first list) until the
@@ -163,11 +149,12 @@ Item {
     // sender (handled by the n.closed hook below).
     function invokeAction(id, actionIndex) {
         const entry = root._entryById(id)
-        if (!entry || !entry.actions)
+        if (!entry || !entry.notification || !entry.notification.actions)
             return
-        if (actionIndex < 0 || actionIndex >= entry.actions.length)
+        const actions = entry.notification.actions
+        if (actionIndex < 0 || actionIndex >= actions.length)
             return
-        const a = entry.actions[actionIndex]
+        const a = actions[actionIndex]
         if (a && a.invoke) {
             try {
                 a.invoke()
@@ -203,6 +190,23 @@ Item {
     // closed stays in the Notification Center.
     property var popups: []
     readonly property int maxPopups: 4
+
+    // Incremental models for the UI. A raw JS array used directly as a
+    // ListView/Repeater model makes the view destroy and recreate EVERY
+    // delegate on every change (and drops the Center's scroll position).
+    // ScriptModel diffs successive values by IDENTITY — entry objects are
+    // stable across array reassignments — so an arrival/removal only
+    // creates/destroys the affected delegates, while content updates reach
+    // delegates through their live bindings to the Notification object and
+    // need no model operation at all.
+    property ScriptModel historyModel: ScriptModel {
+        values: root.list
+        comparisonMode: ObjectComparison.Identity
+    }
+    property ScriptModel popupModel: ScriptModel {
+        values: root.popups
+        comparisonMode: ObjectComparison.Identity
+    }
 
     function _addPopup(entry) {
         const next = root.popups.slice()
@@ -244,26 +248,16 @@ Item {
 
             // Same id seen again — never duplicate the entry. Quickshell
             // re-emits retained notifications on config reload (keepOnReload),
-            // and a replaces_id update is applied to the object in place (see
-            // _watchEntry), so an emission for a known id can only be a
-            // re-delivery: refresh the existing entry and stop.
+            // and a replaces_id update is applied to the object in place and
+            // picked up by the delegates' live bindings, so an emission for a
+            // known id can only be a re-delivery: ignore it and stop.
             const known = root._entryById(n.id)
-            if (known) {
-                root._syncEntry(known)
+            if (known)
                 return
-            }
 
             const entry = {
                 "id": n.id,
                 "notification": n,
-                "actions": n.actions,
-                "appName": n.appName || "",
-                "appIcon": n.appIcon || "",
-                "summary": n.summary || "",
-                "body": n.body || "",
-                "image": n.image || "",
-                "urgency": n.urgency,
-                "critical": n.urgency === NotificationUrgency.Critical,
                 "stackKey": root._stackKeyOf(n),
                 "time": new Date()
             }
@@ -287,12 +281,11 @@ Item {
             root.list = next
             root._pruneHistory()
 
-            // Show a toast unless Do Not Disturb is on. History/count are updated
-            // above regardless of DND.
-            if (!root.doNotDisturb)
+            // Show a toast unless Do Not Disturb is on; critical notifications
+            // bypass DND. History/count are updated above regardless of DND.
+            // (Criticality is read live off the notification, not the entry.)
+            if (!root.doNotDisturb || n.urgency === NotificationUrgency.Critical)
                 root._addPopup(entry)
-
-            root._watchEntry(entry)
 
             // If the sender closes/expires it elsewhere, drop it from both.
             n.closed.connect(function() {
