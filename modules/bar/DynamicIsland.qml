@@ -159,7 +159,7 @@ PanelWindow {
         if (root.expanded) {
             hideTimer.stop()
             pill.forceActiveFocus()
-        } else if (!hitHover.hovered) {
+        } else if (!pillHover.hovered) {
             hideTimer.restart()
         }
     }
@@ -250,6 +250,14 @@ PanelWindow {
         // Reveal the taller content top-down as the pill grows; the collapsed
         // content can never spill past the rounded capsule.
         clip: true
+
+        // Hover tracking for the whole pill (collapsed media row AND expanded
+        // player). This is what `pointerInside` reads: without it, hovering the
+        // pill body never counted as "inside", so the pill hid 500 ms after the
+        // pointer left the 12 px trigger strip even while it was being aimed at,
+        // and the collapse path below could never restart the hide timer.
+        // Hover-only: it never steals taps from the rows/buttons below it.
+        HoverHandler { id: pillHover }
 
         color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
         border.width: 1
