@@ -3,7 +3,6 @@ import Qt5Compat.GraphicalEffects
 import Quickshell
 import Quickshell.Hyprland
 import Quickshell.Wayland
-import "../../components"
 import "."
 
 PanelWindow {
@@ -13,6 +12,9 @@ PanelWindow {
 
     readonly property ShellScreen targetScreen: modelData.screen
     readonly property bool open: SettingsService.open && SettingsService.screen === root.targetScreen
+
+    readonly property real cardWidth: Math.max(460, Math.min(920, (root.targetScreen ? root.targetScreen.width : 1440) - 140))
+    readonly property real cardHeight: Math.max(380, Math.min(620, (root.targetScreen ? root.targetScreen.height : 900) - 140))
 
     screen: root.targetScreen
 
@@ -74,25 +76,21 @@ PanelWindow {
             }
         }
 
-        Rectangle {
+        Item {
             id: card
 
             anchors.centerIn: parent
-            width: settingsView.implicitWidth
-            height: settingsView.implicitHeight
-            radius: 18
-            color: Theme.background
-            border.width: 1
-            border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+            width: root.cardWidth
+            height: root.cardHeight
 
             layer.enabled: true
             layer.effect: DropShadow {
                 transparentBorder: true
                 horizontalOffset: 0
-                verticalOffset: 4
-                radius: 16
+                verticalOffset: 6
+                radius: 20
                 samples: 25
-                color: Qt.rgba(0, 0, 0, 0.45)
+                color: Qt.rgba(0, 0, 0, 0.5)
             }
 
             MouseArea {

@@ -1,44 +1,417 @@
 import QtQuick
+import Qt5Compat.GraphicalEffects
+import Quickshell
 import "../../components"
 
 FocusScope {
     id: root
 
-    implicitWidth: 560
-    implicitHeight: 320
+    readonly property int pad: 16
+    readonly property int headerHeight: 40
+    readonly property int gap: 12
+    readonly property real sidebarWidth: Math.max(150, Math.min(216, root.width * 0.26))
+
+    readonly property var categories: [
+        {
+            label: "Appearance",
+            icon: "preferences-appearance-symbolic",
+            fallback: "applications-graphics",
+            description: "Theme, accent color, and the overall look of the shell."
+        },
+        {
+            label: "Wallpaper",
+            icon: "preferences-desktop-wallpaper-symbolic",
+            fallback: "image-x-generic",
+            description: "Wallpaper selection and background images for each monitor."
+        },
+        {
+            label: "Display",
+            icon: "preferences-desktop-display-symbolic",
+            fallback: "video-display",
+            description: "Monitor layout, resolution, and refresh rate."
+        },
+        {
+            label: "Typography",
+            icon: "preferences-desktop-font-symbolic",
+            fallback: "font-x-generic",
+            description: "Font family and text sizes used across the shell."
+        },
+        {
+            label: "About",
+            icon: "help-about-symbolic",
+            fallback: "dialog-information",
+            description: "Version and environment information for this shell."
+        }
+    ]
+
+    property int categoryIndex: 0
+
+    readonly property var activeCategory: root.categories[Math.max(0, Math.min(root.categories.length - 1, root.categoryIndex))]
 
     signal closeRequested()
 
     Keys.onEscapePressed: root.closeRequested()
 
-    Text {
-        id: title
+    Rectangle {
+        id: baseLayer
+
+        anchors.fill: parent
+        radius: Theme.cornerRadius
+        color: Theme.background
+        border.width: 1
+        border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+    }
+
+    Item {
+        id: header
 
         anchors {
             top: parent.top
             left: parent.left
-            topMargin: 26
-            leftMargin: 26
+            right: parent.right
+            topMargin: root.pad
+            leftMargin: root.pad
+            rightMargin: root.pad
         }
 
-        text: "Settings"
-        color: Theme.text
-        font.family: Theme.fontFamily
-        font.pixelSize: 20
-        font.weight: Font.DemiBold
+        height: root.headerHeight
+
+        Text {
+            anchors.verticalCenter: parent.verticalCenter
+
+            text: "Settings"
+            color: Theme.text
+            font.family: Theme.fontFamily
+            font.pixelSize: 16
+            font.weight: Font.DemiBold
+        }
+
+        Rectangle {
+            id: closeButton
+
+            anchors {
+                right: parent.right
+                verticalCenter: parent.verticalCenter
+            }
+
+            width: 30
+            height: 30
+            radius: 9
+            color: closeArea.containsMouse ? Theme.surfaceHover : "transparent"
+
+            Behavior on color {
+                ColorAnimation { duration: 120 }
+            }
+
+            Image {
+                id: closeIcon
+
+                anchors.centerIn: parent
+                width: 16
+                height: 16
+                source: Quickshell.iconPath("window-close-symbolic", "window-close")
+                sourceSize.width: 32
+                sourceSize.height: 32
+                fillMode: Image.PreserveAspectFit
+                asynchronous: true
+                smooth: true
+                visible: false
+            }
+
+            ColorOverlay {
+                anchors.fill: closeIcon
+
+                source: closeIcon
+                color: closeArea.containsMouse ? Theme.text : Theme.textDim
+            }
+
+            MouseArea {
+                id: closeArea
+
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.closeRequested()
+            }
+        }
     }
 
-    Text {
+    Item {
+        id: body
+
         anchors {
-            top: title.bottom
+            top: header.bottom
             left: parent.left
-            topMargin: 6
-            leftMargin: 26
+            right: parent.right
+            bottom: parent.bottom
+            topMargin: root.gap
+            leftMargin: root.pad
+            rightMargin: root.pad
+            bottomMargin: root.pad
         }
 
-        text: "Settings are not available yet."
-        color: Theme.textMuted
-        font.family: Theme.fontFamily
-        font.pixelSize: 12
+        Rectangle {
+            id: sidebar
+
+            anchors {
+                top: parent.top
+                left: parent.left
+                bottom: parent.bottom
+            }
+
+            width: root.sidebarWidth
+            radius: 14
+            color: Qt.rgba(Theme.surface.r, Theme.surface.g, Theme.surface.b, 0.65)
+            border.width: 1
+            border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity * 0.7)
+
+            Column {
+                anchors.fill: parent
+                anchors.margins: 8
+                spacing: 4
+
+                Repeater {
+                    model: root.categories
+
+                    delegate: Rectangle {
+                        id: sidebarItem
+
+                        required property var modelData
+                        required property int index
+
+                        readonly property bool active: root.categoryIndex === sidebarItem.index
+
+                        width: parent.width
+                        height: 36
+                        radius: 10
+                        color: sidebarItem.active
+                            ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, sidebarArea.containsMouse ? 0.26 : 0.18)
+                            : (sidebarArea.containsMouse ? Theme.surfaceHover : "transparent")
+
+                        Behavior on color {
+                            ColorAnimation { duration: 120 }
+                        }
+
+                        Row {
+                            anchors {
+                                left: parent.left
+                                right: parent.right
+                                verticalCenter: parent.verticalCenter
+                                leftMargin: 10
+                                rightMargin: 8
+                            }
+
+                            spacing: 10
+
+                            Item {
+                                width: 18
+                                height: 18
+                                anchors.verticalCenter: parent.verticalCenter
+
+                                Image {
+                                    id: itemIcon
+
+                                    anchors.fill: parent
+                                    source: Quickshell.iconPath(sidebarItem.modelData.icon, sidebarItem.modelData.fallback)
+                                    sourceSize.width: 36
+                                    sourceSize.height: 36
+                                    fillMode: Image.PreserveAspectFit
+                                    asynchronous: true
+                                    smooth: true
+                                    visible: false
+                                }
+
+                                ColorOverlay {
+                                    anchors.fill: itemIcon
+
+                                    source: itemIcon
+                                    color: sidebarItem.active
+                                        ? Theme.accent
+                                        : (sidebarArea.containsMouse ? Theme.text : Theme.textDim)
+                                }
+                            }
+
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+
+                                width: parent.width - 28
+                                text: sidebarItem.modelData.label
+                                color: sidebarItem.active
+                                    ? Theme.accent
+                                    : (sidebarArea.containsMouse ? Theme.text : Theme.textDim)
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                                font.weight: sidebarItem.active ? Font.DemiBold : Font.Normal
+                                elide: Text.ElideRight
+                            }
+                        }
+
+                        MouseArea {
+                            id: sidebarArea
+
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: root.categoryIndex = sidebarItem.index
+                        }
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            id: detail
+
+            anchors {
+                top: parent.top
+                left: sidebar.right
+                right: parent.right
+                bottom: parent.bottom
+                leftMargin: root.gap
+            }
+
+            radius: 14
+            color: Qt.rgba(Theme.surface.r, Theme.surface.g, Theme.surface.b, 0.28)
+            border.width: 1
+            border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+
+            Text {
+                id: detailTitle
+
+                anchors {
+                    top: parent.top
+                    left: parent.left
+                    right: parent.right
+                    topMargin: 22
+                    leftMargin: 22
+                    rightMargin: 22
+                }
+
+                text: root.activeCategory ? root.activeCategory.label : ""
+                color: Theme.text
+                font.family: Theme.fontFamily
+                font.pixelSize: 18
+                font.weight: Font.DemiBold
+                elide: Text.ElideRight
+            }
+
+            Text {
+                id: detailDescription
+
+                anchors {
+                    top: detailTitle.bottom
+                    left: parent.left
+                    right: parent.right
+                    topMargin: 6
+                    leftMargin: 22
+                    rightMargin: 22
+                }
+
+                text: root.activeCategory ? root.activeCategory.description : ""
+                color: Theme.textDim
+                font.family: Theme.fontFamily
+                font.pixelSize: 12
+                lineHeight: 1.25
+                wrapMode: Text.WordWrap
+            }
+
+            Rectangle {
+                id: divider
+
+                anchors {
+                    top: detailDescription.bottom
+                    left: parent.left
+                    right: parent.right
+                    topMargin: 18
+                    leftMargin: 22
+                    rightMargin: 22
+                }
+
+                height: 1
+                color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+            }
+
+            Rectangle {
+                id: placeholder
+
+                anchors {
+                    top: divider.bottom
+                    left: parent.left
+                    right: parent.right
+                    bottom: parent.bottom
+                    topMargin: 18
+                    leftMargin: 22
+                    rightMargin: 22
+                    bottomMargin: 22
+                }
+
+                radius: 12
+                color: "transparent"
+                border.width: 1
+                border.color: Qt.rgba(1, 1, 1, 0.04)
+
+                Column {
+                    anchors.centerIn: parent
+
+                    width: Math.min(360, placeholder.width - 48)
+                    spacing: 10
+
+                    Item {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        width: 28
+                        height: 28
+                        opacity: 0.75
+
+                        Image {
+                            id: placeholderIcon
+
+                            anchors.fill: parent
+                            source: root.activeCategory
+                                ? Quickshell.iconPath(root.activeCategory.icon, root.activeCategory.fallback)
+                                : ""
+                            sourceSize.width: 56
+                            sourceSize.height: 56
+                            fillMode: Image.PreserveAspectFit
+                            asynchronous: true
+                            smooth: true
+                            visible: false
+                        }
+
+                        ColorOverlay {
+                            anchors.fill: placeholderIcon
+
+                            source: placeholderIcon
+                            color: Theme.textMuted
+                        }
+                    }
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+
+                        width: parent.width
+                        text: root.activeCategory
+                            ? root.activeCategory.label + " settings are not available yet."
+                            : ""
+                        color: Theme.textMuted
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 12
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
+                    }
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+
+                        width: parent.width
+                        text: "This section is a placeholder for the upcoming integration."
+                        color: Qt.rgba(Theme.textMuted.r, Theme.textMuted.g, Theme.textMuted.b, 0.7)
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 11
+                        horizontalAlignment: Text.AlignHCenter
+                        wrapMode: Text.WordWrap
+                    }
+                }
+            }
+        }
     }
 }
