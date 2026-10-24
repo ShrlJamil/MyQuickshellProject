@@ -20,8 +20,6 @@ PanelWindow {
     readonly property var launcherController: modelData.launcherController
     readonly property var mediaService: modelData.mediaService
 
-    readonly property bool mediaExpanded: barState.screen === root.screen && barState.mode === "media"
-
     screen: modelData.screen
 
     // Static bar: always on, from the moment quickshell starts. No IPC gate.
@@ -32,10 +30,8 @@ PanelWindow {
         && root.screen
         && Hyprland.focusedMonitor
         && root.screen.name === Hyprland.focusedMonitor.name
-    // Media arms the focus grab on open: `mediaExpanded && manual` makes the
-    // surface interactive (Escape + outside-click close it).
     property bool surfaceActive: (barState.screen === root.screen && (barState.mode === "power" || barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact")) || root.isCaptureActive
-        || (root.mediaExpanded && barState.mediaManual)
+    property double _mediaPopoverClosedAt: 0
 
     // ---- single-window concave (tiled hug) --------------------------------
     // Reactive presence/count from the workspace model; floating + geometry
@@ -87,12 +83,6 @@ PanelWindow {
     readonly property real _scoopR0: Math.max(0, Math.min(barContent.width, root._winX + root._winW))
     readonly property real _scoopW: root._scoopR0 - root._scoopL0
 
-    // TEMP DEBUG: final gate evaluation (remove after diagnosis).
-    on_ScoopOnChanged: console.log("[concave-dbg] scoopOn=" + root._scoopOn
-        + " haveSolo=" + root._haveSolo + " geoValid=" + root._geoValid
-        + " winFloat=" + root._winFloat + " dc=" + dynamicCenter.activeSurface
-        + " winY=" + root._winY + " scoopW=" + root._scoopW)
-
     // Presence/count recompute over HyprlandToplevel items (address/title/
     // workspace only - no appId/minimized assumption). Reads the model fresh
     // on every trigger. A minimized window still counts: fail-safe OFF rather
@@ -132,15 +122,6 @@ PanelWindow {
         const changed = addr !== root._soloAddr || title !== root._soloTitle
         root._soloAddr = addr
         root._soloTitle = title
-        // TEMP DEBUG (workspaceId=-1 investigation): chain provenance.
-        console.log("[concave-dbg] screen=" + (root.screen ? root.screen.name : "null"))
-        console.log("[concave-dbg] monitor=" + (root._ccMonitor ? root._ccMonitor.name : "null"))
-        console.log("[concave-dbg] activeWorkspace=" + (root._ccWs ? root._ccWs.name : "null"))
-        console.log("[concave-dbg] workspaceId=" + root._ccWsId)
-        console.log("[concave-dbg] refresh ws=" + root._ccWsId + " n=" + n + " addr=" + addr + " title=" + title)
-        console.log("[concave-dbg] ws=" + wsId + " global=" + vals.length + " filtered=" + n)
-        if (n === 1)
-            console.log("[concave-dbg] solo addr=" + addr + " ws=" + wsId)
         if (addr === "")
             root._geoValid = false
         else if (changed)
@@ -170,19 +151,12 @@ PanelWindow {
 
     function _matchClient(clients) {
         const addr = root._normalizeAddress(root._soloAddr)
-        // TEMP DEBUG (nomatch investigation).
-        console.log("[concave-dbg] solo addr=" + addr + " ws=" + root._ccWsId)
         if (addr === "")
             return null
         for (let i = 0; i < clients.length; i++) {
             const c = clients[i]
             const ca = c ? root._normalizeAddress(c.address) : ""
-            const cw = (c && c.workspace) ? c.workspace.id : -1
             const eq = ca !== "" && ca === addr
-            // TEMP DEBUG.
-            console.log("[concave-dbg] client addr=" + ca + " ws=" + cw
-                + " class=" + (c ? c.class : "") + " title=" + (c ? c.title : "")
-                + " | equal=" + eq + " wsEqual=" + (cw === root._ccWsId))
             if (c && eq && c.workspace && c.workspace.id === root._ccWsId)
                 return c
         }
@@ -196,7 +170,6 @@ PanelWindow {
             || !isFinite(c.size[0]) || !isFinite(c.size[1])
             || !(c.size[0] > 0) || !(c.size[1] > 0)
         if (bad) {
-            console.log("[concave-dbg] geo REJECTED nomatch=" + (!c))
             root._geoValid = false
             return
         }
@@ -205,8 +178,6 @@ PanelWindow {
             root._geoValid = false
             return
         }
-        console.log("[concave-dbg] geo float=" + c.floating + " at=" + c.at + " size=" + c.size
-            + " mon=" + mon.name + "(" + mon.x + "," + mon.y + ")")
         root._winX = c.at[0] - mon.x
         root._winY = c.at[1] - mon.y
         root._winW = c.size[0]
@@ -316,7 +287,7 @@ PanelWindow {
     exclusiveZone: 40
     focusable: root.surfaceActive
 
-    mask: (root.surfaceActive || root.mediaExpanded) ? activeMask : idleMask
+    mask: root.surfaceActive ? activeMask : idleMask
     Region { id: idleMask; item: barContent }
     Region {
         id: activeMask
@@ -366,7 +337,7 @@ PanelWindow {
         clip: true
         z: 999
 
-        color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
+        color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.barSurfaceOpacity)
 
         // Material prototype: directional top light + bottom edge key.
         // The top light is a short soft falloff (not a hard hairline) so it
@@ -544,7 +515,7 @@ PanelWindow {
                     anchors.fill: parent
                     anchors.margins: 8
                     radius: Theme.cornerRadius
-                    color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
+                    color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
                     border.width: 1
                     border.color: Theme.surfaceHover
 
@@ -884,28 +855,6 @@ PanelWindow {
             font.weight: Font.Bold
         }
 
-        MediaPreview {
-            id: mediaPreview
-
-            anchors.centerIn: parent
-            // hidden on every screen while media is expanded; and, on the
-            // screen that hosts the surface, kept hidden through the slide-out
-            // tail (mediaSurfacePresent) so the two never overlap/flicker.
-            // Routed via `show` (not `visible`) so the exit shrink/fade can
-            // finish before the item hides.
-            show: !holdLabel.visible && root.mediaService && root.mediaService.hasMedia
-                && barState.mode !== "media"
-                && !dynamicCenter.mediaSurfacePresent
-
-            mediaService: root.mediaService
-
-            onActivateRequested: {
-                barState.mediaManual = true
-                barState.screen = root.screen
-                barState.mode = "media"
-            }
-        }
-
         Item {
             id: rightSlot
 
@@ -1113,6 +1062,41 @@ PanelWindow {
             }
         }
 
+        MediaPill {
+            id: mediaPill
+
+            anchors {
+                verticalCenter: parent.verticalCenter
+                right: systemTrayRow.left
+            }
+            anchors.rightMargin: 4
+
+            mediaService: root.mediaService
+
+            show: !holdLabel.visible && root.mediaService && root.mediaService.hasMedia
+
+            onActivateRequested: {
+                if (Date.now() - root._mediaPopoverClosedAt < 250)
+                    return
+                barState.mediaPopoverOpen = !barState.mediaPopoverOpen
+            }
+        }
+
+        MediaPlayerPopover {
+            id: mediaPlayerPopover
+
+            screen: root.screen
+            mediaService: root.mediaService
+            anchorCenter: mediaPill.x + mediaPill.width / 2
+
+            open: barState.mediaPopoverOpen
+
+            onDismissRequested: {
+                barState.mediaPopoverOpen = false
+                root._mediaPopoverClosedAt = Date.now()
+            }
+        }
+
         // Microphone mute - sits just left of the Wi-Fi indicator. Click
         // toggles the default PipeWire source mute; glyph swaps on/off.
         Item {
@@ -1306,7 +1290,7 @@ PanelWindow {
                     anchors.fill: parent
                     anchors.margins: 8
                     radius: Theme.cornerRadius
-                    color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
+                    color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
                     border.width: 1
                     border.color: Theme.surfaceHover
 
@@ -1501,7 +1485,7 @@ PanelWindow {
             visible: root._scoopOn
             antialiasing: true
             ShapePath {
-                fillColor: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
+                fillColor: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.barSurfaceOpacity)
                 strokeColor: "transparent"
                 startX: 0
                 startY: 0
@@ -1519,7 +1503,7 @@ PanelWindow {
             visible: root._scoopOn
             antialiasing: true
             ShapePath {
-                fillColor: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
+                fillColor: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.barSurfaceOpacity)
                 strokeColor: "transparent"
                 startX: 40
                 startY: 0
@@ -1533,10 +1517,8 @@ PanelWindow {
         id: dynamicCenter
 
         screen: root.screen
-        mediaService: root.mediaService
-        mediaManual: barState.mediaManual
         anchors.horizontalCenter: parent.horizontalCenter
-        activeSurface: barState.screen === root.screen && (barState.mode === "power" || barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact" || barState.mode === "media")
+        activeSurface: barState.screen === root.screen && (barState.mode === "power" || barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact")
             ? barState.mode
             : root.isCaptureActive ? "capture" : "idle"
     }

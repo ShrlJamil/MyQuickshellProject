@@ -145,7 +145,7 @@ PanelWindow {
                     width: parent.width
                     implicitHeight: layout.implicitHeight + 24
                     radius: 16
-                    color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
+                    color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
                     border.width: 1
                     border.color: Theme.surfaceHover
 

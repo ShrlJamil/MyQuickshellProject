@@ -15,15 +15,6 @@ Item {
     signal closeRequested()
 
     property var screen: null
-    property var mediaService: null
-    property bool mediaManual: false
-
-    // True while the expanded media surface exists on screen, including its
-    // close animation tail - used by Bar to keep the bar MediaPreview
-    // hidden until the surface is fully gone (no overlap/flicker).
-    readonly property bool mediaSurfacePresent: root.activeSurface === "media"
-        || root._prevSurface === "media"
-        || (root.allocatedHeight > 0 && root._lastSurface === "media")
 
     anchors.horizontalCenter: parent.horizontalCenter
     y: 40
@@ -42,15 +33,14 @@ Item {
     // ---- Universal content-driven sizing --------------------------------
     // The frame just fits whatever the active surface reports as its own
     // natural size. Each surface (PowerMenu, DisplayManager, WallpaperPicker,
-    // CaptureBar, MediaPlayer) owns its implicitWidth / implicitHeight - no
-    // per-mode magic numbers live here anymore.
+    // CaptureBar) owns its implicitWidth / implicitHeight - no per-mode magic
+    // numbers live here anymore.
     readonly property Item _activeItem: {
         switch (root.activeSurface) {
         case "power": return powerLoader.item
         case "display": return displayLoader.item
         case "wallpapers": return wallpaperLoader.item
         case "capture": return captureLoader.item
-        case "media": return mediaLoader.item
         default: return null
         }
     }
@@ -214,7 +204,7 @@ Item {
             readonly property int notchPx: Math.round(frameBackground.notchSize * frameBackground.notchRevealT)
 
             ShapePath {
-                fillColor: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
+                fillColor: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
                 strokeColor: "transparent"
                 strokeWidth: 0
 
@@ -374,30 +364,6 @@ Item {
             width: parent.width
             visible: root.activeSurface === "mediaCompact"
         }
-
-        Loader {
-            id: mediaLoader
-            width: parent.width
-            active: root._mediaLatched || root.activeSurface === "media" || root._prevSurface === "media"
-                || (root.allocatedHeight > 0 && root._lastSurface === "media")
-            sourceComponent: MediaPlayer {
-                width: parent.width
-                mediaService: root.mediaService
-                manual: root.mediaManual
-                active: root.activeSurface === "media"
-                visible: root.activeSurface === "media" || root._prevSurface === "media"
-                    || (root.allocatedHeight > 0 && root._lastSurface === "media")
-                opacity: root.activeSurface === "media" ? 1 : 0
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: root._contentFadeDuration()
-                        easing.type: Easing.OutCubic
-                    }
-                }
-                onCloseRequested: root.closeRequested()
-            }
-            onLoaded: if (root.activeSurface === "media" && root.mediaManual) root._focusSurface("media")
-        }
     }
 
     // One-way load latches: set when a surface first becomes active, never
@@ -407,7 +373,6 @@ Item {
     property bool _captureLatched: false
     property bool _displayLatched: false
     property bool _wallpapersLatched: false
-    property bool _mediaLatched: false
 
     function _surfaceItem(name) {
         switch (name) {
@@ -415,7 +380,6 @@ Item {
         case "capture": return captureLoader.item
         case "display": return displayLoader.item
         case "wallpapers": return wallpaperLoader.item
-        case "media": return mediaLoader.item
         default: return null
         }
     }
@@ -472,11 +436,6 @@ Item {
             // Arms the bar's HyprlandFocusGrab so Esc + click-outside dismiss
             // work (DisplayManager has no PanelWindow / grab of its own).
             root._focusSurface("display")
-        } else if (root.activeSurface === "media") {
-            root._mediaLatched = true
-            // The media surface always opens via an explicit user click, so it
-            // always takes focus (Escape works).
-            if (root.mediaManual) root._focusSurface("media")
         }
     }
 }

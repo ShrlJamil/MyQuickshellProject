@@ -9,6 +9,7 @@ import "modules/launcher"
 import "modules/controllers"
 import "modules/bar"
 import "modules/capture"
+import "modules/display"
 import "modules/services"
 import "modules/osd"
 
@@ -27,6 +28,34 @@ ShellRoot {
         }
         if (Quickshell.screens.length > 0) return Quickshell.screens[0]
         return null
+    }
+
+    // The Dynamic Center surfaces (power / display / wallpapers / media) are
+    // rendered by the full Bar, so their IPC must target the screen hosting that
+    // Bar - never the focused one, or barState.screen names a screen with no Bar
+    // and nothing renders. That screen is the persisted Primary Display, resolved
+    // through DisplayService's stable identity; when the preference is internal,
+    // or the preferred external is disconnected, it is the internal panel (the
+    // same fallback enforcement uses). null when no internal panel exists at all,
+    // so callers fall back to the focused screen.
+    function barScreen() {
+        const n = DisplayService.primaryMonitorName()
+        if (n) {
+            for (let i = 0; i < Quickshell.screens.length; i++) {
+                if (Quickshell.screens[i].name === n)
+                    return Quickshell.screens[i]
+            }
+        }
+        for (let i = 0; i < Quickshell.screens.length; i++) {
+            if (isInternalScreen(Quickshell.screens[i]))
+                return Quickshell.screens[i]
+        }
+        return null
+    }
+
+    function isBarScreen(s) {
+        const b = barScreen()
+        return b !== null && s === b
     }
 
     QtObject {
@@ -60,20 +89,17 @@ ShellRoot {
 
         property string mode: ""
         property ShellScreen screen: null
-        // true when "media" mode was opened by the user clicking the bar
-        // preview. All "media" opens are manual (click-to-expand); there is no
-        // auto-expand. Gates the focus grab (Bar) + focus routing
-        // (DynamicCenter/MediaPlayer).
-        property bool mediaManual: false
+        // true while the floating media player popover is open. Gates the 1 Hz
+        // position tick and the popover's dismissal state.
+        property bool mediaPopoverOpen: false
     }
 
-    // ---- Media: one service shared by every screen's bar preview + expanded
-    // player. The "media" DynamicCenter surface opens only via an explicit
-    // user click (MediaPreview.activateRequested); playback / track events
-    // never change barState.
+    // ---- Media: one service shared by the bar pill and the floating player
+    // popover. The popover opens only on an explicit pill click; playback /
+    // track events never change shell state.
     MediaService {
         id: mediaService
-        positionActive: barState.mode === "media"
+        positionActive: barState.mediaPopoverOpen
     }
 
     // Own AudioService for the volume keybind IPC below. ControlCenter keeps
@@ -105,7 +131,7 @@ ShellRoot {
 
         function show(): void {
             focusState.inquire()
-            const screen = focusedScreen()
+            const screen = barScreen() || focusedScreen()
             if (!screen) return
             if (barState.mode === "power" && barState.screen === screen) return
             barState.screen = screen
@@ -130,7 +156,7 @@ ShellRoot {
 
         function show(): void {
             focusState.inquire()
-            const screen = focusedScreen()
+            const screen = barScreen() || focusedScreen()
             if (!screen) return
             if (barState.mode === "display" && barState.screen === screen) return
             barState.screen = screen
@@ -152,7 +178,7 @@ ShellRoot {
 
         function show(): void {
             focusState.inquire()
-            const screen = focusedScreen()
+            const screen = barScreen() || focusedScreen()
             if (!screen) return
             if (barState.mode === "wallpapers" && barState.screen === screen) return
             barState.screen = screen
@@ -174,7 +200,7 @@ ShellRoot {
 
         function show(): void {
             focusState.inquire()
-            const screen = focusedScreen()
+            const screen = barScreen() || focusedScreen()
             if (!screen) return
             if (barState.mode === "mediaPreview" && barState.screen === screen) return
             barState.screen = screen
@@ -195,7 +221,7 @@ ShellRoot {
 
         function show(): void {
             focusState.inquire()
-            const screen = focusedScreen()
+            const screen = barScreen() || focusedScreen()
             if (!screen) return
             if (barState.mode === "mediaCompact" && barState.screen === screen) return
             barState.screen = screen
@@ -305,48 +331,55 @@ ShellRoot {
         }
     }
 
-    // External-monitor Dynamic Island. Internal = eDP* (same convention as
-    // DisplayService.layout[].internal); everything else is external. If no
-    // screen matches (renamed outputs), fall back to full bars everywhere so
-    // no monitor is ever left without a bar.
+    // Hardware split only: eDP* is the laptop panel (same convention as
+    // DisplayService.layout[].internal). It is the fallback for barScreen()
+    // when the Primary Display cannot be resolved from the preference.
     function isInternalScreen(s) {
         return s && s.name && s.name.indexOf("eDP") === 0
     }
 
     Variants {
-        // Full bar on internal screens only (external ones get DynamicIsland
-        // below). Same fallback: if nothing matches eDP*, bar everywhere.
-        model: Quickshell.screens.filter(screen => isInternalScreen(screen) || !Quickshell.screens.some(isInternalScreen)).map(screen => ({ barState: barState, launcherController: launcherController, mediaService: mediaService, screen: screen }))
+        // Full bar on the screen that hosts the Primary Display (the other one
+        // gets the DynamicIsland below). Same fallback as before: if no bar
+        // screen can be resolved at all (renamed outputs), bar everywhere so no
+        // monitor is ever left without one.
+        model: Quickshell.screens.filter(screen => isBarScreen(screen) || barScreen() === null).map(screen => ({ barState: barState, launcherController: launcherController, mediaService: mediaService, screen: screen }))
 
         delegate: Bar {}
     }
 
     Variants {
-        model: Quickshell.screens.filter(screen => !isInternalScreen(screen) && Quickshell.screens.some(isInternalScreen)).map(screen => ({ mediaService: mediaService, screen: screen }))
+        // Dynamic Island on the one other active monitor. Empty when the bar
+        // screen could not be resolved (the bar-everywhere fallback above).
+        model: Quickshell.screens.filter(screen => !isBarScreen(screen) && barScreen() !== null).map(screen => ({ mediaService: mediaService, screen: screen }))
 
         delegate: DynamicIsland {}
     }
 
+    // Everything the full Bar owns or is opened from travels with it: the
+    // Control Center (opened from a bar click), the Notification Center (bar
+    // Date & Time), the toast stack and the capture overlay all live on the bar
+    // screen, exactly as they used to live on the internal screen.
     Variants {
-        model: Quickshell.screens.filter(screen => isInternalScreen(screen) || !Quickshell.screens.some(isInternalScreen)).map(screen => ({ barState: barState, screen: screen }))
+        model: Quickshell.screens.filter(screen => isBarScreen(screen) || barScreen() === null).map(screen => ({ barState: barState, screen: screen }))
 
         delegate: ControlCenter {}
     }
 
     Variants {
-        model: Quickshell.screens.filter(screen => isInternalScreen(screen) || !Quickshell.screens.some(isInternalScreen)).map(screen => ({ screen: screen }))
+        model: Quickshell.screens.filter(screen => isBarScreen(screen) || barScreen() === null).map(screen => ({ screen: screen }))
 
         delegate: NotificationCenter {}
     }
 
     Variants {
-        model: Quickshell.screens.filter(screen => isInternalScreen(screen) || !Quickshell.screens.some(isInternalScreen)).map(screen => ({ screen: screen }))
+        model: Quickshell.screens.filter(screen => isBarScreen(screen) || barScreen() === null).map(screen => ({ screen: screen }))
 
         delegate: NotificationPopup {}
     }
 
     Variants {
-        model: Quickshell.screens.filter(screen => isInternalScreen(screen) || !Quickshell.screens.some(isInternalScreen)).map(screen => ({ screen: screen }))
+        model: Quickshell.screens.filter(screen => isBarScreen(screen) || barScreen() === null).map(screen => ({ screen: screen }))
 
         delegate: CaptureOverlay {}
     }

@@ -18,10 +18,15 @@ Item {
     property color activeTile: "#c4c9d1"
 
     // Shared translucent-surface opacity, sourced from the Wallust-generated
-    // palette (`surfaceOpacity`, 0.5 in the template). Consumed by the static
-    // bar, DynamicCenter frame, ControlCenter panels, and OSD backgrounds.
-    // Falls back to 1 (fully opaque) while no palette provides it.
+    // palette (`surfaceOpacity`, 0.5 in the template). Panel backgrounds use
+    // moduleSurfaceOpacity instead; this remains the palette alpha for derived
+    // state fills. Falls back to 1 (fully opaque) while no palette provides it.
     property real surfaceOpacity: 1
+
+    // Surface opacity by layer: every module surface is fully opaque, the bar
+    // strip is fully transparent.
+    property real moduleSurfaceOpacity: 1
+    property real barSurfaceOpacity: 0
 
     // Active/ON-state icon color (white, constant across wallpapers so icons
     // stay readable). Sourced from the Wallust palette (`icon`).
@@ -30,7 +35,7 @@ Item {
     // Material prototype (static bar only): ultra-subtle directional top
     // highlight + bottom edge key over the blurred backdrop. Neutral white at
     // single-digit opacities; the surfaceOpacity tint does the heavy lifting.
-    property real materialHighlightOpacity: 0.28
+    property real materialHighlightOpacity: 0
     property real materialBorderOpacity: 0.06
 
     // UI text typeface (`font.family: Theme.fontFamily` on Text elements).

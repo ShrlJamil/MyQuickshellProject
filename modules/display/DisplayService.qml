@@ -16,7 +16,12 @@ Item {
     // Set by the canvas while a monitor is being dragged, so a late-arriving
     // Hyprland refresh does not overwrite the in-progress edit.
     property bool suspendSync: false
-    onSuspendSyncChanged: if (root.suspendSync) resyncTimer.stop()
+    onSuspendSyncChanged: {
+        if (root.suspendSync) {
+            resyncTimer.stop()
+            root._enforcePending = false
+        }
+    }
 
     // ---- Instant Extend <-> Mirror toggle (Control Center tile) --------------
     // Reuses applyPreset() + applyLive() (live `hyprctl eval` + monitors.lua
@@ -48,6 +53,22 @@ Item {
     property int _monCount: 0
     property bool _seededMirrorFlag: false
 
+    // ---- Primary display preference -----------------------------------------
+    // Hyprland has no native primary-output property, so "primary" is the
+    // convention of sitting at logical (0,0). The user's choice is persisted
+    // separately from the live layout AND from the canonical monitors.lua, in
+    // statePath("display-preferences.json"), and is applied as a RUNTIME
+    // overlay (applyRuntime -> no persist). Enforcement never rewrites
+    // monitors.lua, so the canonical file always keeps the internal panel at a
+    // usable origin and a boot without Quickshell or without the external
+    // monitor stays recoverable.
+    property string primaryKind: "internal"
+    property var primaryIdentity: ({ connector: "", make: "", model: "", serial: "", description: "" })
+    property bool _prefsReady: false
+    property bool _enforcePending: false
+    property bool _enforcing: false
+    property bool _enforceAfterApply: false
+
     Component.onCompleted: {
         root._monCount = Hyprland.monitors.values.length
         // Populate the model from live Hyprland (refreshMonitors + rebuild +
@@ -67,7 +88,7 @@ Item {
                 return
             root._monCount = n
             if (!root.suspendSync)
-                root.syncFromHyprland()
+                root._requestEnforce()
         }
     }
 
@@ -121,6 +142,10 @@ Item {
             disabled: !!m.disabled,
             mirrorOf: (m.mirrorOf && m.mirrorOf !== "none") ? m.mirrorOf : "",
             availableModes: m.availableModes || [],
+            make: m.make || "",
+            model: m.model || "",
+            serial: m.serial || "",
+            description: m.description || "",
             internal: m.name.indexOf("eDP") === 0
         }
     }
@@ -167,6 +192,10 @@ Item {
             root.layout = next
             root._extendSnapshot = null
             root._mirrorEngaged = false
+            // Resume the primary preference once Extend is live again (the
+            // monitor inventory only settles after applyLive lands, so the
+            // re-enforce is deferred to applyProc.onExited).
+            root._enforceAfterApply = true
             root.applyLive()
             return
         }
@@ -201,6 +230,232 @@ Item {
         root.applyPreset("mirror", { source: source })
         root._mirrorEngaged = true
         root.applyLive()
+    }
+
+    // ---- Primary display preference: resolution, persistence, enforcement --
+
+    function _requestEnforce() {
+        root._enforcePending = true
+        root.syncFromHyprland()
+    }
+
+    // Enforcement must act on a settled inventory, so it runs once the resync
+    // window has drained rather than on the first (possibly stale) rebuild.
+    function _settleEnforce() {
+        if (!root._enforcePending)
+            return
+        if (root.suspendSync)
+            return
+        if (!root._prefsReady)
+            return
+        root._enforcePending = false
+        root.enforcePrimary()
+    }
+
+    function internalMonitor() {
+        const names = root.monitorNames()
+        for (let i = 0; i < names.length; i++) {
+            const m = root.layout[names[i]]
+            if (m && m.internal)
+                return names[i]
+        }
+        return ""
+    }
+
+    function externalMonitors() {
+        return root.monitorNames().filter(n => root.layout[n] && !root.layout[n].internal)
+    }
+
+    function monitorIdentity(name) {
+        const m = root.layout[name]
+        if (!m)
+            return null
+        return {
+            connector: name,
+            make: m.make || "",
+            model: m.model || "",
+            serial: m.serial || "",
+            description: m.description || ""
+        }
+    }
+
+    // Stable identity: serial+model when both sides expose one, else the full
+    // hardware description, else the connector name. When serials are absent
+    // AND descriptions are identical the two panels are indistinguishable and
+    // the match fails closed instead of selecting the wrong display.
+    function _matchesIdentity(name, id) {
+        if (!id)
+            return false
+        const m = root.layout[name]
+        if (!m)
+            return false
+        const serial = String(id.serial || "").trim()
+        const mSerial = String(m.serial || "").trim()
+        if (serial !== "" && mSerial !== "")
+            return serial === mSerial && String(id.model || "") === String(m.model || "")
+        const desc = String(id.description || "").trim()
+        const mDesc = String(m.description || "").trim()
+        if (desc !== "" && mDesc !== "")
+            return desc === mDesc
+        const connector = String(id.connector || "").trim()
+        return connector !== "" && connector === name
+    }
+
+    function humanName(name) {
+        const m = root.layout[name]
+        if (!m)
+            return name
+        if (m.internal)
+            return name + " · Internal"
+        if (m.model)
+            return name + " · " + m.model
+        if (m.make)
+            return name + " · " + m.make
+        return name
+    }
+
+    function savedExternalLabel() {
+        const id = root.primaryIdentity || {}
+        const conn = String(id.connector || "").trim()
+        const model = String(id.model || "").trim()
+        let label = conn || "External"
+        if (model)
+            label += " · " + model
+        return label + " (unavailable)"
+    }
+
+    function isPreferredExternal(name) {
+        return root.primaryKind === "external" && root._matchesIdentity(name, root.primaryIdentity)
+    }
+
+    function preferredExternalPresent() {
+        return root.primaryKind === "external" && root._preferredMonitor() !== ""
+    }
+
+    function setPrimaryInternal() {
+        root.primaryKind = "internal"
+        prefsAdapter.primaryKind = "internal"
+        root._requestEnforce()
+    }
+
+    function setPrimaryExternal(name) {
+        const id = root.monitorIdentity(name)
+        if (!id)
+            return
+        root.primaryKind = "external"
+        root.primaryIdentity = id
+        prefsAdapter.primaryKind = "external"
+        prefsAdapter.primaryIdentity = id
+        root._requestEnforce()
+    }
+
+    function _preferredMonitor() {
+        if (root.primaryKind !== "external")
+            return root.internalMonitor()
+        const names = root.monitorNames()
+        for (let i = 0; i < names.length; i++) {
+            const m = root.layout[names[i]]
+            if (!m || m.internal)
+                continue
+            if (root._matchesIdentity(names[i], root.primaryIdentity))
+                return names[i]
+        }
+        return ""
+    }
+
+    // The output that should host the full Bar (and its Dynamic Center): the
+    // resolved Primary Display, falling back to the internal panel when the
+    // preference is internal or the preferred external is not connected - the
+    // same fallback enforcement uses. "" only while the inventory is still
+    // loading, and callers fall back then too. Resolved by stable identity, never
+    // by the enforced (0,0) coordinate.
+    function primaryMonitorName() {
+        const p = root._preferredMonitor()
+        return p !== "" ? p : root.internalMonitor()
+    }
+
+    // Translate the ACTIVE outputs so the preferred display reaches (0,0),
+    // preserving their relative arrangement. Resolution/refresh/scale/transform
+    // are untouched (only x/y change) and the change is applied as a runtime
+    // overlay only - monitors.lua is never rewritten from here.
+    function enforcePrimary() {
+        if (root._enforcing)
+            return
+        if (!root._prefsReady)
+            return
+        if (root.suspendSync)
+            return
+        if (root.mirrorActive)
+            return
+
+        const names = root.monitorNames()
+        if (names.length === 0)
+            return
+        for (let i = 0; i < names.length; i++) {
+            const m = root.layout[names[i]]
+            if (m && m.mirrorOf)
+                return
+        }
+
+        let target = root._preferredMonitor()
+        if (target === "" && root.primaryKind === "external")
+            return
+        if (!target || !root.layout[target] || root.layout[target].disabled)
+            target = root.internalMonitor()
+        const t = root.layout[target]
+        if (!t || t.disabled)
+            return
+        if (t.x === 0 && t.y === 0)
+            return
+
+        const dx = -t.x
+        const dy = -t.y
+        const next = {}
+        for (let i = 0; i < names.length; i++) {
+            const n = names[i]
+            const m = root.layout[n]
+            if (!m || m.disabled) {
+                next[n] = m
+                continue
+            }
+            next[n] = Object.assign({}, m, { x: m.x + dx, y: m.y + dy })
+        }
+
+        root._enforcing = true
+        root.layout = next
+        root.applyRuntime()
+        root._enforcing = false
+    }
+
+    // Keep the CANONICAL monitors.lua boot-safe. When the primary preference is
+    // an external display the live layout has it at (0,0) with the internal
+    // panel offset; undo that offset on the way to disk so the internal panel
+    // is always written at a usable origin (Hyprland re-applies monitors.lua at
+    // startup, before Quickshell exists to enforce anything). With the internal
+    // display as primary the offset is zero and persistence is byte-for-byte
+    // unchanged.
+    function _persistOffset() {
+        if (root.primaryKind !== "external")
+            return { dx: 0, dy: 0 }
+        const internal = root.internalMonitor()
+        const m = internal ? root.layout[internal] : null
+        if (!m || m.disabled)
+            return { dx: 0, dy: 0 }
+        return { dx: m.x, dy: m.y }
+    }
+
+    function _onPrefsLoaded() {
+        root.primaryKind = (prefsAdapter.primaryKind === "external") ? "external" : "internal"
+        const id = prefsAdapter.primaryIdentity || {}
+        root.primaryIdentity = {
+            connector: String(id.connector || ""),
+            make: String(id.make || ""),
+            model: String(id.model || ""),
+            serial: String(id.serial || ""),
+            description: String(id.description || "")
+        }
+        root._prefsReady = true
+        root._requestEnforce()
     }
 
     function monitorNames() {
@@ -241,6 +496,10 @@ Item {
                 disabled: !!ipc.disabled,
                 mirrorOf: ipc.mirrorOf && ipc.mirrorOf !== "none" ? ipc.mirrorOf : "",
                 availableModes: ipc.availableModes || [],
+                make: ipc.make || "",
+                model: ipc.model || "",
+                serial: ipc.serial || "",
+                description: ipc.description || mon.description || "",
                 internal: name.indexOf("eDP") === 0
             }
         }
@@ -269,8 +528,10 @@ Item {
         onTriggered: {
             root._rebuildLayout()
             resyncTimer.ticks++
-            if (resyncTimer.ticks >= 5)
+            if (resyncTimer.ticks >= 5) {
                 resyncTimer.stop()
+                root._settleEnforce()
+            }
         }
     }
 
@@ -482,8 +743,9 @@ Item {
     // One HL.MonitorSpec table literal - { output = ..., mode = ..., ... } - used
     // verbatim by BOTH the live apply (hyprctl eval hl.monitor(...)) and the
     // persisted monitors.lua. Field names must match the hl.monitor() API:
-    // never name / resolution.
-    function monitorSpecLua(name) {
+    // never name / resolution. offX/offY are an optional position shift used
+    // ONLY on the way to disk (see _persistOffset) - the live apply passes none.
+    function monitorSpecLua(name, offX, offY) {
         const mon = root.layout[name]
         if (!mon)
             return ""
@@ -496,7 +758,7 @@ Item {
         }
 
         fields.push('mode = "' + root.modeString(mon) + '"')
-        fields.push('position = "' + mon.x + "x" + mon.y + '"')
+        fields.push('position = "' + (mon.x - (offX || 0)) + "x" + (mon.y - (offY || 0)) + '"')
         fields.push("scale = " + root.cleanScale(mon.scale))
         if (mon.transform)
             fields.push("transform = " + mon.transform)
@@ -513,21 +775,39 @@ Item {
     // splitting them let an "Applied" layout silently vanish on the next
     // Hyprland/laptop restart (which re-reads monitors.lua verbatim).
     function applyLive() {
+        root._applySpecs(true)
+    }
+
+    // Runtime-only twin of applyLive(): identical hl.monitor specs, but it never
+    // writes monitors.lua. Used by primary-preference enforcement, which must
+    // leave the canonical startup configuration untouched.
+    function applyRuntime() {
+        root._applySpecs(false)
+    }
+
+    function _applySpecs(persist) {
         const names = root.monitorNames()
         if (names.length === 0)
             return
 
         // This Hyprland build uses the Lua config parser: `hyprctl keyword
         // monitor` is rejected ("can't work with non-legacy parsers"), so drive
-        // the same hl.monitor() spec through `hyprctl eval`. Attempt every
-        // monitor even if an earlier one is rejected, but exit non-zero so the
-        // UI never reports "Applied" on a partial failure.
-        const cmds = ["rc=0"]
-        for (let i = 0; i < names.length; i++)
-            cmds.push("hyprctl eval 'hl.monitor(" + root.monitorSpecLua(names[i]) + ")' || rc=1")
-        cmds.push("exit $rc")
+        // the same hl.monitor() spec through `hyprctl eval`. Every monitor goes
+        // in ONE eval: hl.monitor() only records a rule and defers the apply to
+        // the next render pre-check, which then runs a single overlap check over
+        // the whole layout. Sending one eval per monitor lets Hyprland check a
+        // half-applied layout and raise a spurious "monitors overlap" warning.
+        const calls = []
+        for (let i = 0; i < names.length; i++) {
+            const spec = root.monitorSpecLua(names[i])
+            if (spec !== "")
+                calls.push("hl.monitor(" + spec + ")")
+        }
+        if (calls.length === 0)
+            return
 
-        applyProc.command = ["sh", "-c", cmds.join("\n")]
+        applyProc.persistAfter = persist
+        applyProc.command = ["sh", "-c", "hyprctl eval '" + calls.join("; ") + "'"]
         applyProc.running = true
     }
 
@@ -540,10 +820,11 @@ Item {
     // add a redundant re-layout flash.
     function _persistConfig() {
         const names = root.monitorNames()
+        const off = root._persistOffset()
         const lines = ["return {"]
 
         for (let i = 0; i < names.length; i++)
-            lines.push("    " + root.monitorSpecLua(names[i]) + ",")
+            lines.push("    " + root.monitorSpecLua(names[i], off.dx, off.dy) + ",")
 
         lines.push("}")
         lines.push("")
@@ -554,35 +835,50 @@ Item {
     Process {
         id: applyProc
 
+        // Set by _applySpecs: true = user Apply (live + persist), false =
+        // primary-preference enforcement (live only).
+        property bool persistAfter: true
+
         stdout: StdioCollector { waitForEnd: true }
         stderr: StdioCollector { waitForEnd: true }
 
         onExited: (exitCode) => {
-            root.statusIsError = exitCode !== 0
+            const enforceAfter = root._enforceAfterApply
+            root._enforceAfterApply = false
+
             if (exitCode === 0) {
-                // Live apply landed -> write the same layout to monitors.lua so
-                // it survives reload / restart / reboot. monitorsFile.onSaved /
-                // onSaveFailed finalises the status message.
-                root.statusMessage = "Applying…"
                 root._toggleRevert = null
-                root._persistConfig()
-            } else {
-                // A failed Control Center mirror toggle must not leave the tile
-                // claiming the wrong state - roll layout + flag + snapshot back.
-                // (Only toggleMirror() arms _toggleRevert; DisplayManager's
-                // Apply leaves it null and is unaffected.)
-                if (root._toggleRevert) {
-                    root.layout = root._toggleRevert.layout
-                    root._mirrorEngaged = root._toggleRevert.engaged
-                    root._extendSnapshot = root._toggleRevert.snapshot
-                    root._toggleRevert = null
+                if (applyProc.persistAfter) {
+                    // Live apply landed -> write the same layout to monitors.lua
+                    // so it survives reload / restart / reboot. monitorsFile's
+                    // onSaved / onSaveFailed finalises the status message.
+                    root.statusIsError = false
+                    root.statusMessage = "Applying…"
+                    root._persistConfig()
+                    // Mirror -> Extend: only now is the inventory settled enough
+                    // to re-resolve and resume the primary preference.
+                    if (enforceAfter)
+                        root._requestEnforce()
                 }
-                const raw = ((applyProc.stdout.text || "") + (applyProc.stderr.text || "")).trim()
-                const errLine = raw.split("\n").filter(l => /error/i.test(l))[0]
-                root.statusMessage = "Apply failed: " + (errLine || raw.split("\n").pop() || ("exit " + exitCode))
-                console.warn("[DisplayService] apply failed (" + exitCode + "):\n" + raw)
-                statusTimer.restart()
+                return
             }
+
+            // A failed Control Center mirror toggle must not leave the tile
+            // claiming the wrong state - roll layout + flag + snapshot back.
+            // (Only toggleMirror() arms _toggleRevert; DisplayManager's Apply
+            // leaves it null and is unaffected.)
+            if (root._toggleRevert) {
+                root.layout = root._toggleRevert.layout
+                root._mirrorEngaged = root._toggleRevert.engaged
+                root._extendSnapshot = root._toggleRevert.snapshot
+                root._toggleRevert = null
+            }
+            const raw = ((applyProc.stdout.text || "") + (applyProc.stderr.text || "")).trim()
+            const errLine = raw.split("\n").filter(l => /error/i.test(l))[0]
+            root.statusIsError = true
+            root.statusMessage = "Apply failed: " + (errLine || raw.split("\n").pop() || ("exit " + exitCode))
+            console.warn("[DisplayService] apply failed (" + exitCode + "):\n" + raw)
+            statusTimer.restart()
         }
     }
 
@@ -615,6 +911,42 @@ Item {
             root.statusIsError = true
             root.statusMessage = "Applied live — save to monitors.lua failed"
             statusTimer.restart()
+        }
+    }
+
+    // ---- Primary display preference persistence ----------------------------
+    // Lives in statePath, never in monitors.lua, and is the ONLY writer of what
+    // the user selected - a temporary disconnect must not wipe it.
+    FileView {
+        id: prefsFile
+
+        path: Quickshell.statePath("display-preferences.json")
+        printErrors: false
+
+        onLoaded: root._onPrefsLoaded()
+        onLoadFailed: (error) => root._onPrefsLoaded()
+        onAdapterUpdated: writeAdapter()
+        onSaveFailed: (error) => console.warn("[DisplayService] display-preferences.json save failed: " + error)
+
+        JsonAdapter {
+            id: prefsAdapter
+
+            property int version: 1
+            property string primaryKind: "internal"
+            property var primaryIdentity: ({ connector: "", make: "", model: "", serial: "", description: "" })
+        }
+    }
+
+    // A `hyprctl reload` (or any config reload) re-applies the canonical
+    // monitors.lua and resets positions, so re-resolve and re-enforce once the
+    // reload has settled. Live `hyprctl eval` never emits this, so no loop.
+    Connections {
+        target: Hyprland
+
+        function onRawEvent(event) {
+            const n = (event && event.name) || ""
+            if (n === "configreloaded")
+                root._requestEnforce()
         }
     }
 

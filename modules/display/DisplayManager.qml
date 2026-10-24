@@ -547,6 +547,90 @@ Item {
             }
         }
 
+        // Primary display preference. Hyprland has no native primary-output
+        // property, so this selects which display should sit at logical (0,0);
+        // it is stored in DisplayService (statePath) and enforced in Extend mode
+        // only. A disconnected saved external stays selected but is shown
+        // unavailable, and the internal panel keeps the origin meanwhile.
+        Row {
+            spacing: 8
+
+            Text {
+                height: 28
+                verticalAlignment: Text.AlignVCenter
+                text: "Primary"
+                color: Theme.textMuted
+                font.pixelSize: 11
+                font.weight: Font.DemiBold
+            }
+
+            Repeater {
+                model: DisplayService.monitorNames()
+
+                delegate: Rectangle {
+                    id: primaryPill
+
+                    required property string modelData
+                    readonly property var info: DisplayService.layout[primaryPill.modelData]
+                    readonly property bool active: primaryPill.info
+                        ? (primaryPill.info.internal
+                            ? DisplayService.primaryKind === "internal"
+                            : DisplayService.isPreferredExternal(primaryPill.modelData))
+                        : false
+
+                    width: primaryLabel.implicitWidth + 24
+                    height: 28
+                    radius: height / 2
+                    color: primaryPill.active
+                        ? Theme.accent
+                        : (primaryHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background)
+
+                    HoverHandler {
+                        id: primaryHover
+                        cursorShape: Qt.PointingHandCursor
+                    }
+
+                    TapHandler {
+                        onTapped: {
+                            if (primaryPill.info && primaryPill.info.internal)
+                                DisplayService.setPrimaryInternal()
+                            else
+                                DisplayService.setPrimaryExternal(primaryPill.modelData)
+                        }
+                    }
+
+                    Text {
+                        id: primaryLabel
+                        anchors.centerIn: parent
+                        text: DisplayService.humanName(primaryPill.modelData)
+                        color: primaryPill.active ? Theme.background : Theme.text
+                        font.pixelSize: 11
+                        font.weight: Font.DemiBold
+                    }
+                }
+            }
+
+            Rectangle {
+                visible: DisplayService.primaryKind === "external" && !DisplayService.preferredExternalPresent()
+                width: savedPrimaryLabel.implicitWidth + 24
+                height: 28
+                radius: height / 2
+                color: Theme.background
+                border.width: 1
+                border.color: Theme.accent
+                opacity: 0.7
+
+                Text {
+                    id: savedPrimaryLabel
+                    anchors.centerIn: parent
+                    text: DisplayService.savedExternalLabel()
+                    color: Theme.accent
+                    font.pixelSize: 11
+                    font.weight: Font.DemiBold
+                }
+            }
+        }
+
         Column {
             width: parent.width
             spacing: 8

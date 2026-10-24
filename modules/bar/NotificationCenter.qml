@@ -159,7 +159,7 @@ PanelWindow {
         anchors.fill: parent
         anchors.margins: 8
         radius: Theme.cornerRadius
-        color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
+        color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
         border.width: 1
         border.color: Theme.surfaceHover
 
@@ -545,7 +545,7 @@ PanelWindow {
                 radius: 12
                 color: {
                     const c = cardHover.hovered ? Qt.lighter(Theme.surface, 1.15) : Theme.surface
-                    return Qt.rgba(c.r, c.g, c.b, Theme.surfaceOpacity)
+                    return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
                 }
 
                 HoverHandler { id: cardHover }

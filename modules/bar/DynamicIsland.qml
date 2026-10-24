@@ -20,10 +20,11 @@ import "../../components"
 // surface.
 //
 // Overlay, never push: the Wayland surface is allocated once for the tallest
-// state and never resizes at runtime (no per-frame layer-shell resize), while
-// `exclusiveZone` is pinned at 44 so the work area is identical in both states.
+// state and never resizes at runtime (no per-frame layer-shell resize) and
+// reserves no work area at all. It starts hidden and shows only when the
+// pointer reaches the top-centre trigger; the pill just fades and slides.
 // Only the pill Rectangle inside the surface grows; `clip` reveals its content
-// top-down as it does. The input Region follows the pill in both states.
+// top-down as it does. The input Region covers the trigger plus the shown pill.
 PanelWindow {
     id: root
 
@@ -57,18 +58,55 @@ PanelWindow {
     // front and never resizes, so there is no per-frame layer-shell resize (and
     // no resize glitch on fractional-scale outputs).
     implicitHeight: root.surfaceH
-    // Pinned in both states: the expanded pill overlays the desktop without
-    // reserving a single extra pixel of work area.
-    exclusiveZone: 44
+    // Never reserves work area: the island only overlays windows, so the
+    // workspace geometry is identical whether it is shown or hidden.
+    exclusiveZone: 0
 
     focusable: root.expanded
 
-    // The pill rect (collapsed or expanded) is the only input area; the rest of
-    // the window stays click-through, so four of the five states never swallow
-    // a click. An empty Region would give the compositor a zero-area input
-    // region and swallow all clicks.
-    mask: pillMask
-    Region { id: pillMask; item: pill }
+    // Input follows the hit area only: the top-centre trigger while hidden, and
+    // the trigger plus the pill once shown. The rest of the window stays
+    // click-through. An empty Region would give the compositor a zero-area
+    // input region and swallow all clicks.
+    mask: hitMask
+    Region { id: hitMask; item: hitArea }
+
+    Item {
+        id: hitArea
+
+        y: 0
+        anchors.horizontalCenter: parent.horizontalCenter
+        width: root.revealed ? Math.max(root.triggerWidth, pill.width) : root.triggerWidth
+        height: root.revealed ? pill.y + pill.height : root.triggerHeight
+    }
+
+    Item {
+        id: triggerHoverArea
+
+        y: 0
+        width: root.triggerWidth
+        height: root.triggerHeight
+        anchors.horizontalCenter: parent.horizontalCenter
+
+        HoverHandler { id: triggerHover }
+    }
+
+    readonly property bool pointerInside: triggerHover.hovered || pillHover.hovered
+
+    onPointerInsideChanged: {
+        if (root.pointerInside) {
+            hideTimer.stop()
+            root.revealed = true
+        } else if (!root.expanded) {
+            hideTimer.restart()
+        }
+    }
+
+    Timer {
+        id: hideTimer
+        interval: 500
+        onTriggered: if (!root.expanded && !root.pointerInside) root.revealed = false
+    }
 
     // Focus grab arms on expand only: a click outside clears it and collapses.
     // Gated on `root.expanded` so it can never interfere with normal pointer
@@ -107,11 +145,24 @@ PanelWindow {
     // events). The pill grows to a fixed, content-independent size, so track
     // changes never oscillate it.
     property bool expanded: false
+    // Auto-hide state: the surface is always mapped (so the trigger can take
+    // pointer input) but the pill is invisible until the pointer reaches the
+    // top-centre trigger. `expanded` always keeps it shown.
+    property bool revealed: false
+    readonly property int triggerWidth: 220
+    readonly property int triggerHeight: 12
     // Losing the track collapses instead of showing an empty pill. Pause and
     // track changes keep mediaMode true, so they never collapse.
     onMediaModeChanged: if (!root.mediaMode) root.expanded = false
     // Give the pill active focus on open so its Keys handler (Escape) works.
-    onExpandedChanged: if (root.expanded) pill.forceActiveFocus()
+    onExpandedChanged: {
+        if (root.expanded) {
+            hideTimer.stop()
+            pill.forceActiveFocus()
+        } else if (!hitHover.hovered) {
+            hideTimer.restart()
+        }
+    }
 
     // Ticks the shared 1 Hz position timer while expanded (shell.qml only
     // drives positionActive for eDP). Owned here, so it clears itself.
@@ -163,9 +214,28 @@ PanelWindow {
             NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
         }
 
-        radius: Math.min(Theme.cornerRadius, height / 2)
+        // Adaptive: collapsed stays a true 16px capsule (half the fixed
+        // collapsed height 32); expanded becomes a normal 28px rounded
+        // rectangle instead of a giant 78px capsule. Both branches are
+        // constants, so a single Behavior cross-fades them over the same
+        // 300ms/OutCubic as width and height. Radius intentionally does not
+        // read the animating `height`, so it cannot fight or lag the resize.
+        radius: root.expanded ? 28 : root.collapsedH / 2
+
         Behavior on radius {
             NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+        }
+
+        opacity: root.revealed ? 1 : 0
+        transform: Translate {
+            y: root.revealed ? 0 : -4
+
+            Behavior on y {
+                NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+            }
+        }
+        Behavior on opacity {
+            NumberAnimation { duration: root.revealed ? 150 : 180; easing.type: Easing.OutCubic }
         }
 
         // Active focus while expanded so the Keys handler below receives Escape.
@@ -181,24 +251,27 @@ PanelWindow {
         // content can never spill past the rounded capsule.
         clip: true
 
-        color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
+        color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
         border.width: 1
         border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
 
-        // Shared material top light: strongest at the top edge, fading down.
-        // Same stops as the static bar; radius matches the pill so the light
-        // never spills past the capsule, and it stays transparent at the
-        // bottom where the edge key lives.
+        // Shared material top light: full-bleed (inset by the 1px border) with
+        // the pill's own capsule radius, so it can never paint outside the
+        // silhouette (a short rect's radius is clamped to half its height,
+        // which desynchronises it from the pill and leaves a stray outline).
+        // The falloff is shaped by the stops, not by a clipped rect height.
         Rectangle {
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: 14
-            radius: pill.radius
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: pill.radius - 1
             gradient: Gradient {
                 GradientStop {
                     position: 0
                     color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                }
+                GradientStop {
+                    position: 0.4
+                    color: "transparent"
                 }
                 GradientStop {
                     position: 1
@@ -326,7 +399,7 @@ PanelWindow {
                     x: 0
                     onTextChanged: metaScroll.x = 0
                     SequentialAnimation on x {
-                        running: metaView.overflow && root.mediaMode && !root.expanded
+                        running: metaView.overflow && root.mediaMode && !root.expanded && root.revealed
                         loops: Animation.Infinite
                         PauseAnimation { duration: 1200 }
                         NumberAnimation {
