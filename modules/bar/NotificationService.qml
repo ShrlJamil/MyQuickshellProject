@@ -52,6 +52,13 @@ Item {
     property var list: []
     readonly property int count: root.list.length
 
+    // Retention cap for the history. Without it, every notification ever
+    // received is retained forever — its entry here plus its Notification
+    // object (and any image payload) on the server — so a long-running shell
+    // grows without bound. Arrivals beyond the cap evict the OLDEST entries;
+    // see _pruneHistory().
+    readonly property int maxHistory: 100
+
     function _entryById(id) {
         for (let i = 0; i < root.list.length; i++) {
             if (root.list[i].id === id)
@@ -126,6 +133,29 @@ Item {
         n.urgencyChanged.connect(sync)
         n.actionsChanged.connect(sync)
         n.hintsChanged.connect(sync)
+    }
+
+    // Evict the oldest entries (tail of the newest-first list) until the
+    // history fits maxHistory. Runs after each insertion — the only place the
+    // list grows. The kept/evicted arrays are swapped in BEFORE dismissing
+    // anything, mirroring clearAll(), so the evicted notifications' n.closed
+    // hooks find nothing left to mutate. Evicted entries are dismissed
+    // properly — not just dropped from the array — so the server releases
+    // their Notification objects (and image payloads) as well.
+    function _pruneHistory() {
+        if (root.list.length <= root.maxHistory)
+            return
+        const evicted = root.list.slice(root.maxHistory)
+        root.list = root.list.slice(0, root.maxHistory)
+        for (let i = 0; i < evicted.length; i++) {
+            root._removePopup(evicted[i].id)
+            const n = evicted[i].notification
+            if (n && n.dismiss) {
+                try {
+                    n.dismiss()
+                } catch (e) {}
+            }
+        }
     }
 
     // Invoke a notification action generically. Never dismisses: whether the
@@ -255,6 +285,7 @@ Item {
             const next = root.list.slice()
             next.unshift(entry)
             root.list = next
+            root._pruneHistory()
 
             // Show a toast unless Do Not Disturb is on. History/count are updated
             // above regardless of DND.
