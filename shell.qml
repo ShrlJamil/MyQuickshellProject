@@ -270,7 +270,7 @@ ShellRoot {
         function region(): void { CaptureService.triggerCapture("region") }
         function window(): void { CaptureService.triggerCapture("window") }
         function screen(): void { CaptureService.triggerCapture("screen") }
-        // instant full-screen shot straight to file + clipboard, no CaptureBar UI
+        // instant shot of the focused screen straight to file + clipboard, no picker UI
         function fullscreen(): void { CaptureService.captureFullscreen() }
         function bar(): void {
             barState.screen = null
