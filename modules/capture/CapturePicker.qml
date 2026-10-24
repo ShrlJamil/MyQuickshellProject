@@ -32,7 +32,13 @@ PanelWindow {
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "quickshell-capture-picker"
     WlrLayershell.exclusionMode: ExclusionMode.Ignore
-    WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
+    // Deliberately NO keyboardFocus override: the default (None) is what every
+    // working grab surface in this shell uses (Launcher, DynamicIsland). An
+    // OnDemand surface joins the normal layer-shell focus flow, where
+    // Hyprland's follow-mouse grants it keyboard focus only while hovered and
+    // the HyprlandFocusGrab below never effectively holds - the picker
+    // hotkeys then only work under the mouse. The grab is the sole focus
+    // mechanism for this window.
 
     anchors { bottom: true }
     margins { bottom: 16 }
