@@ -38,11 +38,17 @@ Item {
     // ---- History ------------------------------------------------------------
     // Newest first. Each entry:
     //   { id, notification, actions, appName, appIcon, summary, body, image,
-    //     urgency, critical, time }
+    //     urgency, critical, stackKey, time }
     // `actions` is the notification's own list<NotificationAction> captured at
     // arrival — the SAME NotificationAction objects, valid while the retained
     // Notification is alive. Used generically: label = action.text, click =
     // action.invoke(). No per-app interpretation.
+    // The snapshot fields are a cache, not a copy set in stone: when a sender
+    // replaces its notification (freedesktop replaces_id), Quickshell mutates
+    // the SAME Notification object in place and does NOT re-emit it, so each
+    // entry is kept in sync by _watchEntry()/_syncEntry() below.
+    // `stackKey` identifies stack-tag replacement (see _stackKeyOf); "" when
+    // the notification carries no stack tag.
     property var list: []
     readonly property int count: root.list.length
 
@@ -52,6 +58,74 @@ Item {
                 return root.list[i]
         }
         return null
+    }
+
+    // Stack-tag identity for replace-by-hint, following the dunst / notify-osd
+    // convention: a new notification carrying the same stack tag from the same
+    // app replaces the previous one instead of stacking next to it. The tag is
+    // read from the standard hints: `x-dunst-stack-tag` first, then Canonical's
+    // `x-canonical-private-synchronous`. Returns "" when there is no usable
+    // tag (the common case — then nothing is ever deduplicated).
+    function _stackKeyOf(n) {
+        if (!n || !n.hints)
+            return ""
+        let tag = n.hints["x-dunst-stack-tag"]
+        if (tag === undefined || tag === null || tag === "")
+            tag = n.hints["x-canonical-private-synchronous"]
+        if (tag === undefined || tag === null)
+            return ""
+        const t = String(tag)
+        if (t.length === 0)
+            return ""
+        return (n.appName || "") + "\n" + t
+    }
+
+    // Re-read every snapshot field of an entry from its live Notification and
+    // re-publish both arrays (same entry objects, new array identities) so
+    // bound UI — history cards and any visible toast — rebuilds with the new
+    // content. The entry keeps its position; only its content and time move.
+    function _syncEntry(entry) {
+        const n = entry.notification
+        if (!n)
+            return
+        entry.actions = n.actions
+        entry.appName = n.appName || ""
+        entry.appIcon = n.appIcon || ""
+        entry.summary = n.summary || ""
+        entry.body = n.body || ""
+        entry.image = n.image || ""
+        entry.urgency = n.urgency
+        entry.critical = n.urgency === NotificationUrgency.Critical
+        entry.stackKey = root._stackKeyOf(n)
+        entry.time = new Date()
+        root.list = root.list.slice()
+        for (let i = 0; i < root.popups.length; i++) {
+            if (root.popups[i].id === entry.id) {
+                root.popups = root.popups.slice()
+                break
+            }
+        }
+    }
+
+    // Keep an entry's snapshot in sync with its Notification. A freedesktop
+    // replace (replaces_id) mutates the object and fires these property
+    // signals instead of producing a new notification, so without this hook a
+    // replaced notification would keep displaying its first-arrival content
+    // forever. Connected once per entry, in the same style as the n.closed
+    // hook in the server handler below.
+    function _watchEntry(entry) {
+        const n = entry.notification
+        if (!n)
+            return
+        const sync = function() { root._syncEntry(entry) }
+        n.appNameChanged.connect(sync)
+        n.appIconChanged.connect(sync)
+        n.summaryChanged.connect(sync)
+        n.bodyChanged.connect(sync)
+        n.imageChanged.connect(sync)
+        n.urgencyChanged.connect(sync)
+        n.actionsChanged.connect(sync)
+        n.hintsChanged.connect(sync)
     }
 
     // Invoke a notification action generically. Never dismisses: whether the
@@ -138,6 +212,17 @@ Item {
             // its NotificationAction children alive.
             n.tracked = true
 
+            // Same id seen again — never duplicate the entry. Quickshell
+            // re-emits retained notifications on config reload (keepOnReload),
+            // and a replaces_id update is applied to the object in place (see
+            // _watchEntry), so an emission for a known id can only be a
+            // re-delivery: refresh the existing entry and stop.
+            const known = root._entryById(n.id)
+            if (known) {
+                root._syncEntry(known)
+                return
+            }
+
             const entry = {
                 "id": n.id,
                 "notification": n,
@@ -149,7 +234,22 @@ Item {
                 "image": n.image || "",
                 "urgency": n.urgency,
                 "critical": n.urgency === NotificationUrgency.Critical,
+                "stackKey": root._stackKeyOf(n),
                 "time": new Date()
+            }
+
+            // Stack-tag replacement: this notification supersedes any earlier
+            // entry from the same app carrying the same stack tag (progress
+            // meters, volume-style indicators, this project's own screenshot
+            // toasts, ...). Dismiss the superseded entries first — which also
+            // closes their Notification objects, so nothing tracked leaks on
+            // the server — then add the new one as a normal arrival.
+            if (entry.stackKey.length > 0) {
+                const snapshot = root.list.slice()
+                for (let i = 0; i < snapshot.length; i++) {
+                    if (snapshot[i].stackKey === entry.stackKey)
+                        root.dismiss(snapshot[i].id)
+                }
             }
 
             const next = root.list.slice()
@@ -160,6 +260,8 @@ Item {
             // above regardless of DND.
             if (!root.doNotDisturb)
                 root._addPopup(entry)
+
+            root._watchEntry(entry)
 
             // If the sender closes/expires it elsewhere, drop it from both.
             n.closed.connect(function() {
