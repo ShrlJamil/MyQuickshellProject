@@ -153,7 +153,7 @@ A static **40px** top bar, one instance per monitor (`Variants(Quickshell.screen
 
 ### The dynamic center
 
-The bar's centre can raise a surface that looks like it grows straight out of the bar — no gap, square top corners. Implemented surfaces: `power`, `display`, `wallpapers`, `media` (expanded player), `capture` (picker). `mediaPreview` / `mediaCompact` IPC modes also exist.
+The bar's centre can raise a surface that looks like it grows straight out of the bar — no gap, square top corners. Implemented surfaces: `power`, `display`, `wallpapers`, `media` (expanded player). `mediaPreview` / `mediaCompact` IPC modes also exist. (The capture picker is no longer a surface here — it is a standalone floating window, see Capture below.)
 
 - The bar's `PanelWindow` height stays constant at runtime; surfaces fade/crossfade inside the allocated space. (Resizing a layer-shell surface every open flickers badly on fractional-scale outputs.)
 - When idle, the transparent area below the 40px strip is click-through (input mask); when a surface is open the window grabs input via `HyprlandFocusGrab`.
@@ -186,7 +186,7 @@ One `MediaService` (`modules/services/MediaService.qml`) wraps the native `Quick
 | --- | --- | --- |
 | Notifications | `modules/bar/NotificationService.qml`, `NotificationCenter.qml`, `NotificationPopup.qml`, `NotificationReply.qml` | freedesktop `NotificationServer` history + per-screen center and popup toasts, inline reply |
 | OSD | `modules/osd/OSD.qml`, `OSDService.qml` | Standalone bottom-centre, click-through overlay: volume / brightness / caps-lock (+ workspace OSD). Brightness keys step optimistically, then run `brightnessctl` detached |
-| Capture | `modules/capture/CaptureService.qml`, `CaptureBar.qml`, `CaptureOverlay.qml`, `ScreenshotPreview.qml` | Region / window / screen / instant-fullscreen shots to file + clipboard; selection overlay; preview. Lives outside `barState.mode` |
+| Capture | `modules/capture/CaptureService.qml`, `CaptureBar.qml`, `CapturePicker.qml`, `CaptureOverlay.qml`, `ScreenshotPreview.qml` | Region / window / screen / instant-fullscreen shots to file + clipboard; selection overlay; preview. Floating bottom-centre picker (`CapturePicker`) on the focused screen, independent of the bar and `barState.mode` |
 | Eco mode | `modules/bar/EcoService.qml` | Snapshot-apply-restore over `hyprctl`: blur/shadow off + opaque QML surfaces, no config edits |
 | Misc services | `AudioService`, `MicService`, `NetworkService`, `BluetoothService`, `BatteryService`, `BrightnessService`, `NightLightService`, `HotspotService`, `SubmapService`, `UptimeService`, `CaffeineService` (all under `modules/bar/`) | Native backends first (PipeWire, UPower, BlueZ, NetworkManager); tiny shell reads only where the 0.3.x QML API has gaps. `MprisService.qml` is a legacy stub superseded by `MediaService` |
 

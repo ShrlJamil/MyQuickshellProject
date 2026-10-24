@@ -1,5 +1,4 @@
 import QtQuick
-import QtQuick.Shapes
 import Qt5Compat.GraphicalEffects
 import Quickshell
 import Quickshell.Widgets
@@ -15,9 +14,9 @@ Item {
     height: 64
 
     // Take keyboard focus while shown so Esc lands here even without a pointer
-    // move (the host Bar window is already focusable during a capture surface).
-    // Imperative only - no static `focus: true` that could contend with the
-    // other DynamicCenter surfaces (PowerMenu etc.) while hidden.
+    // move (the host CapturePicker window is focusable while the picker is up).
+    // Imperative only - no static `focus: true` that could contend with other
+    // surfaces while hidden.
     onVisibleChanged: {
         console.log("[CaptureBar] visible ->", root.visible)
         if (root.visible)
@@ -56,83 +55,6 @@ Item {
         onActivated: CaptureService.closeBar()
     }
 
-    Shape {
-        id: card
-
-        anchors.fill: parent
-        antialiasing: true
-        asynchronous: false
-        vendorExtensionsEnabled: true
-        preferredRendererType: Shape.CurveRenderer
-
-        readonly property real notchSize: 18
-        readonly property real bottomRadius: Theme.cornerRadius
-
-        ShapePath {
-            // Transparent: the DynamicCenter frame is the sole panel background.
-            fillColor: "transparent"
-            strokeColor: "transparent"
-            strokeWidth: 0
-
-            startX: 0
-            startY: 0
-
-            PathCubic {
-                control1X: card.notchSize * 0.5
-                control1Y: 0
-                control2X: card.notchSize
-                control2Y: card.notchSize * 0.5
-                x: card.notchSize
-                y: card.notchSize
-            }
-
-            PathLine {
-                x: card.notchSize
-                y: card.height - card.bottomRadius
-            }
-
-            PathQuad {
-                controlX: card.notchSize
-                controlY: card.height
-                x: card.notchSize + card.bottomRadius
-                y: card.height
-            }
-
-            PathLine {
-                x: card.width - card.notchSize - card.bottomRadius
-                y: card.height
-            }
-
-            PathQuad {
-                controlX: card.width - card.notchSize
-                controlY: card.height
-                x: card.width - card.notchSize
-                y: card.height - card.bottomRadius
-            }
-
-            PathLine {
-                x: card.width - card.notchSize
-                y: card.notchSize
-            }
-
-            PathCubic {
-                control1X: card.width - card.notchSize
-                control1Y: card.notchSize * 0.5
-                control2X: card.width - card.notchSize * 0.5
-                control2Y: 0
-                x: card.width
-                y: 0
-            }
-
-            PathLine {
-                x: 0
-                y: 0
-            }
-        }
-    }
-
-    // The "Capture Mode" header lives in the Bar header slot (Bar.qml holdLabel),
-    // matching the Power Menu / Display Manager pattern - not inside this bar.
     Row {
         anchors.centerIn: parent
 

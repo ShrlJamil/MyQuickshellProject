@@ -258,9 +258,9 @@ ShellRoot {
     IpcHandler {
         target: "capture"
 
-        // Capture is not a barState.mode - clear any open surface first so
-        // DynamicCenter.activeSurface can resolve to "capture" and the picker
-        // renders instead of being shadowed by e.g. an open Power Menu.
+        // The capture picker is a standalone floating window, not a
+        // barState.mode - clear any open bar surface first so the Bar
+        // window's focus grab can't shadow the picker's own input.
         function open(): void {
             console.log("[IPC] capture open")
             barState.screen = null
@@ -358,8 +358,9 @@ ShellRoot {
 
     // Everything the full Bar owns or is opened from travels with it: the
     // Control Center (opened from a bar click), the Notification Center (bar
-    // Date & Time), the toast stack and the capture overlay all live on the bar
-    // screen, exactly as they used to live on the internal screen.
+    // Date & Time) and the toast stack all live on the bar screen, exactly as
+    // they used to live on the internal screen. (Capture is the exception -
+    // see its all-screens Variants below.)
     Variants {
         model: Quickshell.screens.filter(screen => isBarScreen(screen) || barScreen() === null).map(screen => ({ barState: barState, screen: screen }))
 
@@ -379,9 +380,19 @@ ShellRoot {
     }
 
     Variants {
-        model: Quickshell.screens.filter(screen => isBarScreen(screen) || barScreen() === null).map(screen => ({ screen: screen }))
+        // Capture overlay + picker live on every screen: each instance gates
+        // its own visibility to the Hyprland-focused screen, so region /
+        // window selection and the floating picker work on whichever monitor
+        // is focused - not only the bar screen.
+        model: Quickshell.screens.map(screen => ({ screen: screen }))
 
         delegate: CaptureOverlay {}
+    }
+
+    Variants {
+        model: Quickshell.screens.map(screen => ({ screen: screen }))
+
+        delegate: CapturePicker {}
     }
 
     Variants {

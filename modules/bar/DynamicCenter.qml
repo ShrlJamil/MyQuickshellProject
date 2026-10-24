@@ -32,15 +32,14 @@ Item {
 
     // ---- Universal content-driven sizing --------------------------------
     // The frame just fits whatever the active surface reports as its own
-    // natural size. Each surface (PowerMenu, DisplayManager, WallpaperPicker,
-    // CaptureBar) owns its implicitWidth / implicitHeight - no per-mode magic
-    // numbers live here anymore.
+    // natural size. Each surface (PowerMenu, DisplayManager, WallpaperPicker)
+    // owns its implicitWidth / implicitHeight - no per-mode magic numbers
+    // live here anymore.
     readonly property Item _activeItem: {
         switch (root.activeSurface) {
         case "power": return powerLoader.item
         case "display": return displayLoader.item
         case "wallpapers": return wallpaperLoader.item
-        case "capture": return captureLoader.item
         default: return null
         }
     }
@@ -292,26 +291,6 @@ Item {
         }
 
         Loader {
-            id: captureLoader
-            anchors.horizontalCenter: parent.horizontalCenter
-            active: root._captureLatched || root.activeSurface === "capture" || root._prevSurface === "capture"
-                || (root.allocatedHeight > 0 && root._lastSurface === "capture")
-            sourceComponent: CaptureBar {
-                anchors.horizontalCenter: parent.horizontalCenter
-                visible: root.activeSurface === "capture" || root._prevSurface === "capture"
-                    || (root.allocatedHeight > 0 && root._lastSurface === "capture")
-                opacity: root.activeSurface === "capture" ? 1 : 0
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: root._contentFadeDuration()
-                        easing.type: Easing.OutCubic
-                    }
-                }
-            }
-            onLoaded: if (root.activeSurface === "capture") root._focusSurface("capture")
-        }
-
-        Loader {
             id: displayLoader
             width: parent.width
             active: root._displayLatched || root.activeSurface === "display" || root._prevSurface === "display"
@@ -370,14 +349,12 @@ Item {
     // cleared. These are load-lifecycle flags, not mode state - the mode
     // remains solely `activeSurface` (+ `_prevSurface`/`_lastSurface`).
     property bool _powerLatched: false
-    property bool _captureLatched: false
     property bool _displayLatched: false
     property bool _wallpapersLatched: false
 
     function _surfaceItem(name) {
         switch (name) {
         case "power": return powerLoader.item
-        case "capture": return captureLoader.item
         case "display": return displayLoader.item
         case "wallpapers": return wallpaperLoader.item
         default: return null
@@ -396,13 +373,10 @@ Item {
     onActiveSurfaceChanged: {
         console.log("[DynamicCenter] Active surface changed to:", root.activeSurface)
 
-        // Capture runs outside barState.mode; entering any other real surface
-        // must force it down so its latched barVisible / input grab can't shadow
-        // the incoming mode. Safe + loop-free: barState.mode has already won the
-        // activeSurface binding by the time this fires, so clearing barVisible
-        // doesn't re-evaluate to a different surface.
-        if (root.activeSurface !== "capture" && root.activeSurface !== "idle"
-            && CaptureService.barVisible) {
+        // The capture picker is a standalone floating window now, not a
+        // surface; entering any real surface must still force it down so its
+        // focus grab can't shadow the incoming mode.
+        if (root.activeSurface !== "idle" && CaptureService.barVisible) {
             CaptureService.closeBar()
         }
 
@@ -428,9 +402,6 @@ Item {
         } else if (root.activeSurface === "wallpapers") {
             root._wallpapersLatched = true
             root._focusSurface("wallpapers")
-        } else if (root.activeSurface === "capture") {
-            root._captureLatched = true
-            root._focusSurface("capture")
         } else if (root.activeSurface === "display") {
             root._displayLatched = true
             // Arms the bar's HyprlandFocusGrab so Esc + click-outside dismiss

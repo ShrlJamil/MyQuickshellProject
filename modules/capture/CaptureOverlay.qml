@@ -26,11 +26,11 @@ PanelWindow {
     WlrLayershell.namespace: "quickshell-capture"
     WlrLayershell.exclusionMode: ExclusionMode.Ignore
     // Standalone selection (no picker) needs OnDemand focus for its own Esc
-    // handler. When the CaptureBar picker is up (openBar's default region mode)
-    // the overlay must NOT request keyboard focus: Hyprland would hand an
-    // OnDemand layer focus on map, pulling it off the Bar window (tripping that
-    // window's focus-grab) AND delivering it stray keystrokes from whatever the
-    // user was typing. The picker owns Esc/Cancel in that mode.
+    // handler. When the CapturePicker is up the overlay must NOT request
+    // keyboard focus: Hyprland would hand an OnDemand layer focus on map,
+    // pulling it off the picker window (tripping its focus-grab) AND
+    // delivering it stray keystrokes from whatever the user was typing.
+    // The picker owns Esc/Cancel in that mode.
     WlrLayershell.keyboardFocus: CaptureService.barVisible
         ? WlrKeyboardFocus.None
         : WlrKeyboardFocus.OnDemand
@@ -51,8 +51,8 @@ PanelWindow {
             root.hoveredWindow = null
             if (CaptureService.windowSelectActive)
                 Hyprland.refreshToplevels()
-            // Only claim keyboard focus when running without the picker; with the
-            // picker up the Bar window keeps focus (see keyboardFocus above).
+            // Only claim keyboard focus when running without the picker; with
+            // the picker up, the picker window keeps focus (see above).
             if (!CaptureService.barVisible)
                 overlayRoot.forceActiveFocus()
         }

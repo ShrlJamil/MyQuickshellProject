@@ -8,7 +8,6 @@ import Quickshell.Wayland
 import Quickshell.Services.SystemTray
 import Qt5Compat.GraphicalEffects
 import "../../components"
-import "../capture"
 import "../services"
 
 PanelWindow {
@@ -26,11 +25,7 @@ PanelWindow {
     visible: true
 
     property bool centerOpen: barState.mode === "center" && barState.screen === root.screen
-    readonly property bool isCaptureActive: CaptureService.barVisible
-        && root.screen
-        && Hyprland.focusedMonitor
-        && root.screen.name === Hyprland.focusedMonitor.name
-    property bool surfaceActive: (barState.screen === root.screen && (barState.mode === "power" || barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact")) || root.isCaptureActive
+    property bool surfaceActive: (barState.screen === root.screen && (barState.mode === "power" || barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact"))
     property double _mediaPopoverClosedAt: 0
 
     // ---- single-window concave (tiled hug) --------------------------------
@@ -270,7 +265,7 @@ PanelWindow {
         root._ccUpdate()
     }
 
-    onIsCaptureActiveChanged: console.log("[Bar] isCaptureActive ->", root.isCaptureActive, "screen =", (root.screen ? root.screen.name : "null"))
+
 
     readonly property int fixedHeight: 540
 
@@ -304,16 +299,8 @@ PanelWindow {
         onCleared: {
             if (!root.surfaceActive)
                 return
-            // The capture selection overlay is a separate top-layer surface; it
-            // legitimately takes focus while the CaptureBar picker is still up
-            // (openBar's default region mode). That focus hand-off is not a user
-            // dismiss - let the overlay / picker Esc / Cancel own the teardown.
-            if (root.isCaptureActive
-                && (CaptureService.regionSelectActive || CaptureService.windowSelectActive))
-                return
             barState.screen = null
             barState.mode = ""
-            CaptureService.closeBar()
         }
     }
 
@@ -861,10 +848,8 @@ PanelWindow {
             id: holdLabel
 
             anchors.centerIn: parent
-            visible: root.isCaptureActive
-                || (barState.screen === root.screen && (barState.mode === "power" || barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact"))
-            text: root.isCaptureActive ? "Capture Mode"
-                : barState.mode === "power" ? "Power Menu"
+            visible: (barState.screen === root.screen && (barState.mode === "power" || barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact"))
+            text: barState.mode === "power" ? "Power Menu"
                 : barState.mode === "display" ? "Display"
                 : barState.mode === "wallpapers" ? "Wallpapers"
                 : (barState.mode === "mediaPreview" || barState.mode === "mediaCompact") ? "Media"
@@ -1587,7 +1572,7 @@ PanelWindow {
         anchors.horizontalCenter: parent.horizontalCenter
         activeSurface: barState.screen === root.screen && (barState.mode === "power" || barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact")
             ? barState.mode
-            : root.isCaptureActive ? "capture" : "idle"
+            : "idle"
     }
 
     Connections {
@@ -1596,7 +1581,6 @@ PanelWindow {
         onCloseRequested: {
             barState.screen = null
             barState.mode = ""
-            CaptureService.closeBar()
         }
     }
 }
