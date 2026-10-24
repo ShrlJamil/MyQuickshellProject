@@ -102,6 +102,8 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             text: Math.round(BatteryService.percent) + "%"
             color: BatteryService.low ? Theme.accent : Theme.icon
+            style: Text.Raised
+            styleColor: Theme.textShadow
             font.family: Theme.fontFamily
             font.weight: Font.Black
             font.pixelSize: 15

@@ -38,6 +38,11 @@ Item {
     property real materialHighlightOpacity: 0
     property real materialBorderOpacity: 0.06
 
+    // Slight raised shadow under bar text (Text.Raised styleColor): dark at
+    // low alpha, just enough to separate light text from bright wallpapers
+    // or windows. Constant, not palette-driven — a shadow is dark in any theme.
+    property color textShadow: Qt.rgba(0, 0, 0, 0.35)
+
     // UI text typeface (`font.family: Theme.fontFamily` on Text elements).
     // "Google Sans Flex" is the variable-font build of Google Sans installed on
     // this system; plain "Google Sans" is not a registered family and would

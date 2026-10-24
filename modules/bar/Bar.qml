@@ -797,6 +797,8 @@ PanelWindow {
                 maximumLineCount: 1
                 // Match the DateTimeWidget clock text exactly.
                 color: Theme.icon
+                style: Text.Raised
+                styleColor: Theme.textShadow
                 font.family: Theme.fontFamily
                 font.weight: Font.Black
                 font.pixelSize: 14
@@ -850,6 +852,8 @@ PanelWindow {
                 : (barState.mode === "mediaPreview" || barState.mode === "mediaCompact") ? "Media"
                 : ""
             color: Theme.icon
+            style: Text.Raised
+            styleColor: Theme.textShadow
             font.family: Theme.fontFamily
             font.pixelSize: 15
             font.weight: Font.Bold

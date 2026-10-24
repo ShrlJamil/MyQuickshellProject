@@ -136,6 +136,8 @@ Item {
 
             text: root.trackText + (textView.overflow ? separator.text + root.trackText : "")
             color: Theme.text
+            style: Text.Raised
+            styleColor: Theme.textShadow
             font.family: Theme.fontFamily
             font.pixelSize: 12
             font.weight: Font.DemiBold
