@@ -42,11 +42,6 @@ Item {
             styleColor: Theme.textShadow
             font.family: Theme.fontFamily
             font.weight: Font.Black
-            // Experiment: drive the variable wght axis directly (Qt 6.7+).
-            // Compare with the battery % (also Black, no variableAxes): if the
-            // clock renders visibly heavier, Qt was not driving the axis fully
-            // from font.weight alone; if identical, the axis was already driven.
-            font.variableAxes: { "wght": 1000 }
             font.pixelSize: 14
         }
     }

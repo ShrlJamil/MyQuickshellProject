@@ -45,11 +45,11 @@ Item {
     property color textShadow: Qt.rgba(0, 0, 0, 0.5)
 
     // UI text typeface (`font.family: Theme.fontFamily` on Text elements).
-    // "Google Sans Flex" is the variable-font build of Google Sans installed on
-    // this system; plain "Google Sans" is not a registered family and would
-    // silently fall back to Noto Sans. NEVER apply this to icon glyphs
-    // (Nerd Font / symbol strings) - those keep their own family.
-    readonly property string fontFamily: "Google Sans Flex"
+    // "Inter" must be installed on the system (it is not bundled in this
+    // repo); if it is missing, Qt silently falls back to another sans.
+    // NEVER apply this to icon glyphs (symbol strings, media-control glyphs)
+    // - those keep their own family / system fallback so the symbols resolve.
+    readonly property string fontFamily: "Inter"
 
     readonly property real cornerRadius: 22
 

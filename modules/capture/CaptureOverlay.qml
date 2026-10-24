@@ -269,6 +269,7 @@ PanelWindow {
                 text: dimensionLabel.labelText
                 color: Theme.text
                 font.pixelSize: 12
+                font.family: Theme.fontFamily
                 font.weight: Font.DemiBold
             }
         }
@@ -344,6 +345,7 @@ PanelWindow {
                 text: windowBadge.labelText
                 color: Theme.text
                 font.pixelSize: 12
+                font.family: Theme.fontFamily
                 font.weight: Font.DemiBold
             }
         }

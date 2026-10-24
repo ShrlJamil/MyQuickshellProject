@@ -94,6 +94,7 @@ Column {
             text: "Reply"
             color: Theme.text
             font.pixelSize: 11
+            font.family: Theme.fontFamily
         }
 
         HoverHandler { id: replyAffHover; cursorShape: Qt.PointingHandCursor }
@@ -127,6 +128,7 @@ Column {
             anchors.rightMargin: 10
             verticalAlignment: TextInput.AlignVCenter
             color: Theme.text
+            font.family: Theme.fontFamily
             font.pixelSize: 11
             clip: true
             selectByMouse: true
@@ -148,6 +150,7 @@ Column {
                     ? root.notification.inlineReplyPlaceholder : "Reply…"
                 color: Theme.textMuted
                 font.pixelSize: 11
+                font.family: Theme.fontFamily
                 elide: Text.ElideRight
             }
         }
@@ -172,6 +175,7 @@ Column {
                 text: "Cancel"
                 color: Theme.textDim
                 font.pixelSize: 11
+                font.family: Theme.fontFamily
             }
 
             HoverHandler { id: cancelHover; cursorShape: Qt.PointingHandCursor }
@@ -202,6 +206,7 @@ Column {
                 text: "Send"
                 color: sendBtn.enabled ? Theme.background : Theme.textMuted
                 font.pixelSize: 11
+                font.family: Theme.fontFamily
             }
 
             HoverHandler { id: sendHover; cursorShape: Qt.PointingHandCursor }

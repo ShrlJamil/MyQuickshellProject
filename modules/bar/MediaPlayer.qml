@@ -175,6 +175,7 @@ Item {
                         ? root.mediaService.identity : "Player"
                     color: Theme.text
                     font.pixelSize: 13
+                    font.family: Theme.fontFamily
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight
                 }
@@ -313,6 +314,7 @@ Item {
                     text: root.hasMedia ? root.mediaService.title : "Nothing playing"
                     color: Theme.text
                     font.pixelSize: 15
+                    font.family: Theme.fontFamily
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight
                     maximumLineCount: 1
@@ -326,6 +328,7 @@ Item {
                     text: root.hasMedia ? root.mediaService.artist : ""
                     color: Theme.textDim
                     font.pixelSize: 12
+                    font.family: Theme.fontFamily
                     elide: Text.ElideRight
                     maximumLineCount: 1
                 }
@@ -442,6 +445,7 @@ Item {
                         text: root._fmt(root.hasMedia ? root.mediaService.safePosition : 0)
                         color: Theme.textDim
                         font.pixelSize: 9
+                        font.family: Theme.fontFamily
                     }
                     Text {
                         id: lenLabel
@@ -450,6 +454,7 @@ Item {
                         text: progress.ready ? root._fmt(root.mediaService.effectiveLength) : "--:--"
                         color: Theme.textDim
                         font.pixelSize: 9
+                        font.family: Theme.fontFamily
                     }
                     Rectangle {
                         id: track
@@ -602,6 +607,7 @@ Item {
                                 + (playerRow.modelData.isRemote ? "  ·  remote" : "")
                             color: playerRow.current ? Theme.accent : Theme.text
                             font.pixelSize: 11
+                            font.family: Theme.fontFamily
                             font.weight: playerRow.current ? Font.DemiBold : Font.Normal
                             elide: Text.ElideRight
                         }

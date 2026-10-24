@@ -95,6 +95,7 @@ Rectangle {
                 textFormat: Text.RichText
                 color: Theme.text
                 font.pixelSize: 16
+                font.family: Theme.fontFamily
                 font.weight: Font.DemiBold
             }
 
@@ -104,6 +105,7 @@ Rectangle {
                 textFormat: Text.RichText
                 color: Theme.textDim
                 font.pixelSize: 13
+                font.family: Theme.fontFamily
                 opacity: 0.75
             }
         }

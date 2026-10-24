@@ -226,6 +226,7 @@ Item {
                         text: btn.modelData.label
                         color: btnMouse.containsMouse ? Theme.accent : Theme.text
                         font.pixelSize: 11
+                        font.family: Theme.fontFamily
                         font.weight: Font.DemiBold
                     }
                 }

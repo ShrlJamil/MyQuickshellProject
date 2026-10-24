@@ -256,6 +256,7 @@ Item {
                     text: "Battery"
                     color: Theme.textMuted
                     font.pixelSize: 11
+                    font.family: Theme.fontFamily
                     font.weight: Font.DemiBold
                 }
 
@@ -267,6 +268,7 @@ Item {
                         text: Math.round(BatteryService.percent) + "%"
                         color: BatteryService.low ? Theme.accent : Theme.text
                         font.pixelSize: 24
+                        font.family: Theme.fontFamily
                         font.weight: Font.DemiBold
                     }
 
@@ -275,6 +277,7 @@ Item {
                         text: BatteryService.statusText
                         color: Theme.textDim
                         font.pixelSize: 12
+                        font.family: Theme.fontFamily
                     }
                 }
 
@@ -293,6 +296,7 @@ Item {
                             text: infoRow.modelData.label
                             color: Theme.textDim
                             font.pixelSize: 12
+                            font.family: Theme.fontFamily
                         }
 
                         Text {
@@ -301,6 +305,7 @@ Item {
                             text: infoRow.modelData.value
                             color: Theme.text
                             font.pixelSize: 12
+                            font.family: Theme.fontFamily
                             font.weight: Font.DemiBold
                         }
                     }

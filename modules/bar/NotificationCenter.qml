@@ -300,6 +300,7 @@ PanelWindow {
                     text: Qt.formatDate(calendar.view, "MMMM yyyy")
                     color: Theme.text
                     font.pixelSize: 13
+                    font.family: Theme.fontFamily
                     font.weight: Font.DemiBold
                     horizontalAlignment: Text.AlignHCenter
                     elide: Text.ElideRight
@@ -312,6 +313,7 @@ PanelWindow {
                     text: "Today"
                     color: todayHover.hovered ? Theme.accent : Theme.textDim
                     font.pixelSize: 11
+                    font.family: Theme.fontFamily
                     horizontalAlignment: Text.AlignHCenter
                     HoverHandler { id: todayHover; cursorShape: Qt.PointingHandCursor }
                     TapHandler { onTapped: calendar.resetToday() }
@@ -341,6 +343,7 @@ PanelWindow {
                         text: modelData
                         color: Theme.textMuted
                         font.pixelSize: 11
+                        font.family: Theme.fontFamily
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -382,6 +385,7 @@ PanelWindow {
                             color: dayCell.isToday ? Theme.background
                                 : dayCell.inMonth ? Theme.text : Theme.textMuted
                             font.pixelSize: 12
+                            font.family: Theme.fontFamily
                         }
                     }
                 }
@@ -421,6 +425,7 @@ PanelWindow {
                 text: "Notifications"
                 color: Theme.text
                 font.pixelSize: 14
+                font.family: Theme.fontFamily
                 font.weight: Font.DemiBold
             }
 
@@ -431,6 +436,7 @@ PanelWindow {
                 text: "Clear all"
                 color: clearHover.hovered ? Theme.text : Theme.textDim
                 font.pixelSize: 12
+                font.family: Theme.fontFamily
                 HoverHandler { id: clearHover; cursorShape: Qt.PointingHandCursor }
                 TapHandler { onTapped: NotificationService.clearAll() }
             }
@@ -455,6 +461,7 @@ PanelWindow {
                 text: "Do Not Disturb"
                 color: Theme.textDim
                 font.pixelSize: 12
+                font.family: Theme.fontFamily
             }
 
             Rectangle {
@@ -495,6 +502,7 @@ PanelWindow {
             text: "No notifications"
             color: Theme.textMuted
             font.pixelSize: 12
+            font.family: Theme.fontFamily
             horizontalAlignment: Text.AlignHCenter
         }
 
@@ -656,6 +664,7 @@ PanelWindow {
                             text: notifCard.modelData.notification.appName
                             color: Theme.textDim
                             font.pixelSize: 10
+                            font.family: Theme.fontFamily
                             font.weight: Font.DemiBold
                             elide: Text.ElideRight
                             width: Math.min(implicitWidth, parent.width - timeText.width - 6)
@@ -666,6 +675,7 @@ PanelWindow {
                             text: Qt.formatDateTime(notifCard.modelData.time, "hh:mm")
                             color: Theme.textMuted
                             font.pixelSize: 10
+                            font.family: Theme.fontFamily
                         }
                     }
 
@@ -675,6 +685,7 @@ PanelWindow {
                         text: notifCard.modelData.notification.summary
                         color: Theme.text
                         font.pixelSize: 12
+                        font.family: Theme.fontFamily
                         font.weight: Font.DemiBold
                         elide: Text.ElideRight
                         maximumLineCount: 1
@@ -686,6 +697,7 @@ PanelWindow {
                         text: notifCard.modelData.notification.body
                         color: Theme.textDim
                         font.pixelSize: 11
+                        font.family: Theme.fontFamily
                         wrapMode: Text.WordWrap
                         elide: Text.ElideRight
                         maximumLineCount: 3
@@ -714,6 +726,7 @@ PanelWindow {
                             text: "Reply"
                             color: replyActHover.hovered ? Theme.accent : Theme.text
                             font.pixelSize: 11
+                            font.family: Theme.fontFamily
                             elide: Text.ElideRight
 
                             HoverHandler {
@@ -740,6 +753,7 @@ PanelWindow {
                                 text: centerActLabel.modelData.action.text
                                 color: centerActHover.hovered ? Theme.accent : Theme.text
                                 font.pixelSize: 11
+                                font.family: Theme.fontFamily
                                 elide: Text.ElideRight
 
                                 HoverHandler {

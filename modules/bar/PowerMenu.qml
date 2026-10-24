@@ -299,5 +299,6 @@ Item {
         text: "Lock failed"
         color: Theme.textMuted
         font.pixelSize: 12
+        font.family: Theme.fontFamily
     }
 }

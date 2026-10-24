@@ -349,6 +349,7 @@ PanelWindow {
                     text: meterRow.muted ? "Muted" : (meterRow.pct + "%")
                     color: Theme.text
                     font.pixelSize: 13
+                    font.family: Theme.fontFamily
                     font.weight: Font.Bold
                 }
             }
@@ -373,6 +374,7 @@ PanelWindow {
                     text: "Caps Lock " + (OSDService.capsOn ? "On" : "Off")
                     color: Theme.text
                     font.pixelSize: 12
+                    font.family: Theme.fontFamily
                     font.weight: Font.DemiBold
                 }
             }
@@ -397,6 +399,7 @@ PanelWindow {
                         text: "Workspace"
                         color: Theme.text
                         font.pixelSize: 13
+                        font.family: Theme.fontFamily
                         font.weight: Font.Bold
                     }
 
@@ -438,6 +441,7 @@ PanelWindow {
                                 text: badgeA.numText
                                 color: Theme.background
                                 font.pixelSize: 13
+                                font.family: Theme.fontFamily
                                 font.weight: Font.Bold
                             }
 
@@ -470,6 +474,7 @@ PanelWindow {
                                 text: badgeB.numText
                                 color: Theme.background
                                 font.pixelSize: 13
+                                font.family: Theme.fontFamily
                                 font.weight: Font.Bold
                             }
 

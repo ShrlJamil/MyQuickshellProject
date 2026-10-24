@@ -307,6 +307,7 @@ PanelWindow {
                                     ? slot.modelData.notification.appName : "Notification"
                                 color: Theme.textDim
                                 font.pixelSize: 10
+                                font.family: Theme.fontFamily
                                 font.weight: Font.DemiBold
                                 elide: Text.ElideRight
                                 width: Math.min(implicitWidth, parent.width - timeLabel.width - 6)
@@ -317,6 +318,7 @@ PanelWindow {
                                 text: Qt.formatDateTime(slot.modelData.time, "hh:mm")
                                 color: Theme.textMuted
                                 font.pixelSize: 10
+                                font.family: Theme.fontFamily
                             }
                         }
 
@@ -362,6 +364,7 @@ PanelWindow {
                                     text: slot.modelData.notification.summary
                                     color: Theme.text
                                     font.pixelSize: 12
+                                    font.family: Theme.fontFamily
                                     font.weight: Font.DemiBold
                                     wrapMode: Text.WordWrap
                                     maximumLineCount: 2
@@ -375,6 +378,7 @@ PanelWindow {
                                     text: slot.modelData.notification.body
                                     color: Theme.textDim
                                     font.pixelSize: 11
+                                    font.family: Theme.fontFamily
                                     wrapMode: Text.WordWrap
                                     maximumLineCount: 4
                                     elide: Text.ElideRight
@@ -405,6 +409,7 @@ PanelWindow {
                                 text: "Reply"
                                 color: replyActHover.hovered ? Theme.accent : Theme.text
                                 font.pixelSize: 11
+                                font.family: Theme.fontFamily
                                 elide: Text.ElideRight
 
                                 HoverHandler {
@@ -431,6 +436,7 @@ PanelWindow {
                                     text: actLabel.modelData.action.text
                                     color: actHover.hovered ? Theme.accent : Theme.text
                                     font.pixelSize: 11
+                                    font.family: Theme.fontFamily
                                     elide: Text.ElideRight
 
                                     HoverHandler {

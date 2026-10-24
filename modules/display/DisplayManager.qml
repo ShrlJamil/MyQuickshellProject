@@ -317,6 +317,7 @@ Item {
                 text: "No monitors detected"
                 color: Theme.textMuted
                 font.pixelSize: 12
+                font.family: Theme.fontFamily
             }
 
             // Subtle grid + origin, drawn in logical coordinate space.
@@ -411,6 +412,7 @@ Item {
                             text: monBlock.modelData
                             color: monBlock.selected ? Theme.accent : Theme.text
                             font.pixelSize: 12
+                            font.family: Theme.fontFamily
                             font.weight: Font.DemiBold
                         }
 
@@ -422,6 +424,7 @@ Item {
                                 : ""
                             color: Theme.textMuted
                             font.pixelSize: 10
+                            font.family: Theme.fontFamily
                         }
                     }
 
@@ -501,6 +504,7 @@ Item {
                     : ""
                 color: Theme.accent
                 font.pixelSize: 10
+                font.family: Theme.fontFamily
                 font.weight: Font.DemiBold
             }
         }
@@ -541,6 +545,7 @@ Item {
                         text: presetPill.modelData.label
                         color: Theme.text
                         font.pixelSize: 11
+                        font.family: Theme.fontFamily
                         font.weight: Font.DemiBold
                     }
                 }
@@ -561,6 +566,7 @@ Item {
                 text: "Primary"
                 color: Theme.textMuted
                 font.pixelSize: 11
+                font.family: Theme.fontFamily
                 font.weight: Font.DemiBold
             }
 
@@ -605,6 +611,7 @@ Item {
                         text: DisplayService.humanName(primaryPill.modelData)
                         color: primaryPill.active ? Theme.background : Theme.text
                         font.pixelSize: 11
+                        font.family: Theme.fontFamily
                         font.weight: Font.DemiBold
                     }
                 }
@@ -626,6 +633,7 @@ Item {
                     text: DisplayService.savedExternalLabel()
                     color: Theme.accent
                     font.pixelSize: 11
+                    font.family: Theme.fontFamily
                     font.weight: Font.DemiBold
                 }
             }
@@ -640,6 +648,7 @@ Item {
                 text: DisplayService.selectedMonitor
                 color: Theme.text
                 font.pixelSize: 13
+                font.family: Theme.fontFamily
                 font.weight: Font.DemiBold
             }
 
@@ -648,6 +657,7 @@ Item {
                 wrapMode: Text.WordWrap
                 color: Theme.textMuted
                 font.pixelSize: 10
+                font.family: Theme.fontFamily
                 text: root.selectedInfo
                     ? (root.selectedInfo.width + "×" + root.selectedInfo.height
                        + " @ " + root.selectedInfo.refresh + "Hz   •   Scale " + root.selectedInfo.scale
@@ -679,6 +689,7 @@ Item {
                     text: resolutionBox.labelText
                     color: Theme.text
                     font.pixelSize: 12
+                    font.family: Theme.fontFamily
                 }
 
                 IconImage {
@@ -739,6 +750,7 @@ Item {
                                 text: modeDelegate.modelData
                                 color: Theme.text
                                 font.pixelSize: 11
+                                font.family: Theme.fontFamily
                                 verticalAlignment: Text.AlignVCenter
                             }
 
@@ -785,6 +797,7 @@ Item {
                             text: scalePill.modelData.toFixed(2).replace(/0+$/, "").replace(/\.$/, "")
                             color: scalePill.active ? Theme.background : Theme.text
                             font.pixelSize: 11
+                            font.family: Theme.fontFamily
                             font.weight: Font.DemiBold
                         }
                     }
@@ -813,6 +826,7 @@ Item {
                             text: (transformPill.modelData * 90) + "°"
                             color: transformPill.active ? Theme.background : Theme.text
                             font.pixelSize: 11
+                            font.family: Theme.fontFamily
                             font.weight: Font.DemiBold
                         }
                     }
@@ -853,6 +867,7 @@ Item {
                 text: "Apply"
                 color: Theme.background
                 font.pixelSize: 12
+                font.family: Theme.fontFamily
                 font.weight: Font.DemiBold
             }
         }
@@ -876,6 +891,7 @@ Item {
                 text: "Cancel"
                 color: Theme.accent
                 font.pixelSize: 12
+                font.family: Theme.fontFamily
                 font.weight: Font.DemiBold
             }
         }
@@ -887,6 +903,7 @@ Item {
             text: DisplayService.statusMessage
             color: DisplayService.statusIsError ? Theme.accent : Theme.textMuted
             font.pixelSize: 11
+            font.family: Theme.fontFamily
         }
     }
 }

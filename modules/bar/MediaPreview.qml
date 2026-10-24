@@ -184,6 +184,7 @@ Item {
                     text: root.active ? root.mediaService.title : ""
                     color: Theme.icon
                     font.pixelSize: 12
+                    font.family: Theme.fontFamily
                     font.weight: Font.DemiBold
 
                     readonly property bool overflow: implicitWidth > titleClip.width + 0.5
@@ -217,6 +218,7 @@ Item {
                 text: root.active ? root.mediaService.artist : ""
                 color: Theme.icon
                 font.pixelSize: 10
+                font.family: Theme.fontFamily
                 elide: Text.ElideRight
                 maximumLineCount: 1
                 opacity: root._band(root.apart, 0.55, 0.30)
