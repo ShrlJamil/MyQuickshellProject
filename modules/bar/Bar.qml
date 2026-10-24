@@ -25,7 +25,7 @@ PanelWindow {
     visible: true
 
     property bool centerOpen: barState.mode === "center" && barState.screen === root.screen
-    property bool surfaceActive: (barState.screen === root.screen && (barState.mode === "power" || barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact"))
+    property bool surfaceActive: (barState.screen === root.screen && (barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact"))
     property double _mediaPopoverClosedAt: 0
 
     // ---- single-window concave (tiled hug) --------------------------------
@@ -848,9 +848,8 @@ PanelWindow {
             id: holdLabel
 
             anchors.centerIn: parent
-            visible: (barState.screen === root.screen && (barState.mode === "power" || barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact"))
-            text: barState.mode === "power" ? "Power Menu"
-                : barState.mode === "display" ? "Display"
+            visible: (barState.screen === root.screen && (barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact"))
+            text: barState.mode === "display" ? "Display"
                 : barState.mode === "wallpapers" ? "Wallpapers"
                 : (barState.mode === "mediaPreview" || barState.mode === "mediaCompact") ? "Media"
                 : ""
@@ -1570,7 +1569,7 @@ PanelWindow {
 
         screen: root.screen
         anchors.horizontalCenter: parent.horizontalCenter
-        activeSurface: barState.screen === root.screen && (barState.mode === "power" || barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact")
+        activeSurface: barState.screen === root.screen && (barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact")
             ? barState.mode
             : "idle"
     }

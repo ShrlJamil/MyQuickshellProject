@@ -20,7 +20,7 @@ A hand-rolled [Quickshell](https://github.com/Quickshell/Quickshell) desktop she
 Prototype, not a stable release. Expect rough edges and breaking changes. What exists today:
 
 - **Launcher** (solid): full-screen keyboard app launcher with fuzzy scoring, usage history, and prefix search modes.
-- **Top bar** (working): static 40px bar per monitor with a pop-down **Dynamic Center** (power menu, display manager, wallpaper picker, expanded media player, capture picker), a **Control Center** overlay, system tray, and status indicators.
+- **Top bar** (working): static 40px bar per monitor with a pop-down **Dynamic Center** (display manager, wallpaper picker, expanded media player), a **Control Center** overlay, system tray, and status indicators.
 - **Media**: MPRIS-backed now-playing preview in the bar centre (click-to-expand, never auto-expands) plus an expanded player surface.
 - **Notifications**: freedesktop notification history (Notification Center) + popup toasts, with inline reply support.
 - **OSD**: standalone bottom-centre overlay for volume / brightness / caps-lock, plus a workspace OSD.
@@ -144,7 +144,7 @@ A static **40px** top bar, one instance per monitor (`Variants(Quickshell.screen
 | --- | --- | --- |
 | Bar | `modules/bar/Bar.qml` | `PanelWindow`, `exclusiveZone: 40`, focus grab, input mask, all bar content |
 | Dynamic center | `modules/bar/DynamicCenter.qml` | Plain `Item` at `y: 40`, attached under the bar; raises one surface at a time, each behind a latched `Loader` with crossfade |
-| Power menu | `modules/bar/PowerMenu.qml` + `PowerActionItem.qml` | 6 actions — Lock, Hibernate, Logout, Shutdown, Suspend, Reboot — with hold-to-confirm |
+| Power menu | `modules/bar/PowerMenuWindow.qml` (host) + `PowerMenu.qml` + `PowerActionItem.qml` | Standalone centred modal over a dimmed background, own focus grab; 6 actions — Lock, Hibernate, Logout, Shutdown, Suspend, Reboot — with hold-to-confirm |
 | Display | `modules/display/DisplayManager.qml` | Monitor-arrangement surface (backed by `DisplayService`) |
 | Wallpapers | `modules/wallpapers/WallpaperPicker.qml` | Thumbnail strip, keyboard nav, applies via `walset-backend`-style flow (wallpaper + wallust + matugen) |
 | Control Center | `modules/bar/ControlCenter.qml` + `ControlSlider.qml` / `ControlTile.qml` | Separate top-right overlay window: audio, brightness, network, bluetooth, hotspot and quick toggles (audio over native PipeWire, no `wpctl`) |
@@ -153,7 +153,7 @@ A static **40px** top bar, one instance per monitor (`Variants(Quickshell.screen
 
 ### The dynamic center
 
-The bar's centre can raise a surface that looks like it grows straight out of the bar — no gap, square top corners. Implemented surfaces: `power`, `display`, `wallpapers`, `media` (expanded player). `mediaPreview` / `mediaCompact` IPC modes also exist. (The capture picker is no longer a surface here — it is a standalone floating window, see Capture below.)
+The bar's centre can raise a surface that looks like it grows straight out of the bar — no gap, square top corners. Implemented surfaces: `display`, `wallpapers`, `media` (expanded player). `mediaPreview` / `mediaCompact` IPC modes also exist. (The capture picker and the power menu are no longer surfaces here — they are standalone floating windows, see Capture below.)
 
 - The bar's `PanelWindow` height stays constant at runtime; surfaces fade/crossfade inside the allocated space. (Resizing a layer-shell surface every open flickers badly on fractional-scale outputs.)
 - When idle, the transparent area below the 40px strip is click-through (input mask); when a surface is open the window grabs input via `HyprlandFocusGrab`.
@@ -162,9 +162,9 @@ The bar's centre can raise a surface that looks like it grows straight out of th
 ### Power menu
 
 - **Hold to confirm** — press and hold (mouse *or* `Enter`) for ~1s; a progress bar fills; releasing or leaving early cancels. No accidental shutdowns.
-- Arrow keys move the selection, `Esc` closes, clicking outside closes.
+- Arrow keys move the selection, `Esc` closes, clicking the dimmed background closes.
 - Icons are SVGs from `assets/`, recoloured to white in QML (`ColorOverlay`) — the source files are left untouched.
-- Multi-monitor safe: only the focused monitor's bar activates the surface and the focus grab.
+- Standalone centred modal (`PowerMenuWindow`): a full-screen window per monitor renders it on the screen the `power` IPC targets (the bar screen), with its own Hyprland focus grab — the Bar window and DynamicCenter are no longer involved.
 
 ---
 

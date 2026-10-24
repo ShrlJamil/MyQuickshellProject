@@ -187,7 +187,7 @@ Item {
         readonly property real bottomRadius: 16
 
         ShapePath {
-            // Transparent: the DynamicCenter frame is the sole panel background.
+            // Transparent: the host card (PowerMenuWindow) is the sole panel background.
             fillColor: "transparent"
             strokeColor: "transparent"
             strokeWidth: 0

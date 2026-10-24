@@ -30,10 +30,12 @@ ShellRoot {
         return null
     }
 
-    // The Dynamic Center surfaces (power / display / wallpapers / media) are
+    // The Dynamic Center surfaces (display / wallpapers / media) are
     // rendered by the full Bar, so their IPC must target the screen hosting that
     // Bar - never the focused one, or barState.screen names a screen with no Bar
-    // and nothing renders. That screen is the persisted Primary Display, resolved
+    // and nothing renders. The power menu's window is standalone now, but its
+    // IPC keeps this same targeting: barState.screen is the screen it renders
+    // on. That screen is the persisted Primary Display, resolved
     // through DisplayService's stable identity; when the preference is internal,
     // or the preferred external is disconnected, it is the internal panel (the
     // same fallback enforcement uses). null when no internal panel exists at all,
@@ -393,6 +395,17 @@ ShellRoot {
         model: Quickshell.screens.map(screen => ({ screen: screen }))
 
         delegate: CapturePicker {}
+    }
+
+    Variants {
+        // Power menu on every screen: a standalone centred modal over a
+        // dimmed background. Each instance gates on barState (mode "power"
+        // + its screen), which the unchanged `power` IPC target writes, so
+        // it renders on the same screen the IPC targeted - just no longer
+        // inside the Bar window's DynamicCenter.
+        model: Quickshell.screens.map(screen => ({ barState: barState, screen: screen }))
+
+        delegate: PowerMenuWindow {}
     }
 
     Variants {

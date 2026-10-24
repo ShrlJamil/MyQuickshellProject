@@ -22,7 +22,7 @@ Item {
     clip: true
 
     property bool surfaceVisible: activeSurface !== "idle"
-    property string _lastSurface: "power"
+    property string _lastSurface: "wallpapers"
 
     // The surface being switched AWAY from during a direct surface->surface
     // morph. Kept non-empty for the duration of the 280ms height morph so the
@@ -32,12 +32,11 @@ Item {
 
     // ---- Universal content-driven sizing --------------------------------
     // The frame just fits whatever the active surface reports as its own
-    // natural size. Each surface (PowerMenu, DisplayManager, WallpaperPicker)
+    // natural size. Each surface (DisplayManager, WallpaperPicker)
     // owns its implicitWidth / implicitHeight - no per-mode magic numbers
     // live here anymore.
     readonly property Item _activeItem: {
         switch (root.activeSurface) {
-        case "power": return powerLoader.item
         case "display": return displayLoader.item
         case "wallpapers": return wallpaperLoader.item
         default: return null
@@ -270,27 +269,6 @@ Item {
         // one-way load latch (see below) - the mode remains solely
         // `activeSurface` (+ the transient `_prevSurface`/`_lastSurface`).
         Loader {
-            id: powerLoader
-            width: parent.width
-            active: root._powerLatched || root.activeSurface === "power" || root._prevSurface === "power"
-                || (root.allocatedHeight > 0 && root._lastSurface === "power")
-            sourceComponent: PowerMenu {
-                width: parent.width
-                visible: root.activeSurface === "power" || root._prevSurface === "power"
-                    || (root.allocatedHeight > 0 && root._lastSurface === "power")
-                opacity: root.activeSurface === "power" ? 1 : 0
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: root._contentFadeDuration()
-                        easing.type: Easing.OutCubic
-                    }
-                }
-                onCloseRequested: root.closeRequested()
-            }
-            onLoaded: if (root.activeSurface === "power") root._focusSurface("power")
-        }
-
-        Loader {
             id: displayLoader
             width: parent.width
             active: root._displayLatched || root.activeSurface === "display" || root._prevSurface === "display"
@@ -348,13 +326,11 @@ Item {
     // One-way load latches: set when a surface first becomes active, never
     // cleared. These are load-lifecycle flags, not mode state - the mode
     // remains solely `activeSurface` (+ `_prevSurface`/`_lastSurface`).
-    property bool _powerLatched: false
     property bool _displayLatched: false
     property bool _wallpapersLatched: false
 
     function _surfaceItem(name) {
         switch (name) {
-        case "power": return powerLoader.item
         case "display": return displayLoader.item
         case "wallpapers": return wallpaperLoader.item
         default: return null
@@ -365,8 +341,6 @@ Item {
         var it = root._surfaceItem(name)
         if (!it)
             return
-        if (name === "power" && it.reset)
-            it.reset()
         it.forceActiveFocus()
     }
 
@@ -396,10 +370,7 @@ Item {
         if (root.activeSurface !== "idle")
             root._lastSurface = root.activeSurface
 
-        if (root.activeSurface === "power") {
-            root._powerLatched = true
-            root._focusSurface("power")
-        } else if (root.activeSurface === "wallpapers") {
+        if (root.activeSurface === "wallpapers") {
             root._wallpapersLatched = true
             root._focusSurface("wallpapers")
         } else if (root.activeSurface === "display") {
