@@ -11,6 +11,7 @@ import "modules/bar"
 import "modules/capture"
 import "modules/display"
 import "modules/services"
+import "modules/settings"
 import "modules/osd"
 
 ShellRoot {
@@ -303,6 +304,27 @@ ShellRoot {
         }
     }
 
+    IpcHandler {
+        target: "settings"
+
+        function show(): void {
+            focusState.inquire()
+            const screen = focusedScreen()
+            if (!screen) return
+            barState.screen = null
+            barState.mode = ""
+            CaptureService.closeBar()
+            SettingsService.show(screen)
+        }
+        function hide(): void {
+            SettingsService.hide()
+        }
+        function toggle(): void {
+            if (SettingsService.open) hide()
+            else show()
+        }
+    }
+
     // The launcher pulls in AppProvider + Quickshell's DesktopEntries scan
     // (all .desktop files + every app icon decoded). It is only shown on
     // demand, so it is not created at shell startup: the Loader stays inactive
@@ -406,6 +428,12 @@ ShellRoot {
         model: Quickshell.screens.map(screen => ({ barState: barState, screen: screen }))
 
         delegate: PowerMenuWindow {}
+    }
+
+    Variants {
+        model: Quickshell.screens.map(screen => ({ screen: screen }))
+
+        delegate: SettingsWindow {}
     }
 
     Variants {
