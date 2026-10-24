@@ -97,7 +97,7 @@ PanelWindow {
         if (root.pointerInside) {
             hideTimer.stop()
             root.revealed = true
-        } else if (!root.expanded) {
+        } else if (!root.expanded && root.hasWindows) {
             hideTimer.restart()
         }
     }
@@ -105,7 +105,48 @@ PanelWindow {
     Timer {
         id: hideTimer
         interval: 500
-        onTriggered: if (!root.expanded && !root.pointerInside) root.revealed = false
+        onTriggered: if (!root.expanded && !root.pointerInside && root.hasWindows) root.revealed = false
+    }
+
+    // The Hyprland monitor backing this screen (Wayland output name and
+    // Hyprland connector name are the same string), or null while IPC data
+    // is still loading.
+    readonly property var _hyMonitor: {
+        const ms = Hyprland.monitors ? Hyprland.monitors.values : []
+        for (let i = 0; i < ms.length; i++)
+            if (ms[i] && ms[i].name === root.screen.name) return ms[i]
+        return null
+    }
+    // True when this monitor currently shows at least one app window: the
+    // toplevels of the monitor's active workspace. Windows on other
+    // workspaces of this monitor don't count — the visible desktop is empty
+    // then. An unresolvable monitor counts as "has windows", so the overlay
+    // never gets stuck over a window it cannot see.
+    readonly property bool hasWindows: {
+        const m = root._hyMonitor
+        if (!m) return true
+        const ws = m.activeWorkspace
+        if (!ws) return true
+        const tls = ws.toplevels ? ws.toplevels.values : []
+        return tls.length > 0
+    }
+    // Auto-hide only applies while a window is shown. On an empty desktop
+    // the pill is a clock, not an overlay — it stays. When the last window
+    // closes it reappears; when the first window opens it hides after the
+    // usual delay (unless the pointer is on it).
+    onHasWindowsChanged: {
+        if (!root.hasWindows) {
+            hideTimer.stop()
+            root.revealed = true
+        } else if (!root.expanded && !root.pointerInside) {
+            hideTimer.restart()
+        }
+    }
+    Component.onCompleted: {
+        if (!root.hasWindows) {
+            hideTimer.stop()
+            root.revealed = true
+        }
     }
 
     // Focus grab arms on expand only: a click outside clears it and collapses.
@@ -153,13 +194,22 @@ PanelWindow {
     readonly property int triggerHeight: 12
     // Losing the track collapses instead of showing an empty pill. Pause and
     // track changes keep mediaMode true, so they never collapse.
-    onMediaModeChanged: if (!root.mediaMode) root.expanded = false
+    onMediaModeChanged: {
+        if (!root.mediaMode) {
+            root.expanded = false
+            // If the pill was already collapsed, onExpandedChanged never fires
+            // (no change), so restart the hide timer here too — otherwise the
+            // fallback clock pill stays revealed forever after the track is
+            // lost, sitting on top of whatever window is below it.
+            if (!root.pointerInside && root.hasWindows) hideTimer.restart()
+        }
+    }
     // Give the pill active focus on open so its Keys handler (Escape) works.
     onExpandedChanged: {
         if (root.expanded) {
             hideTimer.stop()
             pill.forceActiveFocus()
-        } else if (!pillHover.hovered) {
+        } else if (!pillHover.hovered && root.hasWindows) {
             hideTimer.restart()
         }
     }
@@ -226,16 +276,17 @@ PanelWindow {
             NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
         }
 
-        opacity: root.revealed ? 1 : 0
+        // Slide only, no fade: the pill slides down into view on reveal and
+        // slides back up out of view on hide. The hidden offset always covers
+        // the full pill (top margin + current height), so the pill's bottom
+        // edge sits exactly at the surface top while hidden — fully out of
+        // sight at any size, collapsed or expanded, with no opacity involved.
         transform: Translate {
-            y: root.revealed ? 0 : -4
+            y: root.revealed ? 0 : -(root.topMargin + pill.height)
 
             Behavior on y {
-                NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+                NumberAnimation { duration: 250; easing.type: Easing.OutCubic }
             }
-        }
-        Behavior on opacity {
-            NumberAnimation { duration: root.revealed ? 150 : 180; easing.type: Easing.OutCubic }
         }
 
         // Active focus while expanded so the Keys handler below receives Escape.
