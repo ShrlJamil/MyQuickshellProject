@@ -7,10 +7,18 @@ import "."
 import "../../components"
 
 // Floating capture picker: a standalone bottom-centre PanelWindow, one
-// instance per screen, shown only on the Hyprland-focused screen. It
+// instance per screen, active only on the Hyprland-focused screen. It
 // replaces the old DynamicCenter-hosted picker, so capture can be invoked
 // on any monitor - not just the bar screen - and no longer depends on
 // barState / the Bar window's focus grab.
+//
+// The WINDOW NEVER UNMAPS (visible stays true); `pickerActive` gates the
+// card, the input mask, focusable and the focus grab instead. This follows
+// the Bar window (wallpaper picker / DynamicCenter surfaces) and
+// DynamicIsland, whose grabs work: Hyprland assigns keyboard focus when a
+// grab commits, so the grab must land on a surface that is already mapped.
+// A window that maps in the same instant its grab activates only ever
+// received keyboard focus through the hover / follow-mouse path.
 //
 // CaptureBar owns the buttons and hotkeys (R / W / F / Esc). This window
 // owns placement, framing and dismissal: Esc / Cancel run through
@@ -27,7 +35,12 @@ PanelWindow {
         && Hyprland.focusedMonitor
         && modelData.screen.name === Hyprland.focusedMonitor.name
 
-    visible: CaptureService.barVisible && root.isFocusedScreen
+    // Content state, NOT window visibility (see the header note): the card,
+    // the grab and keyboard focusability all follow this, while the surface
+    // itself stays mapped for the shell's whole lifetime.
+    readonly property bool pickerActive: CaptureService.barVisible && root.isFocusedScreen
+
+    visible: true
 
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.namespace: "quickshell-capture-picker"
@@ -49,14 +62,18 @@ PanelWindow {
     implicitHeight: 96
 
     color: "transparent"
-    focusable: true
+    // Tied to the content state like DynamicIsland's `focusable: expanded`:
+    // an inactive picker window must not be a keyboard focus candidate.
+    focusable: root.pickerActive
 
-    // Input only on the card itself; the padding ring stays click-through.
-    mask: Region { item: frame }
+    // Input only on the card itself while active; the padding ring stays
+    // click-through. While inactive the region is empty (Launcher idiom),
+    // so the always-mapped surface never swallows pointer input.
+    mask: Region { item: root.pickerActive ? frame : null }
 
     HyprlandFocusGrab {
         windows: [root]
-        active: root.visible
+        active: root.pickerActive
 
         onCleared: {
             // Guarded like the other popovers: a programmatic close flips
@@ -70,6 +87,7 @@ PanelWindow {
     Rectangle {
         id: frame
 
+        visible: root.pickerActive
         anchors.centerIn: parent
         width: 460
         height: 64
