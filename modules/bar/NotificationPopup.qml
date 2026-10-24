@@ -1,14 +1,17 @@
 import QtQuick
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Wayland
 import Quickshell.Widgets
 import "../../components"
 
-// Standalone toast stack (one per screen). Shows NotificationService.popups on
-// the currently focused monitor, newest on top. Each toast owns its lifecycle
+// Standalone toast stack (instances exist only on bar screens — see shell.qml).
+// Shows NotificationService.popupModel on the bar monitor regardless of which
+// monitor is currently focused, newest on top. Each toast owns its lifecycle
 // (auto-dismiss, hover-pause, close button). Removing a toast never touches the
 // Notification Center history — that stays in NotificationService.list.
+// Display fields are bound to the live Notification object (see
+// NotificationService's model notes), so a sender-side replace updates a
+// visible toast without any model operation.
 PanelWindow {
     id: root
 
@@ -16,13 +19,11 @@ PanelWindow {
 
     screen: modelData.screen
 
-    // Reuse the project's existing "focused monitor" mechanism — no new screen
-    // detection. Only the focused screen's instance renders toasts.
-    readonly property bool onThisScreen: Hyprland.focusedMonitor
-        && root.modelData.screen
-        && Hyprland.focusedMonitor.name === root.modelData.screen.name
-
-    readonly property var items: root.onThisScreen ? NotificationService.popups : []
+    // Always render the toast stack on this (bar) screen, regardless of which
+    // monitor Hyprland currently has focused. Instances only exist on bar
+    // screens (shell.qml Variants), so in the normal setup exactly one stack
+    // renders; focus moving to another monitor never hides incoming toasts.
+    readonly property var items: NotificationService.popups
 
     visible: root.items.length > 0
 
@@ -68,7 +69,7 @@ PanelWindow {
         clip: true
 
         Repeater {
-            model: root.items
+            model: NotificationService.popupModel
 
             delegate: Item {
                 id: slot
@@ -89,8 +90,11 @@ PanelWindow {
 
                 // Generic actions the sender attached, as {action, index} pairs
                 // with the original index preserved. Empty-text actions dropped.
+                // Bound to the live Notification, so an action-set change on a
+                // replaced notification re-evaluates without a model operation.
                 readonly property var actionItems: {
-                    const src = slot.modelData.actions
+                    const n = slot.modelData.notification
+                    const src = n ? n.actions : null
                     if (!src)
                         return []
                     const out = []
@@ -100,6 +104,45 @@ PanelWindow {
                             out.push({ "action": a, "index": i })
                     }
                     return out
+                }
+
+                // Inline-reply availability/mode, mirrored on the slot so the
+                // actions row and the auto-dismiss timer can consult them
+                // WITHOUT instantiating the reply editor (see replyLoader).
+                // Availability is a pure function of the notification; mode
+                // and active simply read through the loader once it exists.
+                readonly property bool replyAvailable: !!(slot.modelData.notification
+                    && slot.modelData.notification.hasInlineReply)
+                readonly property bool replyModeOn: !!(replyLoader.item && replyLoader.item.replyMode)
+                readonly property bool replyActive: !!(replyLoader.item && replyLoader.item.active)
+
+                // Build the reply editor on first use, then flip it open.
+                function openReply() {
+                    replyLoader.active = true
+                    if (replyLoader.item)
+                        replyLoader.item.replyMode = true
+                }
+
+                // Auto-dismiss duration for this toast, evaluated live from
+                // the notification (urgency/expireTimeout) — see
+                // NotificationService.autoDismissMsFor. 0 = never.
+                readonly property int autoDismissMs:
+                    NotificationService.autoDismissMsFor(slot.modelData.notification)
+
+                // Index of the sender's default action ("default" identifier),
+                // or -1. The default action is never shown in the actions row
+                // (empty-text actions are filtered there); it is what a body
+                // click invokes.
+                readonly property int defaultActionIndex: {
+                    const n = slot.modelData.notification
+                    const acts = n ? n.actions : null
+                    if (!acts)
+                        return -1
+                    for (let i = 0; i < acts.length; i++) {
+                        if (acts[i] && acts[i].identifier === "default")
+                            return i
+                    }
+                    return -1
                 }
 
                 function beginClose() {
@@ -125,17 +168,19 @@ PanelWindow {
                     onTriggered: NotificationService.dismissPopup(slot.modelData.id)
                 }
 
-                // Normal toasts auto-dismiss after 5s; critical ones stay until
-                // closed by the user or the sender. Hover pauses the timer, and
-                // so does an active inline-reply interaction (reply mode / input
+                // Auto-dismiss after the entry's policy duration, computed by
+                // NotificationService from the sender's expireTimeout and the
+                // urgency (see _autoDismissMs there); 0 means never, and the
+                // timer is then simply not run. Hover pauses the timer, and so
+                // does an active inline-reply interaction (reply mode / input
                 // focus) so a toast never vanishes mid-typing.
                 Timer {
                     id: autoTimer
-                    interval: 5000
-                    running: !slot.closing
-                        && !slot.modelData.critical
+                    interval: Math.max(1, slot.autoDismissMs)
+                    running: slot.autoDismissMs > 0
+                        && !slot.closing
                         && !hoverHandler.hovered
-                        && !replyWidget.active
+                        && !slot.replyActive
                     onTriggered: slot.beginClose()
                 }
 
@@ -145,7 +190,7 @@ PanelWindow {
                     width: parent.width
                     implicitHeight: layout.implicitHeight + 24
                     radius: 16
-                    color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
+                    color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
                     border.width: 1
                     border.color: Theme.surfaceHover
 
@@ -169,11 +214,20 @@ PanelWindow {
                         id: hoverHandler
                     }
 
-                    // Click anywhere on the toast dismisses it (no app launch,
-                    // no actions — Phase 1).
+                    // Click anywhere on the toast: if the sender attached a
+                    // default action, invoke it (a non-resident notification
+                    // then closes itself on the server side); otherwise
+                    // dismiss the toast. Action labels and the reply input
+                    // consume their own taps, so this never fires for them.
                     TapHandler {
                         acceptedButtons: Qt.LeftButton
-                        onTapped: slot.beginClose()
+                        onTapped: {
+                            if (slot.defaultActionIndex >= 0)
+                                NotificationService.invokeAction(
+                                    slot.modelData.id, slot.defaultActionIndex)
+                            else
+                                slot.beginClose()
+                        }
                     }
 
                     // Shared glass highlight (see ControlTile): inset by the
@@ -249,10 +303,11 @@ PanelWindow {
                             spacing: 6
 
                             Text {
-                                text: slot.modelData.appName.length > 0
-                                    ? slot.modelData.appName : "Notification"
+                                text: slot.modelData.notification.appName.length > 0
+                                    ? slot.modelData.notification.appName : "Notification"
                                 color: Theme.textDim
                                 font.pixelSize: 10
+                                font.family: Theme.fontFamily
                                 font.weight: Font.DemiBold
                                 elide: Text.ElideRight
                                 width: Math.min(implicitWidth, parent.width - timeLabel.width - 6)
@@ -263,6 +318,7 @@ PanelWindow {
                                 text: Qt.formatDateTime(slot.modelData.time, "hh:mm")
                                 color: Theme.textMuted
                                 font.pixelSize: 10
+                                font.family: Theme.fontFamily
                             }
                         }
 
@@ -283,15 +339,16 @@ PanelWindow {
                                     anchors.margins: 2
                                     asynchronous: true
                                     source: {
-                                        const img = slot.modelData.image
+                                        const n = slot.modelData.notification
+                                        const img = n ? n.image : ""
                                         if (img && img.length > 0)
                                             return img.charAt(0) === "/" ? "file://" + img : img
-                                        const ic = slot.modelData.appIcon
+                                        const ic = n ? n.appIcon : ""
                                         if (ic && ic.length > 0)
                                             return ic.charAt(0) === "/" ? "file://" + ic
                                                 : Quickshell.iconPath(ic, "dialog-information")
                                         return Quickshell.iconPath(
-                                            slot.modelData.appName.toLowerCase(),
+                                            (n ? n.appName : "").toLowerCase(),
                                             "dialog-information")
                                     }
                                 }
@@ -303,10 +360,11 @@ PanelWindow {
 
                                 Text {
                                     width: parent.width
-                                    visible: slot.modelData.summary.length > 0
-                                    text: slot.modelData.summary
+                                    visible: slot.modelData.notification.summary.length > 0
+                                    text: slot.modelData.notification.summary
                                     color: Theme.text
                                     font.pixelSize: 12
+                                    font.family: Theme.fontFamily
                                     font.weight: Font.DemiBold
                                     wrapMode: Text.WordWrap
                                     maximumLineCount: 2
@@ -316,10 +374,11 @@ PanelWindow {
 
                                 Text {
                                     width: parent.width
-                                    visible: slot.modelData.body.length > 0
-                                    text: slot.modelData.body
+                                    visible: slot.modelData.notification.body.length > 0
+                                    text: slot.modelData.notification.body
                                     color: Theme.textDim
                                     font.pixelSize: 11
+                                    font.family: Theme.fontFamily
                                     wrapMode: Text.WordWrap
                                     maximumLineCount: 4
                                     elide: Text.ElideRight
@@ -336,20 +395,21 @@ PanelWindow {
                             width: parent.width
                             spacing: 16
                             visible: slot.actionItems.length > 0
-                                || (replyWidget.available && !replyWidget.replyMode)
+                                || (slot.replyAvailable && !slot.replyModeOn)
 
                             // Reply as a generic action: identical metrics/style
                             // to the delegates after this; opens the input below.
                             Text {
                                 id: replyActLabel
 
-                                visible: replyWidget.available && !replyWidget.replyMode
+                                visible: slot.replyAvailable && !slot.replyModeOn
                                 width: replyActLabel.implicitWidth
                                 height: 28
                                 verticalAlignment: Text.AlignVCenter
                                 text: "Reply"
                                 color: replyActHover.hovered ? Theme.accent : Theme.text
                                 font.pixelSize: 11
+                                font.family: Theme.fontFamily
                                 elide: Text.ElideRight
 
                                 HoverHandler {
@@ -358,7 +418,7 @@ PanelWindow {
                                 }
                                 TapHandler {
                                     gesturePolicy: TapHandler.ReleaseWithinBounds
-                                    onTapped: replyWidget.replyMode = true
+                                    onTapped: slot.openReply()
                                 }
                             }
 
@@ -376,6 +436,7 @@ PanelWindow {
                                     text: actLabel.modelData.action.text
                                     color: actHover.hovered ? Theme.accent : Theme.text
                                     font.pixelSize: 11
+                                    font.family: Theme.fontFamily
                                     elide: Text.ElideRight
 
                                     HoverHandler {
@@ -397,27 +458,43 @@ PanelWindow {
                         // is the first item of the actions Flow above, same
                         // style as generic actions. The expanded input form
                         // lives here, below the whole action row.
-                        NotificationReply {
-                            id: replyWidget
+                        //
+                        // Loaded lazily: the editor's object tree (TextInput,
+                        // buttons, handlers) is the heaviest part of this
+                        // delegate and most toasts are never replied to, so it
+                        // is built only when the user first opens the reply
+                        // (slot.openReply) and then kept for the toast's
+                        // remaining life — replyMode and the keyboard-focus
+                        // bookkeeping inside keep exactly one owner.
+                        Loader {
+                            id: replyLoader
                             width: parent.width
-                            showAffordance: false
-                            notifId: slot.modelData.id
-                            notification: slot.modelData.notification
+                            active: false
+                            visible: slot.replyAvailable
 
-                            // Raise the window's keyboard-focus demand only while
-                            // this reply is actually in use. Idempotent via
-                            // _counted so a toast torn down mid-reply still
-                            // balances the count. No state leaves this card.
-                            property bool _counted: false
-                            onActiveChanged: {
-                                if (replyWidget.active === replyWidget._counted)
-                                    return
-                                replyWidget._counted = replyWidget.active
-                                root.replyFocusHolders += replyWidget.active ? 1 : -1
-                            }
-                            Component.onDestruction: {
-                                if (replyWidget._counted)
-                                    root.replyFocusHolders -= 1
+                            sourceComponent: NotificationReply {
+                                id: replyItem
+
+                                showAffordance: false
+                                notifId: slot.modelData.id
+                                notification: slot.modelData.notification
+
+                                // Raise the window's keyboard-focus demand only
+                                // while this reply is actually in use. Idempotent
+                                // via _counted so a toast torn down mid-reply
+                                // still balances the count. No state leaves
+                                // this card.
+                                property bool _counted: false
+                                onActiveChanged: {
+                                    if (replyItem.active === replyItem._counted)
+                                        return
+                                    replyItem._counted = replyItem.active
+                                    root.replyFocusHolders += replyItem.active ? 1 : -1
+                                }
+                                Component.onDestruction: {
+                                    if (replyItem._counted)
+                                        root.replyFocusHolders -= 1
+                                }
                             }
                         }
                     }

@@ -159,7 +159,7 @@ PanelWindow {
         anchors.fill: parent
         anchors.margins: 8
         radius: Theme.cornerRadius
-        color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
+        color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
         border.width: 1
         border.color: Theme.surfaceHover
 
@@ -300,6 +300,7 @@ PanelWindow {
                     text: Qt.formatDate(calendar.view, "MMMM yyyy")
                     color: Theme.text
                     font.pixelSize: 13
+                    font.family: Theme.fontFamily
                     font.weight: Font.DemiBold
                     horizontalAlignment: Text.AlignHCenter
                     elide: Text.ElideRight
@@ -312,6 +313,7 @@ PanelWindow {
                     text: "Today"
                     color: todayHover.hovered ? Theme.accent : Theme.textDim
                     font.pixelSize: 11
+                    font.family: Theme.fontFamily
                     horizontalAlignment: Text.AlignHCenter
                     HoverHandler { id: todayHover; cursorShape: Qt.PointingHandCursor }
                     TapHandler { onTapped: calendar.resetToday() }
@@ -341,6 +343,7 @@ PanelWindow {
                         text: modelData
                         color: Theme.textMuted
                         font.pixelSize: 11
+                        font.family: Theme.fontFamily
                         horizontalAlignment: Text.AlignHCenter
                         verticalAlignment: Text.AlignVCenter
                     }
@@ -382,6 +385,7 @@ PanelWindow {
                             color: dayCell.isToday ? Theme.background
                                 : dayCell.inMonth ? Theme.text : Theme.textMuted
                             font.pixelSize: 12
+                            font.family: Theme.fontFamily
                         }
                     }
                 }
@@ -421,6 +425,7 @@ PanelWindow {
                 text: "Notifications"
                 color: Theme.text
                 font.pixelSize: 14
+                font.family: Theme.fontFamily
                 font.weight: Font.DemiBold
             }
 
@@ -431,6 +436,7 @@ PanelWindow {
                 text: "Clear all"
                 color: clearHover.hovered ? Theme.text : Theme.textDim
                 font.pixelSize: 12
+                font.family: Theme.fontFamily
                 HoverHandler { id: clearHover; cursorShape: Qt.PointingHandCursor }
                 TapHandler { onTapped: NotificationService.clearAll() }
             }
@@ -455,6 +461,7 @@ PanelWindow {
                 text: "Do Not Disturb"
                 color: Theme.textDim
                 font.pixelSize: 12
+                font.family: Theme.fontFamily
             }
 
             Rectangle {
@@ -495,6 +502,7 @@ PanelWindow {
             text: "No notifications"
             color: Theme.textMuted
             font.pixelSize: 12
+            font.family: Theme.fontFamily
             horizontalAlignment: Text.AlignHCenter
         }
 
@@ -518,7 +526,12 @@ PanelWindow {
             clip: true
             spacing: 8
             visible: NotificationService.count > 0
-            model: NotificationService.list
+            // Incremental model (see NotificationService's model notes):
+            // arrivals/removals only create/destroy the affected delegates,
+            // and content updates arrive via live bindings, so the scroll
+            // position survives new notifications. Reuse delegates too.
+            model: NotificationService.historyModel
+            reuseItems: true
 
             delegate: Rectangle {
                 id: notifCard
@@ -527,8 +540,11 @@ PanelWindow {
 
                 // Generic actions as {action, index} pairs, original index kept,
                 // empty-text actions dropped. Same semantics as the popup.
+                // Bound to the live Notification, so an action-set change on a
+                // replaced notification re-evaluates without a model operation.
                 readonly property var actionItems: {
-                    const src = notifCard.modelData.actions
+                    const n = notifCard.modelData.notification
+                    const src = n ? n.actions : null
                     if (!src)
                         return []
                     const out = []
@@ -540,12 +556,28 @@ PanelWindow {
                     return out
                 }
 
+                // Inline-reply availability/mode, mirrored on the card so the
+                // actions row can consult them WITHOUT instantiating the
+                // reply editor (see replyLoader below). Availability is a pure
+                // function of the notification; mode reads through the loader
+                // once it exists.
+                readonly property bool replyAvailable: !!(notifCard.modelData.notification
+                    && notifCard.modelData.notification.hasInlineReply)
+                readonly property bool replyModeOn: !!(replyLoader.item && replyLoader.item.replyMode)
+
+                // Build the reply editor on first use, then flip it open.
+                function openReply() {
+                    replyLoader.active = true
+                    if (replyLoader.item)
+                        replyLoader.item.replyMode = true
+                }
+
                 width: notifList.width
                 height: cardCol.implicitHeight + 20
                 radius: 12
                 color: {
                     const c = cardHover.hovered ? Qt.lighter(Theme.surface, 1.15) : Theme.surface
-                    return Qt.rgba(c.r, c.g, c.b, Theme.surfaceOpacity)
+                    return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
                 }
 
                 HoverHandler { id: cardHover }
@@ -583,11 +615,17 @@ PanelWindow {
                     width: 24
                     height: 24
                     asynchronous: true
+                    // Same priority as the popup: attached image first, then
+                    // the app icon, then an icon derived from the app name.
                     source: {
-                        const ic = notifCard.modelData.appIcon
+                        const n = notifCard.modelData.notification
+                        const img = n ? n.image : ""
+                        if (img && img.length > 0)
+                            return img.charAt(0) === "/" ? "file://" + img : img
+                        const ic = n ? n.appIcon : ""
                         if (ic && ic.charAt(0) === "/")
                             return "file://" + ic
-                        return Quickshell.iconPath(ic || notifCard.modelData.appName.toLowerCase(),
+                        return Quickshell.iconPath(ic || (n ? n.appName : "").toLowerCase(),
                                                   "dialog-information")
                     }
                 }
@@ -623,9 +661,10 @@ PanelWindow {
                         spacing: 6
 
                         Text {
-                            text: notifCard.modelData.appName
+                            text: notifCard.modelData.notification.appName
                             color: Theme.textDim
                             font.pixelSize: 10
+                            font.family: Theme.fontFamily
                             font.weight: Font.DemiBold
                             elide: Text.ElideRight
                             width: Math.min(implicitWidth, parent.width - timeText.width - 6)
@@ -636,15 +675,17 @@ PanelWindow {
                             text: Qt.formatDateTime(notifCard.modelData.time, "hh:mm")
                             color: Theme.textMuted
                             font.pixelSize: 10
+                            font.family: Theme.fontFamily
                         }
                     }
 
                     Text {
                         width: parent.width
-                        visible: notifCard.modelData.summary.length > 0
-                        text: notifCard.modelData.summary
+                        visible: notifCard.modelData.notification.summary.length > 0
+                        text: notifCard.modelData.notification.summary
                         color: Theme.text
                         font.pixelSize: 12
+                        font.family: Theme.fontFamily
                         font.weight: Font.DemiBold
                         elide: Text.ElideRight
                         maximumLineCount: 1
@@ -652,10 +693,11 @@ PanelWindow {
 
                     Text {
                         width: parent.width
-                        visible: notifCard.modelData.body.length > 0
-                        text: notifCard.modelData.body
+                        visible: notifCard.modelData.notification.body.length > 0
+                        text: notifCard.modelData.notification.body
                         color: Theme.textDim
                         font.pixelSize: 11
+                        font.family: Theme.fontFamily
                         wrapMode: Text.WordWrap
                         elide: Text.ElideRight
                         maximumLineCount: 3
@@ -670,20 +712,21 @@ PanelWindow {
                         spacing: 16
                         topPadding: 4
                         visible: notifCard.actionItems.length > 0
-                            || (replyWidget.available && !replyWidget.replyMode)
+                            || (notifCard.replyAvailable && !notifCard.replyModeOn)
 
                         // Reply as a generic action: identical metrics/style
                         // to the delegates after this; opens the input below.
                         Text {
                             id: replyActLabel
 
-                            visible: replyWidget.available && !replyWidget.replyMode
+                            visible: notifCard.replyAvailable && !notifCard.replyModeOn
                             width: replyActLabel.implicitWidth
                             height: 28
                             verticalAlignment: Text.AlignVCenter
                             text: "Reply"
                             color: replyActHover.hovered ? Theme.accent : Theme.text
                             font.pixelSize: 11
+                            font.family: Theme.fontFamily
                             elide: Text.ElideRight
 
                             HoverHandler {
@@ -692,7 +735,7 @@ PanelWindow {
                             }
                             TapHandler {
                                 gesturePolicy: TapHandler.ReleaseWithinBounds
-                                onTapped: replyWidget.replyMode = true
+                                onTapped: notifCard.openReply()
                             }
                         }
 
@@ -710,6 +753,7 @@ PanelWindow {
                                 text: centerActLabel.modelData.action.text
                                 color: centerActHover.hovered ? Theme.accent : Theme.text
                                 font.pixelSize: 11
+                                font.family: Theme.fontFamily
                                 elide: Text.ElideRight
 
                                 HoverHandler {
@@ -731,12 +775,23 @@ PanelWindow {
                     // Reply is rendered as the first item of the actions Flow
                     // above, same style as generic actions. The expanded input
                     // form lives here, below the whole action row.
-                    NotificationReply {
-                        id: replyWidget
+                    //
+                    // Loaded lazily, exactly as in the popup: the editor's
+                    // object tree is built only when the user first opens the
+                    // reply on this card (notifCard.openReply) and then kept
+                    // for the card's remaining life, so a history full of
+                    // never-replied notifications carries none of its cost.
+                    Loader {
+                        id: replyLoader
                         width: parent.width
-                        showAffordance: false
-                        notifId: notifCard.modelData.id
-                        notification: notifCard.modelData.notification
+                        active: false
+                        visible: notifCard.replyAvailable
+
+                        sourceComponent: NotificationReply {
+                            showAffordance: false
+                            notifId: notifCard.modelData.id
+                            notification: notifCard.modelData.notification
+                        }
                     }
                 }
             }

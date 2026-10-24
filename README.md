@@ -1,6 +1,6 @@
 # quickshell
 
-A hand-rolled [Quickshell](https://github.com/Quickshell/Quickshell) desktop shell for **Hyprland** (Wayland), written in pure QML. No build system, no dependencies, no framework — just QML files and good taste.
+A hand-rolled [Quickshell](https://github.com/Quickshell/Quickshell) desktop shell for **Hyprland** (Wayland), written in pure QML. No build system, no framework — just QML files and good taste.
 
 ```
    ___                      _      _     _
@@ -11,23 +11,23 @@ A hand-rolled [Quickshell](https://github.com/Quickshell/Quickshell) desktop she
                        |__/
 ```
 
-> **WIP** - this project is a work in progress. It is *far* from finished.
-> Treat it as a living sketch, not a shipped product.
+> **WIP** - this project is a work in progress. Treat it as a living sketch, not a shipped product.
 
 ---
 
 ## Status: still cooking
 
-This is a **prototype**, not a stable release. Expect rough edges, missing features, and breaking changes at any commit. Things we already know are unfinished or unimplemented:
+Prototype, not a stable release. Expect rough edges and breaking changes. What exists today:
 
-- Two widgets exist: the **launcher** (solid) and a **top bar** with a pop-down "dynamic center" and a power menu (working, but young). A tray, notifications, and OSD do not exist.
-- The bar's **Control Center** (Wi-Fi / sliders / quick-toggle tiles) is stubbed — it renders but most tiles do nothing. The `display` / media-preview / media-compact surfaces are placeholders.
-- `components/` holds the `Theme` palette singleton (now used by everything); `assets/` holds a handful of SVG icons; `models/` and top-level `scripts/` / `services/` are still empty placeholders.
-- A drop-shadow design for the launcher was researched and spec'd but is **not implemented**.
-- No tests. Verification is done by running a scratch copy (`qs -p /tmp/copy`) and reading stderr, plus throwaway Node mirrors of the scoring logic.
-- The only way to validate QML is to run it and read stderr — there is no dry-run flag.
+- **Launcher** (solid): full-screen keyboard app launcher with fuzzy scoring, usage history, and prefix search modes.
+- **Top bar** (working): static 40px bar per monitor with a pop-down **Dynamic Center** (display manager, wallpaper picker, expanded media player), a **Control Center** overlay, system tray, and status indicators.
+- **Media**: MPRIS-backed now-playing preview in the bar centre (click-to-expand, never auto-expands) plus an expanded player surface.
+- **Notifications**: freedesktop notification history (Notification Center) + popup toasts, with inline reply support.
+- **OSD**: standalone bottom-centre overlay for volume / brightness / caps-lock, plus a workspace OSD.
+- **Capture**: region / window / screen / fullscreen screenshots with overlay selection and preview.
+- No tests. Verification is a scratch copy (`cp -r . /tmp/scratch && qs -p /tmp/scratch -n`) plus reading stderr / `qs log`.
 
-Built and verified against **Quickshell 0.3.1**, **Qt 6.11**, **Hyprland 0.56**.
+Built and verified against **Quickshell 0.3.2**, **Qt 6.11**, **Hyprland 0.56**.
 
 ---
 
@@ -48,11 +48,13 @@ A full-screen, keyboard-first application launcher.
 | Theme | `components/Theme.qml` | Color palette singleton (defaults + `palette.json` override) |
 | State | `modules/controllers/LauncherController.qml` | Visibility toggle |
 
+The launcher is created lazily: the `Loader` in `shell.qml` stays inactive until the first open, then latches active so reopening is instant.
+
 ### Launching
 
 - `quickshell` (or `qs`) runs the directory as the `default` config; `shell.qml` is the entrypoint.
 - `quickshell -p <path>` runs a config from an arbitrary path — **always** use this to test a scratch copy; running `qs` bare replaces the live shell.
-- IPC control: `qs ipc call launcher toggle`, `qs ipc call bar toggle`, `qs ipc call power toggle`, `qs ipc call center toggle`.
+- IPC control, e.g. `qs ipc call launcher toggle`. Full target list is in [IPC reference](#ipc-reference) below.
 
 ---
 
@@ -130,38 +132,83 @@ File search exists but is **not fully working yet**:
 
 ## The bar
 
-A static **40px** top bar, one instance per monitor (`Variants(Quickshell.screens)`), all sharing a single `barState { mode, screen, barEnabled }` object in `shell.qml`. Toggle it with `qs ipc call bar toggle`.
+A static **40px** top bar, one instance per monitor (`Variants(Quickshell.screens)`), all sharing a single `barState { mode, screen, mediaManual }` object in `shell.qml`.
+
+| Zone | Contents |
+| --- | --- |
+| Left | Arch logo (click: fastfetch-style system popover via `UptimeService`), active window icon + title, Hyprland submap pill |
+| Centre | Mode hold-label, or the `MediaPreview` now-playing pill (artwork, scrolling title/artist, cava mini-viz) |
+| Right | Control-Center button, clock (`DateTimeWidget`), battery widget + popover, caffeine indicator, system tray, mic-mute indicator, Wi-Fi indicator + details popover |
 
 | Piece | File | Role |
 | --- | --- | --- |
-| Bar | `modules/bar/Bar.qml` | `PanelWindow`, `exclusiveZone: 40`, fixed height, focus grab, mask. Static content: launcher button, clock, control-center button, "Hold to confirm" hint |
-| Dynamic center | `modules/bar/DynamicCenter.qml` | Plain `Item` at `y: 40`, attached under the bar; raises one surface at a time |
-| Power menu | `modules/bar/PowerMenu.qml` | 6 actions — Lock, Hibernate, Logout, Shutdown, Suspend, Reboot |
-| Action tile | `modules/bar/PowerActionItem.qml` | Icon + label + hold-to-confirm progress bar |
-| Control Center | `modules/bar/ControlCenter.qml` | Separate top-right overlay window (Wi-Fi, sliders, quick toggles) — **stubbed** |
-| Helpers | `ControlSlider.qml`, `ControlTile.qml`, `WifiService.qml` | Slider/tile widgets; `WifiService` shells out to `nmcli` |
+| Bar | `modules/bar/Bar.qml` | `PanelWindow`, `exclusiveZone: 40`, focus grab, input mask, all bar content |
+| Dynamic center | `modules/bar/DynamicCenter.qml` | Plain `Item` at `y: 40`, attached under the bar; raises one surface at a time, each behind a latched `Loader` with crossfade |
+| Power menu | `modules/bar/PowerMenuWindow.qml` (host) + `PowerMenu.qml` + `PowerActionItem.qml` | Standalone centred modal over a dimmed background, own focus grab; 6 actions — Lock, Hibernate, Logout, Shutdown, Suspend, Reboot — with hold-to-confirm |
+| Display | `modules/display/DisplayManager.qml` | Monitor-arrangement surface (backed by `DisplayService`) |
+| Wallpapers | `modules/wallpapers/WallpaperPicker.qml` | Thumbnail strip, keyboard nav, applies via `walset-backend`-style flow (wallpaper + wallust + matugen) |
+| Control Center | `modules/bar/ControlCenter.qml` + `ControlSlider.qml` / `ControlTile.qml` | Separate top-right overlay window: audio, brightness, network, bluetooth, hotspot and quick toggles (audio over native PipeWire, no `wpctl`) |
+| Clock/date | `modules/bar/DateTimeWidget.qml` | Clock + calendar popover |
+| Battery | `modules/bar/BatteryWidget.qml` + `BatteryService.qml` | UPower-backed indicator + popover |
 
 ### The dynamic center
 
-The idea: the bar's centre can drop a surface that looks like it grows straight out of the bar — no gap, square top corners — and different "commands" reuse the same slot.
+The bar's centre can raise a surface that looks like it grows straight out of the bar — no gap, square top corners. Implemented surfaces: `display`, `wallpapers`, `media` (expanded player). `mediaPreview` / `mediaCompact` IPC modes also exist. (The capture picker and the power menu are no longer surfaces here — they are standalone floating windows, see Capture below.)
 
-- `qs ipc call power toggle` → power menu. `display` / `mediaPreview` / `mediaCompact` targets exist but their surfaces are empty stubs.
-- The bar's `PanelWindow` is a **runtime constant height** (`40` + a fixed max surface size). It never resizes when the surface opens/closes — the content just fades in and out inside the already-allocated space. (Resizing a layer-shell surface every open turned out to flicker badly on fractional-scale outputs.)
-- When idle, the transparent area below the 40px strip is click-through (input mask); when a surface is open the whole window grabs input via `HyprlandFocusGrab`.
+- The bar's `PanelWindow` height stays constant at runtime; surfaces fade/crossfade inside the allocated space. (Resizing a layer-shell surface every open flickers badly on fractional-scale outputs.)
+- When idle, the transparent area below the 40px strip is click-through (input mask); when a surface is open the window grabs input via `HyprlandFocusGrab`.
 - Wi-Fi and audio output deliberately live in **Control Center**, not here. Search and clipboard live in the **launcher**.
 
 ### Power menu
 
 - **Hold to confirm** — press and hold (mouse *or* `Enter`) for ~1s; a progress bar fills; releasing or leaving early cancels. No accidental shutdowns.
-- Arrow keys move the selection, `Esc` closes, clicking outside closes.
+- Arrow keys move the selection, `Esc` closes, clicking the dimmed background closes.
 - Icons are SVGs from `assets/`, recoloured to white in QML (`ColorOverlay`) — the source files are left untouched.
-- Multi-monitor safe: only the focused monitor's bar activates the surface and the focus grab.
+- Standalone centred modal (`PowerMenuWindow`): a full-screen window per monitor renders it on the screen the `power` IPC targets (the bar screen), with its own Hyprland focus grab — the Bar window and DynamicCenter are no longer involved.
+
+---
+
+## Media
+
+One `MediaService` (`modules/services/MediaService.qml`) wraps the native `Quickshell.Services.Mpris` singleton for every consumer: laptop-first player selection, a runtime last-media cache (pause/stop/gone players keep showing the last track), a stable `trackKey` identity (`mpris:trackid`, title-anchored fallback), and a 1 Hz position tick that only runs while the expanded player is open and playing.
+
+- **Bar preview** (`modules/bar/MediaPreview.qml`): compact pill — artwork, scrolling title/artist, live cava mini-viz. Intro animation on open only (artwork flies in from the right and unveils the content); track/metadata changes update in place, no animation.
+- **Expanded player** (`modules/bar/MediaPlayer.qml`): DynamicCenter surface with vinyl artwork, transport controls, seek bar, and a multi-player selector pill.
+- **Click-to-expand, never auto-expand**: playback, track changes, and metadata updates never touch `barState` — only clicking the preview opens the expanded player (`mediaManual`).
+- **Artwork prefetch**: a hidden zero-size `Image` in `MediaService` pre-loads the current artwork URL (same URL + size as the display art, sharing Qt's image cache); the intro never waits for it, and the `♪` fallback covers misses/errors.
+- `CavaService` runs the `cava` spectrum analyzer only while something is actually playing; pausing releases the capture stream.
+
+---
+
+## Notifications, OSD, capture, display
+
+| Area | Files | Notes |
+| --- | --- | --- |
+| Notifications | `modules/bar/NotificationService.qml`, `NotificationCenter.qml`, `NotificationPopup.qml`, `NotificationReply.qml` | freedesktop `NotificationServer` history + per-screen center and popup toasts, inline reply |
+| OSD | `modules/osd/OSD.qml`, `OSDService.qml` | Standalone bottom-centre, click-through overlay: volume / brightness / caps-lock (+ workspace OSD). Brightness keys step optimistically, then run `brightnessctl` detached |
+| Capture | `modules/capture/CaptureService.qml`, `CaptureBar.qml`, `CapturePicker.qml`, `CaptureOverlay.qml`, `ScreenshotPreview.qml` | Region / window / screen / instant-fullscreen shots to file + clipboard; selection overlay; preview. Floating bottom-centre picker (`CapturePicker`) on the focused screen, independent of the bar and `barState.mode`. Screen mode captures only the focused output (`grim -o`), falling back to the full layout when no output name is available |
+| Eco mode | `modules/bar/EcoService.qml` | Snapshot-apply-restore over `hyprctl`: blur/shadow off + opaque QML surfaces, no config edits |
+| Misc services | `AudioService`, `MicService`, `NetworkService`, `BluetoothService`, `BatteryService`, `BrightnessService`, `NightLightService`, `HotspotService`, `SubmapService`, `UptimeService`, `CaffeineService` (all under `modules/bar/`) | Native backends first (PipeWire, UPower, BlueZ, NetworkManager); tiny shell reads only where the 0.3.x QML API has gaps. `MprisService.qml` is a legacy stub superseded by `MediaService` |
+
+---
+
+## IPC reference
+
+`qs ipc call <target> <fn>` (target = focused monitor where relevant):
+
+| Target | Functions |
+| --- | --- |
+| `launcher` | `show`, `hide`, `toggle` |
+| `power`, `display`, `wallpapers`, `center`, `mediaPreview`, `mediaCompact` | `show`, `hide`, `toggle` (set `barState.mode` + `screen`) |
+| `volume` | `up`, `down` (±5 via native PipeWire) |
+| `brightness` | `up`, `down` (step + OSD) |
+| `capture` | `open`, `bar`, `region`, `window`, `screen`, `fullscreen` |
 
 ---
 
 ## Theming
 
-All colors flow from a single `Theme` singleton (`components/Theme.qml`) — there are **no hardcoded hex colors** in the UI anymore (launcher and bar both). Each widget imports `../../components` and reads `Theme.*`.
+All colors flow from a single `Theme` singleton (`components/Theme.qml`) — no hardcoded hex colors in the UI. Each widget imports `../../components` and reads `Theme.*`.
 
 `Theme` ships with built-in defaults, then **overrides them from `palette.json`** in the config directory (`~/.config/quickshell/palette.json`) when that file exists. It is watched for changes and re-applied live, so you don't need to restart the shell.
 
@@ -208,14 +255,14 @@ Just run `wallust` against a wallpaper as usual — the whole shell picks the ne
 - 2-space indentation; colors come from the `Theme` singleton, defaulting to a black card / light text (was Catppuccin Mocha in previous versions).
 - Per-file imports (each QML file declares its own `QtQuick` / `Quickshell` needs).
 - QML "modules" are plain directories imported by relative path — every `.qml` in `modules/launcher/` or `modules/bar/` becomes a type (`Launcher`, `Bar`, `PowerMenu`, ...). No `qmldir`, no manifest. `components/` is imported the same way for `Theme`.
-- No comments in the codebase.
-- One non-QtQuick QML dependency: `Qt5Compat.GraphicalEffects` (`ColorOverlay`, for white-tinting icons) — package `qt6-5compat`.
+- Explanatory comments live with the tricky code (layer-shell sizing, focus grabs, MPRIS quirks) — read them before touching those paths.
+- One non-QtQuick QML dependency: `Qt5Compat.GraphicalEffects` (`ColorOverlay`, for white-tinting icons) — package `qt6-5compat`. Plus external tools the shell shells out to: `cava`, `brightnessctl`, `nmcli`/`ip`, `fd`, `cliphist`, `wallust`/`matugen` (wallpaper flow).
 
 ---
 
 ## Roadmap (very incomplete)
 
-- [x] Launcher window + focus grabbing + IPC
+- [x] Launcher window + focus grabbing + IPC (lazy-loaded)
 - [x] Fuzzy scoring with field penalties
 - [x] Usage-ranked history with decay
 - [x] Exact-match tier
@@ -223,15 +270,17 @@ Just run `wallust` against a wallpaper as usual — the whole shell picks the ne
 - [x] URL detection fallback
 - [x] Calculator, command, web, and clipboard search modes
 - [x] Centralized theming via `palette.json` (+ wallust integration)
-- [x] Static top bar (per-monitor, fixed height, IPC toggle)
-- [x] Dynamic center surface, attached under the bar
+- [x] Static top bar (per-monitor, tray, indicators, popovers)
+- [x] Dynamic center surfaces: power, display, wallpapers, media, capture
 - [x] Power menu with hold-to-confirm, keyboard nav, multi-monitor-safe focus grab
+- [x] MPRIS media stack (preview + expanded player, click-to-expand, prefetch)
+- [x] Control Center (audio/network/bluetooth/hotspot tiles)
+- [x] Tray (StatusNotifierItem hosts in the bar), notifications (center + popups + reply), OSD (volume/brightness/caps + workspace)
+- [x] Screenshot capture (region/window/screen) with overlay + preview
 - [ ] File search activation — results are found but Enter is a no-op
 - [ ] Drop shadow for the launcher (design settled, code pending)
-- [ ] Control Center — renders, but Wi-Fi/sliders/toggles are mostly stubs
-- [ ] `display` and media (preview / compact now-playing) surfaces
-- [ ] Tray, notifications, OSD — everything else a shell needs
+- [ ] `mediaPreview` / `mediaCompact` IPC surfaces (targets exist, surfaces unbuilt)
 
 ---
 
-*Pure QML, no framework, one stock Qt module, endless WIP.*
+*Pure QML, no framework, endless WIP.*

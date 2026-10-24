@@ -388,7 +388,7 @@ PanelWindow {
                     radius: height / 2
                     color: {
                         const c = wifiHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
-                        return Qt.rgba(c.r, c.g, c.b, Theme.surfaceOpacity)
+                        return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
                     }
 
                     HoverHandler {
@@ -680,7 +680,7 @@ PanelWindow {
                 radius: 29
                 color: {
                     const c = mediaHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
-                    return Qt.rgba(c.r, c.g, c.b, Theme.surfaceOpacity)
+                    return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
                 }
 
                 HoverHandler {
@@ -960,7 +960,7 @@ PanelWindow {
             radius: height / 2
             color: {
                 const c = displayHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
-                return Qt.rgba(c.r, c.g, c.b, Theme.surfaceOpacity)
+                return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
             }
 
             HoverHandler {
@@ -1058,7 +1058,7 @@ PanelWindow {
             radius: height / 2
             color: {
                 const c = soundHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
-                return Qt.rgba(c.r, c.g, c.b, Theme.surfaceOpacity)
+                return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
             }
 
             HoverHandler {

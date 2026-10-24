@@ -87,6 +87,15 @@ Item {
             ColorOverlay {
                 anchors.fill: battImg
                 source: battImg
+                layer.enabled: true
+                layer.effect: DropShadow {
+                    transparentBorder: true
+                    horizontalOffset: 0
+                    verticalOffset: 1
+                    radius: 2
+                    samples: 9
+                    color: Theme.textShadow
+                }
                 color: iconBox.attention ? Theme.accent : Theme.icon
 
                 // Subtle fade, fires only while the Image reloads on a
@@ -102,6 +111,8 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             text: Math.round(BatteryService.percent) + "%"
             color: BatteryService.low ? Theme.accent : Theme.icon
+            style: Text.Raised
+            styleColor: Theme.textShadow
             font.family: Theme.fontFamily
             font.weight: Font.Black
             font.pixelSize: 15
@@ -193,7 +204,7 @@ Item {
             anchors.fill: parent
             anchors.margins: 8
             radius: Theme.cornerRadius
-            color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
+            color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
             border.width: 1
             border.color: Theme.surfaceHover
 
@@ -254,6 +265,7 @@ Item {
                     text: "Battery"
                     color: Theme.textMuted
                     font.pixelSize: 11
+                    font.family: Theme.fontFamily
                     font.weight: Font.DemiBold
                 }
 
@@ -265,6 +277,7 @@ Item {
                         text: Math.round(BatteryService.percent) + "%"
                         color: BatteryService.low ? Theme.accent : Theme.text
                         font.pixelSize: 24
+                        font.family: Theme.fontFamily
                         font.weight: Font.DemiBold
                     }
 
@@ -273,6 +286,7 @@ Item {
                         text: BatteryService.statusText
                         color: Theme.textDim
                         font.pixelSize: 12
+                        font.family: Theme.fontFamily
                     }
                 }
 
@@ -291,6 +305,7 @@ Item {
                             text: infoRow.modelData.label
                             color: Theme.textDim
                             font.pixelSize: 12
+                            font.family: Theme.fontFamily
                         }
 
                         Text {
@@ -299,6 +314,7 @@ Item {
                             text: infoRow.modelData.value
                             color: Theme.text
                             font.pixelSize: 12
+                            font.family: Theme.fontFamily
                             font.weight: Font.DemiBold
                         }
                     }

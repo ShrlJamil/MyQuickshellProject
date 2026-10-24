@@ -3,3 +3,6 @@ claude.md
 
 ./vscode
 palette.json
+
+__pycache__/
+*.py[cod]

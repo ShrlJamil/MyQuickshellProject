@@ -2,6 +2,7 @@ pragma Singleton
 
 import QtQuick
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Io
 
 Item {
@@ -13,6 +14,9 @@ Item {
     property bool regionSelectActive: false
     property bool windowSelectActive: false
     property string _pendingGeometry: ""
+    // Focused output name snapshotted at trigger time for "screen" mode
+    // (grim -o). Empty = no reliable name -> full-layout capture fallback.
+    property string _pendingOutput: ""
 
     onBarVisibleChanged: console.log("[CaptureService] barVisible ->", root.barVisible)
 
@@ -45,6 +49,20 @@ Item {
     function triggerCapture(mode) {
         console.log("[CaptureService] triggerCapture(", mode, ")")
         root.pendingMode = mode
+
+        // Snapshot the focused output NOW, not when the execute timer fires:
+        // the shot must target the screen that was active when the user asked,
+        // even if focus moves during the unmap delay. Wayland output names
+        // (eDP-1, DP-1, HDMI-A-1, ...) are compositor-generated; the strict
+        // pattern is defence-in-depth before the name reaches a shell string.
+        if (mode === "screen") {
+            const fm = Hyprland.focusedMonitor
+            const name = (fm && typeof fm.name === "string") ? fm.name : ""
+            root._pendingOutput = /^[A-Za-z0-9._-]+$/.test(name) ? name : ""
+            if (root._pendingOutput === "")
+                console.log("[CaptureService] No focused output name; screen mode will capture the full layout")
+        }
+
         root.closeBar()
 
         if (mode === "region") {
@@ -112,7 +130,7 @@ Item {
         // Same as region: leave the picker up if it is still open.
     }
 
-    function _runCapture(mode, geometry) {
+    function _runCapture(mode, geometry, output) {
         if (captureProc.running) {
             console.log("[CaptureService] Terminating lingering capture process...")
             captureProc.running = false
@@ -126,9 +144,13 @@ Item {
         // missing, and never breaks the trailing `echo "$f"` stdout contract.
         const notify = ' && { command -v notify-send >/dev/null 2>&1 && notify-send -a "Screenshot" -i "$f" -t 4000 -h string:x-canonical-private-synchronous:screenshot "Screenshot saved" "Copied to clipboard"; true; }'
 
+        // "screen" captures ONLY the focused output (grim -o) when a name
+        // was snapshotted; without one it falls back to the full layout.
         const grab = (mode === "region" || mode === "window")
             ? 'grim -g "' + geometry + '" "$f"'
-            : 'grim "$f"'
+            : (mode === "screen" && output)
+                ? 'grim -o "' + output + '" "$f"'
+                : 'grim "$f"'
         const cmd = envPrefix + 'mkdir -p ~/Pictures/Screenshots && f=~/Pictures/Screenshots/Screenshot_$(date +%Y%m%d_%H%M%S).png && ' + grab + ' && wl-copy --type image/png < "$f"' + notify + ' && echo "$f"'
 
         console.log("[CaptureService] Launching command for mode:", mode)
@@ -174,7 +196,7 @@ Item {
         id: executeTimer
 
         interval: 250
-        onTriggered: root._runCapture(root.pendingMode)
+        onTriggered: root._runCapture(root.pendingMode, "", root._pendingOutput)
     }
 
     Timer {

@@ -140,6 +140,7 @@ Item {
                 text: root.label
                 color: Theme.text
                 font.pixelSize: 12
+                font.family: Theme.fontFamily
                 font.weight: Font.DemiBold
                 horizontalAlignment: Text.AlignHCenter
                 elide: Text.ElideRight

@@ -44,7 +44,7 @@ Item {
             if (root.active)
                 return hover.hovered ? Qt.darker(Theme.activeTile, 1.06) : Theme.activeTile
             const c = hover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
-            return Qt.rgba(c.r, c.g, c.b, Theme.surfaceOpacity)
+            return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
         }
 
         HoverHandler {

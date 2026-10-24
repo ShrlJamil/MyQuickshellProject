@@ -9,7 +9,7 @@ Rectangle {
 
     radius: 40
 
-    color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.surfaceOpacity)
+    color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
 
     // Shared glass highlight (see ControlTile): full-bleed rect with the
     // panel's own radius (no border, so no inset is needed); falloff shaped

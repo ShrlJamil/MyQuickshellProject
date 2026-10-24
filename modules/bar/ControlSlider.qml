@@ -112,6 +112,7 @@ Item {
         text: root.rightText
         color: Theme.textMuted
         font.pixelSize: 11
+        font.family: Theme.fontFamily
         font.weight: Font.DemiBold
     }
 

@@ -14,9 +14,8 @@ Item {
 
     required property var mediaService
     property bool active: false
-    // True when opened by clicking the bar preview (vs auto-expand). Gates all
-    // focus behavior (focus flag + explicit grabs) and suppresses the 3s
-    // auto-hide timer in shell.qml - auto-expand stays fully focus-free.
+    // True when opened by clicking the bar preview. All media opens are manual
+    // (click-to-expand); gates focus behavior for the interactive surface.
     property bool manual: false
 
     signal closeRequested()
@@ -59,9 +58,9 @@ Item {
         return (h > 0 ? h + ":" : "") + mm + ":" + (r < 10 ? "0" + r : r)
     }
 
-    // Focus is strictly manual-only: the flag and both explicit grabs are gated
-    // on `manual`, so an auto-expand never takes keyboard focus while a manual
-    // open behaves as an interactive focused surface (Escape works).
+    // Focus is manual-only: the flag and both explicit grabs are gated
+    // on `manual`, so the clicked-open surface behaves as an interactive
+    // focused surface (Escape works).
     focus: root.active && root.manual
     onActiveChanged: {
         if (root.active) {
@@ -176,6 +175,7 @@ Item {
                         ? root.mediaService.identity : "Player"
                     color: Theme.text
                     font.pixelSize: 13
+                    font.family: Theme.fontFamily
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight
                 }
@@ -314,6 +314,7 @@ Item {
                     text: root.hasMedia ? root.mediaService.title : "Nothing playing"
                     color: Theme.text
                     font.pixelSize: 15
+                    font.family: Theme.fontFamily
                     font.weight: Font.DemiBold
                     elide: Text.ElideRight
                     maximumLineCount: 1
@@ -327,6 +328,7 @@ Item {
                     text: root.hasMedia ? root.mediaService.artist : ""
                     color: Theme.textDim
                     font.pixelSize: 12
+                    font.family: Theme.fontFamily
                     elide: Text.ElideRight
                     maximumLineCount: 1
                 }
@@ -443,6 +445,7 @@ Item {
                         text: root._fmt(root.hasMedia ? root.mediaService.safePosition : 0)
                         color: Theme.textDim
                         font.pixelSize: 9
+                        font.family: Theme.fontFamily
                     }
                     Text {
                         id: lenLabel
@@ -451,6 +454,7 @@ Item {
                         text: progress.ready ? root._fmt(root.mediaService.effectiveLength) : "--:--"
                         color: Theme.textDim
                         font.pixelSize: 9
+                        font.family: Theme.fontFamily
                     }
                     Rectangle {
                         id: track
@@ -603,6 +607,7 @@ Item {
                                 + (playerRow.modelData.isRemote ? "  ·  remote" : "")
                             color: playerRow.current ? Theme.accent : Theme.text
                             font.pixelSize: 11
+                            font.family: Theme.fontFamily
                             font.weight: playerRow.current ? Font.DemiBold : Font.Normal
                             elide: Text.ElideRight
                         }

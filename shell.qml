@@ -9,7 +9,9 @@ import "modules/launcher"
 import "modules/controllers"
 import "modules/bar"
 import "modules/capture"
+import "modules/display"
 import "modules/services"
+import "modules/settings"
 import "modules/osd"
 
 ShellRoot {
@@ -27,6 +29,36 @@ ShellRoot {
         }
         if (Quickshell.screens.length > 0) return Quickshell.screens[0]
         return null
+    }
+
+    // The Dynamic Center surfaces (display / wallpapers / media) are
+    // rendered by the full Bar, so their IPC must target the screen hosting that
+    // Bar - never the focused one, or barState.screen names a screen with no Bar
+    // and nothing renders. The power menu's window is standalone now, but its
+    // IPC keeps this same targeting: barState.screen is the screen it renders
+    // on. That screen is the persisted Primary Display, resolved
+    // through DisplayService's stable identity; when the preference is internal,
+    // or the preferred external is disconnected, it is the internal panel (the
+    // same fallback enforcement uses). null when no internal panel exists at all,
+    // so callers fall back to the focused screen.
+    function barScreen() {
+        const n = DisplayService.primaryMonitorName()
+        if (n) {
+            for (let i = 0; i < Quickshell.screens.length; i++) {
+                if (Quickshell.screens[i].name === n)
+                    return Quickshell.screens[i]
+            }
+        }
+        for (let i = 0; i < Quickshell.screens.length; i++) {
+            if (isInternalScreen(Quickshell.screens[i]))
+                return Quickshell.screens[i]
+        }
+        return null
+    }
+
+    function isBarScreen(s) {
+        const b = barScreen()
+        return b !== null && s === b
     }
 
     QtObject {
@@ -60,25 +92,17 @@ ShellRoot {
 
         property string mode: ""
         property ShellScreen screen: null
-        // true when "media" mode was opened by the user clicking the bar
-        // preview (vs auto-expand). Gates the focus grab (Bar) + focus routing
-        // (DynamicCenter/MediaPlayer) and suppresses the auto-hide timer:
-        // manual is a persistent interactive surface, auto is focus-free.
-        property bool mediaManual: false
-
-        // Escape / click-outside clear `mode` -> kill the auto-hide timer in the
-        // same turn so a stale tick can't fire after an early dismiss.
-        onModeChanged: if (mode !== "media") mediaAutoHide.stop()
-        // Manual open pins the panel: kill any auto-hide already counting.
-        onMediaManualChanged: if (mediaManual) mediaAutoHide.stop()
+        // true while the floating media player popover is open. Gates the 1 Hz
+        // position tick and the popover's dismissal state.
+        property bool mediaPopoverOpen: false
     }
 
-    // ---- Media: one service shared by every screen's bar preview + expanded
-    // player, plus the auto-expand / auto-hide lifecycle for the "media"
-    // DynamicCenter surface.
+    // ---- Media: one service shared by the bar pill and the floating player
+    // popover. The popover opens only on an explicit pill click; playback /
+    // track events never change shell state.
     MediaService {
         id: mediaService
-        positionActive: barState.mode === "media"
+        positionActive: barState.mediaPopoverOpen
     }
 
     // Own AudioService for the volume keybind IPC below. ControlCenter keeps
@@ -97,51 +121,6 @@ ShellRoot {
         value: mediaService.playing
     }
 
-    Timer {
-        id: mediaAutoHide
-        interval: 3000
-        running: barState.mode === "media" && !barState.mediaManual
-        onTriggered: {
-            // Manual-open never auto-hides; it closes via Escape/outside-click.
-            if (barState.mode === "media" && !barState.mediaManual) {
-                barState.screen = null
-                barState.mode = ""
-            }
-        }
-    }
-
-    Connections {
-        target: mediaService
-
-        // Playback started / track changed while playing -> briefly expand.
-        // (MediaService only fires mediaEvent on a real paused/stopped->playing
-        // transition or a track change; no need to re-check playing here, and a
-        // laggy player may still report paused for a beat after the command.)
-        function onMediaEvent() {
-            if (barState.mode !== "" && barState.mode !== "media")
-                return
-            // Already pinned open by an explicit user click -> a track change
-            // must NOT demote it into an auto-hiding preview.
-            if (barState.mode === "media" && barState.mediaManual)
-                return
-            focusState.inquire()
-            const screen = focusedScreen()
-            if (!screen)
-                return
-            barState.mediaManual = false
-            barState.screen = screen
-            barState.mode = "media"
-            mediaAutoHide.restart()
-        }
-
-        // User is interacting with the auto-expanded player -> keep it open by
-        // postponing the auto-hide timer. Manual-open has no timer running.
-        function onInteraction() {
-            if (barState.mode === "media" && !barState.mediaManual)
-                mediaAutoHide.restart()
-        }
-    }
-
     IpcHandler {
         target: "launcher"
 
@@ -155,7 +134,7 @@ ShellRoot {
 
         function show(): void {
             focusState.inquire()
-            const screen = focusedScreen()
+            const screen = barScreen() || focusedScreen()
             if (!screen) return
             if (barState.mode === "power" && barState.screen === screen) return
             barState.screen = screen
@@ -180,7 +159,7 @@ ShellRoot {
 
         function show(): void {
             focusState.inquire()
-            const screen = focusedScreen()
+            const screen = barScreen() || focusedScreen()
             if (!screen) return
             if (barState.mode === "display" && barState.screen === screen) return
             barState.screen = screen
@@ -202,7 +181,7 @@ ShellRoot {
 
         function show(): void {
             focusState.inquire()
-            const screen = focusedScreen()
+            const screen = barScreen() || focusedScreen()
             if (!screen) return
             if (barState.mode === "wallpapers" && barState.screen === screen) return
             barState.screen = screen
@@ -224,7 +203,7 @@ ShellRoot {
 
         function show(): void {
             focusState.inquire()
-            const screen = focusedScreen()
+            const screen = barScreen() || focusedScreen()
             if (!screen) return
             if (barState.mode === "mediaPreview" && barState.screen === screen) return
             barState.screen = screen
@@ -245,7 +224,7 @@ ShellRoot {
 
         function show(): void {
             focusState.inquire()
-            const screen = focusedScreen()
+            const screen = barScreen() || focusedScreen()
             if (!screen) return
             if (barState.mode === "mediaCompact" && barState.screen === screen) return
             barState.screen = screen
@@ -282,9 +261,9 @@ ShellRoot {
     IpcHandler {
         target: "capture"
 
-        // Capture is not a barState.mode - clear any open surface first so
-        // DynamicCenter.activeSurface can resolve to "capture" and the picker
-        // renders instead of being shadowed by e.g. an open Power Menu.
+        // The capture picker is a standalone floating window, not a
+        // barState.mode - clear any open bar surface first so the Bar
+        // window's focus grab can't shadow the picker's own input.
         function open(): void {
             console.log("[IPC] capture open")
             barState.screen = null
@@ -294,7 +273,7 @@ ShellRoot {
         function region(): void { CaptureService.triggerCapture("region") }
         function window(): void { CaptureService.triggerCapture("window") }
         function screen(): void { CaptureService.triggerCapture("screen") }
-        // instant full-screen shot straight to file + clipboard, no CaptureBar UI
+        // instant shot of the focused screen straight to file + clipboard, no picker UI
         function fullscreen(): void { CaptureService.captureFullscreen() }
         function bar(): void {
             barState.screen = null
@@ -321,6 +300,27 @@ ShellRoot {
         }
         function toggle(): void {
             if (barState.mode === "center") hide()
+            else show()
+        }
+    }
+
+    IpcHandler {
+        target: "settings"
+
+        function show(): void {
+            focusState.inquire()
+            const screen = focusedScreen()
+            if (!screen) return
+            barState.screen = null
+            barState.mode = ""
+            CaptureService.closeBar()
+            SettingsService.show(screen)
+        }
+        function hide(): void {
+            SettingsService.hide()
+        }
+        function toggle(): void {
+            if (SettingsService.open) hide()
             else show()
         }
     }
@@ -355,37 +355,93 @@ ShellRoot {
         }
     }
 
+    // Hardware split only: eDP* is the laptop panel (same convention as
+    // DisplayService.layout[].internal). It is the fallback for barScreen()
+    // when the Primary Display cannot be resolved from the preference.
+    function isInternalScreen(s) {
+        return s && s.name && s.name.indexOf("eDP") === 0
+    }
+
     Variants {
-        model: Quickshell.screens.map(screen => ({ barState: barState, launcherController: launcherController, mediaService: mediaService, screen: screen }))
+        // Full bar on the screen that hosts the Primary Display (the other one
+        // gets the DynamicIsland below). Same fallback as before: if no bar
+        // screen can be resolved at all (renamed outputs), bar everywhere so no
+        // monitor is ever left without one.
+        model: Quickshell.screens.filter(screen => isBarScreen(screen) || barScreen() === null).map(screen => ({ barState: barState, launcherController: launcherController, mediaService: mediaService, screen: screen }))
 
         delegate: Bar {}
     }
 
     Variants {
-        model: Quickshell.screens.map(screen => ({ barState: barState, screen: screen }))
+        // Dynamic Island on the one other active monitor. Empty when the bar
+        // screen could not be resolved (the bar-everywhere fallback above).
+        model: Quickshell.screens.filter(screen => !isBarScreen(screen) && barScreen() !== null).map(screen => ({ mediaService: mediaService, screen: screen }))
+
+        delegate: DynamicIsland {}
+    }
+
+    // Everything the full Bar owns or is opened from travels with it: the
+    // Control Center (opened from a bar click), the Notification Center (bar
+    // Date & Time) and the toast stack all live on the bar screen, exactly as
+    // they used to live on the internal screen. (Capture is the exception -
+    // see its all-screens Variants below.)
+    Variants {
+        model: Quickshell.screens.filter(screen => isBarScreen(screen) || barScreen() === null).map(screen => ({ barState: barState, screen: screen }))
 
         delegate: ControlCenter {}
     }
 
     Variants {
-        model: Quickshell.screens.map(screen => ({ screen: screen }))
+        model: Quickshell.screens.filter(screen => isBarScreen(screen) || barScreen() === null).map(screen => ({ screen: screen }))
 
         delegate: NotificationCenter {}
     }
 
     Variants {
-        model: Quickshell.screens.map(screen => ({ screen: screen }))
+        model: Quickshell.screens.filter(screen => isBarScreen(screen) || barScreen() === null).map(screen => ({ screen: screen }))
 
         delegate: NotificationPopup {}
     }
 
     Variants {
+        // Capture overlay + picker live on every screen: each instance gates
+        // its own visibility to the Hyprland-focused screen, so region /
+        // window selection and the floating picker work on whichever monitor
+        // is focused - not only the bar screen.
         model: Quickshell.screens.map(screen => ({ screen: screen }))
 
         delegate: CaptureOverlay {}
     }
 
     Variants {
+        model: Quickshell.screens.map(screen => ({ screen: screen }))
+
+        delegate: CapturePicker {}
+    }
+
+    Variants {
+        // Power menu on every screen: a standalone centred modal over a
+        // dimmed background. Each instance gates on barState (mode "power"
+        // + its screen), which the unchanged `power` IPC target writes, so
+        // it renders on the same screen the IPC targeted - just no longer
+        // inside the Bar window's DynamicCenter.
+        model: Quickshell.screens.map(screen => ({ barState: barState, screen: screen }))
+
+        delegate: PowerMenuWindow {}
+    }
+
+    Variants {
+        model: Quickshell.screens.map(screen => ({ screen: screen }))
+
+        delegate: SettingsWindow {}
+    }
+
+    Variants {
+        // OSD stays on every screen by design: the volume/brightness/caps
+        // overlay renders on the focused screen only (see OSD.qml isFocused),
+        // so filtering it to internal would hide it whenever an external
+        // monitor is focused. Lightweight click-through window; only one ever
+        // shows at a time, never a duplicate.
         model: Quickshell.screens.map(screen => ({ screen: screen }))
 
         delegate: OSD {}

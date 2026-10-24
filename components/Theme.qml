@@ -18,10 +18,15 @@ Item {
     property color activeTile: "#c4c9d1"
 
     // Shared translucent-surface opacity, sourced from the Wallust-generated
-    // palette (`surfaceOpacity`, 0.5 in the template). Consumed by the static
-    // bar, DynamicCenter frame, ControlCenter panels, and OSD backgrounds.
-    // Falls back to 1 (fully opaque) while no palette provides it.
+    // palette (`surfaceOpacity`, 0.5 in the template). Panel backgrounds use
+    // moduleSurfaceOpacity instead; this remains the palette alpha for derived
+    // state fills. Falls back to 1 (fully opaque) while no palette provides it.
     property real surfaceOpacity: 1
+
+    // Surface opacity by layer: every module surface is fully opaque, the bar
+    // strip is fully transparent.
+    property real moduleSurfaceOpacity: 1
+    property real barSurfaceOpacity: 0
 
     // Active/ON-state icon color (white, constant across wallpapers so icons
     // stay readable). Sourced from the Wallust palette (`icon`).
@@ -30,15 +35,21 @@ Item {
     // Material prototype (static bar only): ultra-subtle directional top
     // highlight + bottom edge key over the blurred backdrop. Neutral white at
     // single-digit opacities; the surfaceOpacity tint does the heavy lifting.
-    property real materialHighlightOpacity: 0.28
+    property real materialHighlightOpacity: 0
     property real materialBorderOpacity: 0.06
 
+    // Slight raised shadow under bar text (Text.Raised styleColor): dark at
+    // moderate alpha, just enough to separate light text from bright
+    // wallpapers or windows without looking like an outline. Constant, not
+    // palette-driven — a shadow is dark in any theme.
+    property color textShadow: Qt.rgba(0, 0, 0, 0.6)
+
     // UI text typeface (`font.family: Theme.fontFamily` on Text elements).
-    // "Google Sans Flex" is the variable-font build of Google Sans installed on
-    // this system; plain "Google Sans" is not a registered family and would
-    // silently fall back to Noto Sans. NEVER apply this to icon glyphs
-    // (Nerd Font / symbol strings) - those keep their own family.
-    readonly property string fontFamily: "Google Sans Flex"
+    // "Inter" must be installed on the system (it is not bundled in this
+    // repo); if it is missing, Qt silently falls back to another sans.
+    // NEVER apply this to icon glyphs (symbol strings, media-control glyphs)
+    // - those keep their own family / system fallback so the symbols resolve.
+    readonly property string fontFamily: "Inter"
 
     readonly property real cornerRadius: 22
 

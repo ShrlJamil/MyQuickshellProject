@@ -38,6 +38,8 @@ Item {
             // e.g. "Tue 2 Apr, 17:23"
             text: Qt.formatDateTime(clock.date, "ddd d MMM, HH:mm")
             color: Theme.icon
+            style: Text.Raised
+            styleColor: Theme.textShadow
             font.family: Theme.fontFamily
             font.weight: Font.Black
             font.pixelSize: 14

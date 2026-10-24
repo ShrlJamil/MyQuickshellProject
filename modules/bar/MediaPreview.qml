@@ -20,7 +20,67 @@ Item {
     // is paused / stopped / gone.
     readonly property bool active: root.mediaService && root.mediaService.hasMedia
     readonly property bool playing: root.active && root.mediaService.playing
-    visible: root.active
+
+    property bool show: false
+    property bool _present: false
+    // Artwork travel progress, derived from the live artwork offset - the
+    // single driver for the content reveal below. 0 at the staged start pose
+    // (left edge flush with the preview's right edge, clear of the content),
+    // 1 once the artwork rests in its slot.
+    readonly property real _startX: Math.max(0, row.implicitWidth)
+    readonly property real apart: root._startX <= 0 ? 1
+        : Math.max(0, Math.min(1, 1 - coverShift.x / root._startX)
+        )
+    function _band(p, lo, span) {
+        return Math.max(0, Math.min(1, (p - lo) / span))
+    }
+    visible: root._present
+    opacity: root.show ? 1 : 0
+    Behavior on opacity {
+        NumberAnimation {
+            duration: root.show ? 0 : 200
+            easing.type: Easing.InCubic
+            onFinished: if (!root.show) root._present = false
+        }
+    }
+    transform: Scale {
+        origin.x: root.width / 2
+        origin.y: root.height / 2
+        xScale: root.show ? 1 : 0.6
+        yScale: 1
+        Behavior on xScale {
+            NumberAnimation {
+                duration: root.show ? 0 : 200
+                easing.type: Easing.InCubic
+                onFinished: if (!root.show) root._present = false
+            }
+        }
+    }
+    onShowChanged: {
+        if (root.show) {
+            root._present = true
+            enterAnim.stop()
+            coverShift.x = root._startX
+            cover.opacity = 0
+            enterAnim.restart()
+        } else {
+            enterAnim.stop()
+        }
+    }
+    Component.onCompleted: {
+        if (root.show) {
+            root._present = true
+            coverShift.x = root._startX
+            cover.opacity = 0
+            enterAnim.restart()
+        }
+    }
+
+    ParallelAnimation {
+        id: enterAnim
+        NumberAnimation { target: coverShift; property: "x"; from: root._startX; to: 0; duration: 900; easing.type: Easing.OutQuart }
+        NumberAnimation { target: cover; property: "opacity"; from: 0; to: 1; duration: 130; easing.type: Easing.OutCubic }
+    }
 
     implicitHeight: 30
     implicitWidth: row.implicitWidth
@@ -30,10 +90,12 @@ Item {
 
     HoverHandler {
         id: hover
+        enabled: root.show
         cursorShape: Qt.PointingHandCursor
     }
 
     TapHandler {
+        enabled: root.show
         onTapped: root.activateRequested()
     }
 
@@ -63,6 +125,13 @@ Item {
             clip: true
             color: Theme.surface
             anchors.verticalCenter: parent.verticalCenter
+            // Top layer within the row: the travelling artwork occludes the
+            // content it vacates, reading as a curtain reveal. Same stacking
+            // context (Row), so no hierarchy change is needed.
+            // Constantly opaque: the artwork is fully visible from frame one;
+            // `apart` only drives the reveal of the content behind it.
+            z: 1
+            transform: Translate { id: coverShift }
 
             Image {
                 id: art
@@ -104,12 +173,18 @@ Item {
                 width: Math.min(titleText.implicitWidth, root.textMax)
                 height: titleText.implicitHeight
                 clip: true
+                opacity: root._band(root.apart, 0.35, 0.30)
+                transform: Translate {
+                    id: titleShift
+                    x: (1 - root._band(root.apart, 0.35, 0.30)) * 20
+                }
 
                 Text {
                     id: titleText
                     text: root.active ? root.mediaService.title : ""
                     color: Theme.icon
                     font.pixelSize: 12
+                    font.family: Theme.fontFamily
                     font.weight: Font.DemiBold
 
                     readonly property bool overflow: implicitWidth > titleClip.width + 0.5
@@ -138,12 +213,19 @@ Item {
             }
 
             Text {
+                id: artistText
                 width: Math.min(implicitWidth, root.textMax)
                 text: root.active ? root.mediaService.artist : ""
                 color: Theme.icon
                 font.pixelSize: 10
+                font.family: Theme.fontFamily
                 elide: Text.ElideRight
                 maximumLineCount: 1
+                opacity: root._band(root.apart, 0.55, 0.30)
+                transform: Translate {
+                    id: artistShift
+                    x: (1 - root._band(root.apart, 0.55, 0.30)) * 16
+                }
             }
         }
 
@@ -156,6 +238,11 @@ Item {
             width: 16
             height: root.coverSize
             anchors.verticalCenter: parent.verticalCenter
+            opacity: root._band(root.apart, 0.10, 0.30)
+            transform: Translate {
+                id: vizShift
+                x: (1 - root._band(root.apart, 0.10, 0.30)) * 14
+            }
 
             readonly property bool live: root.playing
             readonly property real barMax: 14
@@ -183,13 +270,19 @@ Item {
                         readonly property real level: (viz.live && viz.spec && viz.spec.length > cell.tap)
                             ? Math.max(0, Math.min(1, viz.spec[cell.tap] * viz.gain))
                             : 0
+                        readonly property real enterK: root._band(root.apart, 0.10 + cell.index * 0.08, 0.25)
 
                         Rectangle {
+                            id: bar
                             width: parent.width
                             radius: width / 2
                             color: Theme.accent
                             anchors.bottom: parent.bottom
                             height: Math.max(2, viz.barMax * cell.level)
+                            transform: Scale {
+                                origin.y: viz.barMax
+                                yScale: 0.15 + 0.85 * cell.enterK
+                            }
                             Behavior on height {
                                 NumberAnimation { duration: 60; easing.type: Easing.OutQuad }
                             }

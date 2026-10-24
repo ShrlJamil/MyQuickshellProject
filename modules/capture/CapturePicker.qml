@@ -1,0 +1,113 @@
+import QtQuick
+import Qt5Compat.GraphicalEffects
+import Quickshell
+import Quickshell.Hyprland
+import Quickshell.Wayland
+import "."
+import "../../components"
+
+// Floating capture picker: a standalone bottom-centre PanelWindow, one
+// instance per screen, active only on the Hyprland-focused screen. It
+// replaces the old DynamicCenter-hosted picker, so capture can be invoked
+// on any monitor - not just the bar screen - and no longer depends on
+// barState / the Bar window's focus grab.
+//
+// The WINDOW NEVER UNMAPS (visible stays true); `pickerActive` gates the
+// card, the input mask, focusable and the focus grab instead. This follows
+// the Bar window (wallpaper picker / DynamicCenter surfaces) and
+// DynamicIsland, whose grabs work: Hyprland assigns keyboard focus when a
+// grab commits, so the grab must land on a surface that is already mapped.
+// A window that maps in the same instant its grab activates only ever
+// received keyboard focus through the hover / follow-mouse path.
+//
+// CaptureBar owns the buttons and hotkeys (R / W / F / Esc). This window
+// owns placement, framing and dismissal: Esc / Cancel run through
+// CaptureBar -> CaptureService.closeBar(), a click outside clears the
+// focus grab below, which also closes the picker.
+PanelWindow {
+    id: root
+
+    required property var modelData
+
+    screen: modelData.screen
+
+    readonly property bool isFocusedScreen: modelData.screen
+        && Hyprland.focusedMonitor
+        && modelData.screen.name === Hyprland.focusedMonitor.name
+
+    // Content state, NOT window visibility (see the header note): the card,
+    // the grab and keyboard focusability all follow this, while the surface
+    // itself stays mapped for the shell's whole lifetime.
+    readonly property bool pickerActive: CaptureService.barVisible && root.isFocusedScreen
+
+    visible: true
+
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.namespace: "quickshell-capture-picker"
+    WlrLayershell.exclusionMode: ExclusionMode.Ignore
+    // Deliberately NO keyboardFocus override: the default (None) is what every
+    // working grab surface in this shell uses (Launcher, DynamicIsland). An
+    // OnDemand surface joins the normal layer-shell focus flow, where
+    // Hyprland's follow-mouse grants it keyboard focus only while hovered and
+    // the HyprlandFocusGrab below never effectively holds - the picker
+    // hotkeys then only work under the mouse. The grab is the sole focus
+    // mechanism for this window.
+
+    anchors { bottom: true }
+    margins { bottom: 16 }
+
+    // Card (460x64) plus 16px of breathing room on every side so the drop
+    // shadow is not clipped by the surface edge (MediaPlayerPopover pattern).
+    implicitWidth: 492
+    implicitHeight: 96
+
+    color: "transparent"
+    // Tied to the content state like DynamicIsland's `focusable: expanded`:
+    // an inactive picker window must not be a keyboard focus candidate.
+    focusable: root.pickerActive
+
+    // Input only on the card itself while active; the padding ring stays
+    // click-through. While inactive the region is empty (Launcher idiom),
+    // so the always-mapped surface never swallows pointer input.
+    mask: Region { item: root.pickerActive ? frame : null }
+
+    HyprlandFocusGrab {
+        windows: [root]
+        active: root.pickerActive
+
+        onCleared: {
+            // Guarded like the other popovers: a programmatic close flips
+            // `active` off itself and must not re-enter.
+            if (!CaptureService.barVisible)
+                return
+            CaptureService.closeBar()
+        }
+    }
+
+    Rectangle {
+        id: frame
+
+        visible: root.pickerActive
+        anchors.centerIn: parent
+        width: 460
+        height: 64
+        radius: 18
+        color: Theme.background
+        border.width: 1
+        border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+
+        layer.enabled: true
+        layer.effect: DropShadow {
+            transparentBorder: true
+            horizontalOffset: 0
+            verticalOffset: 4
+            radius: 16
+            samples: 25
+            color: Qt.rgba(0, 0, 0, 0.45)
+        }
+
+        CaptureBar {
+            anchors.centerIn: parent
+        }
+    }
+}

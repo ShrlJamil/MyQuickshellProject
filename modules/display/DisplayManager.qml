@@ -317,6 +317,7 @@ Item {
                 text: "No monitors detected"
                 color: Theme.textMuted
                 font.pixelSize: 12
+                font.family: Theme.fontFamily
             }
 
             // Subtle grid + origin, drawn in logical coordinate space.
@@ -411,6 +412,7 @@ Item {
                             text: monBlock.modelData
                             color: monBlock.selected ? Theme.accent : Theme.text
                             font.pixelSize: 12
+                            font.family: Theme.fontFamily
                             font.weight: Font.DemiBold
                         }
 
@@ -422,6 +424,7 @@ Item {
                                 : ""
                             color: Theme.textMuted
                             font.pixelSize: 10
+                            font.family: Theme.fontFamily
                         }
                     }
 
@@ -501,6 +504,7 @@ Item {
                     : ""
                 color: Theme.accent
                 font.pixelSize: 10
+                font.family: Theme.fontFamily
                 font.weight: Font.DemiBold
             }
         }
@@ -541,8 +545,96 @@ Item {
                         text: presetPill.modelData.label
                         color: Theme.text
                         font.pixelSize: 11
+                        font.family: Theme.fontFamily
                         font.weight: Font.DemiBold
                     }
+                }
+            }
+        }
+
+        // Primary display preference. Hyprland has no native primary-output
+        // property, so this selects which display should sit at logical (0,0);
+        // it is stored in DisplayService (statePath) and enforced in Extend mode
+        // only. A disconnected saved external stays selected but is shown
+        // unavailable, and the internal panel keeps the origin meanwhile.
+        Row {
+            spacing: 8
+
+            Text {
+                height: 28
+                verticalAlignment: Text.AlignVCenter
+                text: "Primary"
+                color: Theme.textMuted
+                font.pixelSize: 11
+                font.family: Theme.fontFamily
+                font.weight: Font.DemiBold
+            }
+
+            Repeater {
+                model: DisplayService.monitorNames()
+
+                delegate: Rectangle {
+                    id: primaryPill
+
+                    required property string modelData
+                    readonly property var info: DisplayService.layout[primaryPill.modelData]
+                    readonly property bool active: primaryPill.info
+                        ? (primaryPill.info.internal
+                            ? DisplayService.primaryKind === "internal"
+                            : DisplayService.isPreferredExternal(primaryPill.modelData))
+                        : false
+
+                    width: primaryLabel.implicitWidth + 24
+                    height: 28
+                    radius: height / 2
+                    color: primaryPill.active
+                        ? Theme.accent
+                        : (primaryHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background)
+
+                    HoverHandler {
+                        id: primaryHover
+                        cursorShape: Qt.PointingHandCursor
+                    }
+
+                    TapHandler {
+                        onTapped: {
+                            if (primaryPill.info && primaryPill.info.internal)
+                                DisplayService.setPrimaryInternal()
+                            else
+                                DisplayService.setPrimaryExternal(primaryPill.modelData)
+                        }
+                    }
+
+                    Text {
+                        id: primaryLabel
+                        anchors.centerIn: parent
+                        text: DisplayService.humanName(primaryPill.modelData)
+                        color: primaryPill.active ? Theme.background : Theme.text
+                        font.pixelSize: 11
+                        font.family: Theme.fontFamily
+                        font.weight: Font.DemiBold
+                    }
+                }
+            }
+
+            Rectangle {
+                visible: DisplayService.primaryKind === "external" && !DisplayService.preferredExternalPresent()
+                width: savedPrimaryLabel.implicitWidth + 24
+                height: 28
+                radius: height / 2
+                color: Theme.background
+                border.width: 1
+                border.color: Theme.accent
+                opacity: 0.7
+
+                Text {
+                    id: savedPrimaryLabel
+                    anchors.centerIn: parent
+                    text: DisplayService.savedExternalLabel()
+                    color: Theme.accent
+                    font.pixelSize: 11
+                    font.family: Theme.fontFamily
+                    font.weight: Font.DemiBold
                 }
             }
         }
@@ -556,6 +648,7 @@ Item {
                 text: DisplayService.selectedMonitor
                 color: Theme.text
                 font.pixelSize: 13
+                font.family: Theme.fontFamily
                 font.weight: Font.DemiBold
             }
 
@@ -564,6 +657,7 @@ Item {
                 wrapMode: Text.WordWrap
                 color: Theme.textMuted
                 font.pixelSize: 10
+                font.family: Theme.fontFamily
                 text: root.selectedInfo
                     ? (root.selectedInfo.width + "×" + root.selectedInfo.height
                        + " @ " + root.selectedInfo.refresh + "Hz   •   Scale " + root.selectedInfo.scale
@@ -595,6 +689,7 @@ Item {
                     text: resolutionBox.labelText
                     color: Theme.text
                     font.pixelSize: 12
+                    font.family: Theme.fontFamily
                 }
 
                 IconImage {
@@ -655,6 +750,7 @@ Item {
                                 text: modeDelegate.modelData
                                 color: Theme.text
                                 font.pixelSize: 11
+                                font.family: Theme.fontFamily
                                 verticalAlignment: Text.AlignVCenter
                             }
 
@@ -701,6 +797,7 @@ Item {
                             text: scalePill.modelData.toFixed(2).replace(/0+$/, "").replace(/\.$/, "")
                             color: scalePill.active ? Theme.background : Theme.text
                             font.pixelSize: 11
+                            font.family: Theme.fontFamily
                             font.weight: Font.DemiBold
                         }
                     }
@@ -729,6 +826,7 @@ Item {
                             text: (transformPill.modelData * 90) + "°"
                             color: transformPill.active ? Theme.background : Theme.text
                             font.pixelSize: 11
+                            font.family: Theme.fontFamily
                             font.weight: Font.DemiBold
                         }
                     }
@@ -769,6 +867,7 @@ Item {
                 text: "Apply"
                 color: Theme.background
                 font.pixelSize: 12
+                font.family: Theme.fontFamily
                 font.weight: Font.DemiBold
             }
         }
@@ -792,6 +891,7 @@ Item {
                 text: "Cancel"
                 color: Theme.accent
                 font.pixelSize: 12
+                font.family: Theme.fontFamily
                 font.weight: Font.DemiBold
             }
         }
@@ -803,6 +903,7 @@ Item {
             text: DisplayService.statusMessage
             color: DisplayService.statusIsError ? Theme.accent : Theme.textMuted
             font.pixelSize: 11
+            font.family: Theme.fontFamily
         }
     }
 }
