@@ -540,6 +540,22 @@ PanelWindow {
                     return out
                 }
 
+                // Inline-reply availability/mode, mirrored on the card so the
+                // actions row can consult them WITHOUT instantiating the
+                // reply editor (see replyLoader below). Availability is a pure
+                // function of the notification; mode reads through the loader
+                // once it exists.
+                readonly property bool replyAvailable: !!(notifCard.modelData.notification
+                    && notifCard.modelData.notification.hasInlineReply)
+                readonly property bool replyModeOn: !!(replyLoader.item && replyLoader.item.replyMode)
+
+                // Build the reply editor on first use, then flip it open.
+                function openReply() {
+                    replyLoader.active = true
+                    if (replyLoader.item)
+                        replyLoader.item.replyMode = true
+                }
+
                 width: notifList.width
                 height: cardCol.implicitHeight + 20
                 radius: 12
@@ -670,14 +686,14 @@ PanelWindow {
                         spacing: 16
                         topPadding: 4
                         visible: notifCard.actionItems.length > 0
-                            || (replyWidget.available && !replyWidget.replyMode)
+                            || (notifCard.replyAvailable && !notifCard.replyModeOn)
 
                         // Reply as a generic action: identical metrics/style
                         // to the delegates after this; opens the input below.
                         Text {
                             id: replyActLabel
 
-                            visible: replyWidget.available && !replyWidget.replyMode
+                            visible: notifCard.replyAvailable && !notifCard.replyModeOn
                             width: replyActLabel.implicitWidth
                             height: 28
                             verticalAlignment: Text.AlignVCenter
@@ -692,7 +708,7 @@ PanelWindow {
                             }
                             TapHandler {
                                 gesturePolicy: TapHandler.ReleaseWithinBounds
-                                onTapped: replyWidget.replyMode = true
+                                onTapped: notifCard.openReply()
                             }
                         }
 
@@ -731,12 +747,23 @@ PanelWindow {
                     // Reply is rendered as the first item of the actions Flow
                     // above, same style as generic actions. The expanded input
                     // form lives here, below the whole action row.
-                    NotificationReply {
-                        id: replyWidget
+                    //
+                    // Loaded lazily, exactly as in the popup: the editor's
+                    // object tree is built only when the user first opens the
+                    // reply on this card (notifCard.openReply) and then kept
+                    // for the card's remaining life, so a history full of
+                    // never-replied notifications carries none of its cost.
+                    Loader {
+                        id: replyLoader
                         width: parent.width
-                        showAffordance: false
-                        notifId: notifCard.modelData.id
-                        notification: notifCard.modelData.notification
+                        active: false
+                        visible: notifCard.replyAvailable
+
+                        sourceComponent: NotificationReply {
+                            showAffordance: false
+                            notifId: notifCard.modelData.id
+                            notification: notifCard.modelData.notification
+                        }
                     }
                 }
             }

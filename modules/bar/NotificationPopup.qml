@@ -100,6 +100,23 @@ PanelWindow {
                     return out
                 }
 
+                // Inline-reply availability/mode, mirrored on the slot so the
+                // actions row and the auto-dismiss timer can consult them
+                // WITHOUT instantiating the reply editor (see replyLoader).
+                // Availability is a pure function of the notification; mode
+                // and active simply read through the loader once it exists.
+                readonly property bool replyAvailable: !!(slot.modelData.notification
+                    && slot.modelData.notification.hasInlineReply)
+                readonly property bool replyModeOn: !!(replyLoader.item && replyLoader.item.replyMode)
+                readonly property bool replyActive: !!(replyLoader.item && replyLoader.item.active)
+
+                // Build the reply editor on first use, then flip it open.
+                function openReply() {
+                    replyLoader.active = true
+                    if (replyLoader.item)
+                        replyLoader.item.replyMode = true
+                }
+
                 function beginClose() {
                     if (slot.closing)
                         return
@@ -133,7 +150,7 @@ PanelWindow {
                     running: !slot.closing
                         && !slot.modelData.critical
                         && !hoverHandler.hovered
-                        && !replyWidget.active
+                        && !slot.replyActive
                     onTriggered: slot.beginClose()
                 }
 
@@ -334,14 +351,14 @@ PanelWindow {
                             width: parent.width
                             spacing: 16
                             visible: slot.actionItems.length > 0
-                                || (replyWidget.available && !replyWidget.replyMode)
+                                || (slot.replyAvailable && !slot.replyModeOn)
 
                             // Reply as a generic action: identical metrics/style
                             // to the delegates after this; opens the input below.
                             Text {
                                 id: replyActLabel
 
-                                visible: replyWidget.available && !replyWidget.replyMode
+                                visible: slot.replyAvailable && !slot.replyModeOn
                                 width: replyActLabel.implicitWidth
                                 height: 28
                                 verticalAlignment: Text.AlignVCenter
@@ -356,7 +373,7 @@ PanelWindow {
                                 }
                                 TapHandler {
                                     gesturePolicy: TapHandler.ReleaseWithinBounds
-                                    onTapped: replyWidget.replyMode = true
+                                    onTapped: slot.openReply()
                                 }
                             }
 
@@ -395,27 +412,43 @@ PanelWindow {
                         // is the first item of the actions Flow above, same
                         // style as generic actions. The expanded input form
                         // lives here, below the whole action row.
-                        NotificationReply {
-                            id: replyWidget
+                        //
+                        // Loaded lazily: the editor's object tree (TextInput,
+                        // buttons, handlers) is the heaviest part of this
+                        // delegate and most toasts are never replied to, so it
+                        // is built only when the user first opens the reply
+                        // (slot.openReply) and then kept for the toast's
+                        // remaining life — replyMode and the keyboard-focus
+                        // bookkeeping inside keep exactly one owner.
+                        Loader {
+                            id: replyLoader
                             width: parent.width
-                            showAffordance: false
-                            notifId: slot.modelData.id
-                            notification: slot.modelData.notification
+                            active: false
+                            visible: slot.replyAvailable
 
-                            // Raise the window's keyboard-focus demand only while
-                            // this reply is actually in use. Idempotent via
-                            // _counted so a toast torn down mid-reply still
-                            // balances the count. No state leaves this card.
-                            property bool _counted: false
-                            onActiveChanged: {
-                                if (replyWidget.active === replyWidget._counted)
-                                    return
-                                replyWidget._counted = replyWidget.active
-                                root.replyFocusHolders += replyWidget.active ? 1 : -1
-                            }
-                            Component.onDestruction: {
-                                if (replyWidget._counted)
-                                    root.replyFocusHolders -= 1
+                            sourceComponent: NotificationReply {
+                                id: replyItem
+
+                                showAffordance: false
+                                notifId: slot.modelData.id
+                                notification: slot.modelData.notification
+
+                                // Raise the window's keyboard-focus demand only
+                                // while this reply is actually in use. Idempotent
+                                // via _counted so a toast torn down mid-reply
+                                // still balances the count. No state leaves
+                                // this card.
+                                property bool _counted: false
+                                onActiveChanged: {
+                                    if (replyItem.active === replyItem._counted)
+                                        return
+                                    replyItem._counted = replyItem.active
+                                    root.replyFocusHolders += replyItem.active ? 1 : -1
+                                }
+                                Component.onDestruction: {
+                                    if (replyItem._counted)
+                                        root.replyFocusHolders -= 1
+                                }
                             }
                         }
                     }
