@@ -87,6 +87,15 @@ Item {
             ColorOverlay {
                 anchors.fill: battImg
                 source: battImg
+                layer.enabled: true
+                layer.effect: DropShadow {
+                    transparentBorder: true
+                    horizontalOffset: 0
+                    verticalOffset: 1
+                    radius: 2
+                    samples: 9
+                    color: Theme.textShadow
+                }
                 color: iconBox.attention ? Theme.accent : Theme.icon
 
                 // Subtle fade, fires only while the Image reloads on a

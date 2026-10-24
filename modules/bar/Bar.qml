@@ -430,6 +430,15 @@ PanelWindow {
             ColorOverlay {
                 anchors.fill: archImg
                 source: archImg
+                layer.enabled: true
+                layer.effect: DropShadow {
+                    transparentBorder: true
+                    horizontalOffset: 0
+                    verticalOffset: 1
+                    radius: 2
+                    samples: 9
+                    color: Theme.textShadow
+                }
                 color: Theme.icon
             }
 
@@ -784,6 +793,15 @@ PanelWindow {
 
                 source: activeWindowRow.resolveWindowIcon(activeWindowRow.rawAppId)
                 asynchronous: true
+                layer.enabled: true
+                layer.effect: DropShadow {
+                    transparentBorder: true
+                    horizontalOffset: 0
+                    verticalOffset: 1
+                    radius: 2
+                    samples: 9
+                    color: Theme.textShadow
+                }
             }
 
             Text {
@@ -911,6 +929,15 @@ PanelWindow {
 
                     source: "file://" + Quickshell.shellPath("assets/controls-symbolic.svg")
                     asynchronous: true
+                    layer.enabled: true
+                    layer.effect: DropShadow {
+                        transparentBorder: true
+                        horizontalOffset: 0
+                        verticalOffset: 1
+                        radius: 2
+                        samples: 9
+                        color: Theme.textShadow
+                    }
                 }
             }
         }
@@ -984,6 +1011,15 @@ PanelWindow {
             ColorOverlay {
                 anchors.fill: caffeineIndicatorImg
                 source: caffeineIndicatorImg
+                layer.enabled: true
+                layer.effect: DropShadow {
+                    transparentBorder: true
+                    horizontalOffset: 0
+                    verticalOffset: 1
+                    radius: 2
+                    samples: 9
+                    color: Theme.textShadow
+                }
                 color: Theme.icon
             }
 
@@ -1039,6 +1075,15 @@ PanelWindow {
                         asynchronous: true
 
                         source: trayItem.modelData.icon
+                        layer.enabled: true
+                        layer.effect: DropShadow {
+                            transparentBorder: true
+                            horizontalOffset: 0
+                            verticalOffset: 1
+                            radius: 2
+                            samples: 9
+                            color: Theme.textShadow
+                        }
                     }
 
                     MouseArea {
@@ -1142,6 +1187,15 @@ PanelWindow {
             ColorOverlay {
                 anchors.fill: micIndicatorImg
                 source: micIndicatorImg
+                layer.enabled: true
+                layer.effect: DropShadow {
+                    transparentBorder: true
+                    horizontalOffset: 0
+                    verticalOffset: 1
+                    radius: 2
+                    samples: 9
+                    color: Theme.textShadow
+                }
                 color: Theme.icon
             }
 
@@ -1212,6 +1266,15 @@ PanelWindow {
             ColorOverlay {
                 anchors.fill: wifiBarIcon
                 source: wifiBarIcon
+                layer.enabled: true
+                layer.effect: DropShadow {
+                    transparentBorder: true
+                    horizontalOffset: 0
+                    verticalOffset: 1
+                    radius: 2
+                    samples: 9
+                    color: Theme.textShadow
+                }
                 color: wifiIndicator.wifiOn ? Theme.icon : Theme.textMuted
             }
 

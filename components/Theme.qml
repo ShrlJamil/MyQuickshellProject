@@ -42,7 +42,7 @@ Item {
     // moderate alpha, just enough to separate light text from bright
     // wallpapers or windows without looking like an outline. Constant, not
     // palette-driven — a shadow is dark in any theme.
-    property color textShadow: Qt.rgba(0, 0, 0, 0.5)
+    property color textShadow: Qt.rgba(0, 0, 0, 0.6)
 
     // UI text typeface (`font.family: Theme.fontFamily` on Text elements).
     // "Inter" must be installed on the system (it is not bundled in this

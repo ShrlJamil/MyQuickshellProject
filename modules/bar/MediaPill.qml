@@ -91,6 +91,8 @@ Item {
             visible: art.status !== Image.Ready
             text: "\u266a"
             color: Theme.textMuted
+            style: Text.Raised
+            styleColor: Theme.textShadow
             font.pixelSize: 10
         }
     }
