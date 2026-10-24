@@ -1,12 +1,12 @@
 import QtQuick
 import Quickshell
-import Quickshell.Hyprland
 import Quickshell.Wayland
 import Quickshell.Widgets
 import "../../components"
 
-// Standalone toast stack (one per screen). Shows NotificationService.popups on
-// the currently focused monitor, newest on top. Each toast owns its lifecycle
+// Standalone toast stack (instances exist only on bar screens — see shell.qml).
+// Shows NotificationService.popups on the bar monitor regardless of which
+// monitor is currently focused, newest on top. Each toast owns its lifecycle
 // (auto-dismiss, hover-pause, close button). Removing a toast never touches the
 // Notification Center history — that stays in NotificationService.list.
 PanelWindow {
@@ -16,13 +16,11 @@ PanelWindow {
 
     screen: modelData.screen
 
-    // Reuse the project's existing "focused monitor" mechanism — no new screen
-    // detection. Only the focused screen's instance renders toasts.
-    readonly property bool onThisScreen: Hyprland.focusedMonitor
-        && root.modelData.screen
-        && Hyprland.focusedMonitor.name === root.modelData.screen.name
-
-    readonly property var items: root.onThisScreen ? NotificationService.popups : []
+    // Always render the toast stack on this (bar) screen, regardless of which
+    // monitor Hyprland currently has focused. Instances only exist on bar
+    // screens (shell.qml Variants), so in the normal setup exactly one stack
+    // renders; focus moving to another monitor never hides incoming toasts.
+    readonly property var items: NotificationService.popups
 
     visible: root.items.length > 0
 
