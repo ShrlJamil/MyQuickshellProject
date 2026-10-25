@@ -69,6 +69,15 @@ FocusScope {
         }
     }
 
+    // The lazy Loader in shell.qml CREATES this view as a result of the
+    // open, so the Connections above never observes that first open change.
+    // Run the same check once at creation; later category switches are
+    // covered by DisplayManager.onVisibleChanged as before.
+    Component.onCompleted: {
+        if (SettingsService.open && root.categoryIndex === SettingsService.displayCategory)
+            DisplayService.syncFromHyprland()
+    }
+
     // Deliberately square and full-bleed: this view fills a real application
     // window, so corner rounding belongs to the compositor (his Hyprland
     // rounding rules), not to the app - an app-drawn radius would double up

@@ -437,7 +437,21 @@ ShellRoot {
     // Settings is ONE floating application window for the whole shell (see
     // SettingsWindow.qml) - no per-screen Variants: Hyprland places and
     // manages it like any other app, gated only by SettingsService.open.
-    SettingsWindow {}
+    //
+    // Fully lazy, unlike the launcher's latch: the Loader is active exactly
+    // while Settings is open, so closing Settings DESTROYS the whole window
+    // + view + DisplayManager tree and a closed Settings costs nothing at
+    // all - no objects, no live bindings. SettingsService (the state
+    // singleton: open / screen / categoryIndex) outlives the tree, so the
+    // selected page survives the reload, and the Display page re-syncs on
+    // every open by design (see SettingsView).
+    Loader {
+        id: settingsLoader
+
+        active: SettingsService.open
+
+        sourceComponent: SettingsWindow {}
+    }
 
     Variants {
         // OSD stays on every screen by design: the volume/brightness/caps
