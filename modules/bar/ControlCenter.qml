@@ -60,15 +60,12 @@ PanelWindow {
 
     readonly property real colWidth: 210
     readonly property real colGap: 12
-    readonly property real wifiHeight: 100
-    readonly property real circleSize: 100
-    readonly property real circleGap: 10
     readonly property real rowGap: 10
-    readonly property real mediaHeight: 210
-    readonly property real focusHeight: 100
+    readonly property real heroHeight: 68
+    readonly property real gridTileSize: 96
     readonly property real sliderHeight: 100
-    readonly property real tilesHeight: root.wifiHeight + root.rowGap + root.circleSize + root.rowGap + root.focusHeight
-    readonly property real contentHeight: root.tilesHeight + root.rowGap + root.sliderHeight + root.rowGap + root.sliderHeight + root.rowGap + root.circleSize
+    readonly property real tilesHeight: root.heroHeight + 12 + root.gridTileSize * 2 + 12
+    readonly property real contentHeight: root.tilesHeight + root.rowGap + root.sliderHeight + root.rowGap + root.sliderHeight
 
     implicitWidth: root.colWidth * 2 + root.colGap
     implicitHeight: root.contentHeight
@@ -245,9 +242,6 @@ PanelWindow {
         id: brightnessService
     }
 
-    MprisService {
-        id: mprisService
-    }
 
     NightLightService {
         id: nightLightService
@@ -257,6 +251,15 @@ PanelWindow {
         id: content
 
         anchors.fill: parent
+
+        // Panel background (brought back 2026-10-25): one solid card
+        // behind everything; the detail panels layer above it.
+        Rectangle {
+            anchors.fill: parent
+
+            radius: 24
+            color: Theme.background
+        }
 
         // Fast scale-fade from the bar trigger's corner (top-right, matching the
         // panel anchor) + a tiny -8px drift. No full-height slide.
@@ -355,33 +358,26 @@ PanelWindow {
             }
         }
 
-        Row {
+        Column {
             id: columns
 
-            anchors {
-                top: parent.top
-                left: parent.left
-                right: parent.right
-            }
-
+            width: parent.width
             height: root.tilesHeight
 
-            spacing: root.colGap
+            spacing: 12
 
-            Column {
-                id: leftColumn
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
 
-                width: root.colWidth
-
-                spacing: root.rowGap
+                spacing: 10
 
                 Rectangle {
                     id: wifiTile
 
                     readonly property bool wifiOn: wifiService.enabled
 
-                    width: parent.width
-                    height: root.wifiHeight
+                    width: 211
+                    height: 68
 
                     // Full pill. The outer capsule ALWAYS stays dark - only the
                     // inner wifiActiveCircle reflects the on/off state.
@@ -428,26 +424,26 @@ PanelWindow {
                         // Inner padding: clear the full-pill (radius 50) arc.
                         // Left is +4 over the right so the 46px circle's left
                         // gap optically matches its top/bottom arc margin.
-                        anchors.leftMargin: 22
-                        anchors.rightMargin: 26
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 16
 
-                        spacing: 25
+                        spacing: 12
 
                         Item {
                             // Slot matches the enlarged circle so the Row lays
                             // the status column out to its right. Sits flush at
                             // the Row's left (leftMargin 26), i.e. centered in
                             // the capsule's left arc.
-                            width: 64
-                            height: 64
+                            width: 46
+                            height: 46
 
                             Rectangle {
                                 id: wifiActiveCircle
 
                                 anchors.centerIn: parent
 
-                                width: 64
-                                height: 64
+                                width: 46
+                                height: 46
                                 radius: width / 2
                                 // ON -> light muted tile, OFF -> subtle dark surface.
                                 color: wifiTile.wifiOn ? Theme.activeTile : Theme.surfaceHover
@@ -458,8 +454,8 @@ PanelWindow {
 
                                 anchors.centerIn: parent
 
-                                width: 46
-                                height: 46
+                                width: 30
+                                height: 30
 
                                 source: Quickshell.iconPath("network-wireless-symbolic", "network-wireless")
                                 asynchronous: true
@@ -477,8 +473,8 @@ PanelWindow {
                             MouseArea {
                                 anchors.centerIn: parent
 
-                                width: 60
-                                height: 60
+                                width: 44
+                                height: 44
                                 cursorShape: Qt.PointingHandCursor
 
                                 onClicked: wifiService.toggle()
@@ -488,12 +484,12 @@ PanelWindow {
                         Column {
                             anchors.verticalCenter: parent.verticalCenter
 
-                            width: parent.parent.width - 64 - 12
+                            width: 130
 
                             spacing: 2
 
                             Text {
-                                width: parent.width
+                                width: 211
                                 elide: Text.ElideRight
 
                                 text: "Wi-Fi"
@@ -504,7 +500,7 @@ PanelWindow {
                             }
 
                             Text {
-                                width: parent.width
+                                width: 211
                                 elide: Text.ElideRight
 
                                 text: {
@@ -531,7 +527,7 @@ PanelWindow {
                         // Clear the enlarged 64px toggle circle (Row leftMargin
                         // 26 + 64) so tapping the circle toggles Wi-Fi rather
                         // than opening the panel.
-                        anchors.leftMargin: 90
+                        anchors.leftMargin: 62
                         anchors.rightMargin: 14
 
                         cursorShape: Qt.PointingHandCursor
@@ -540,118 +536,197 @@ PanelWindow {
                     }
                 }
 
-                Row {
-                    anchors.horizontalCenter: parent.horizontalCenter
+                Rectangle {
+                    id: bluetoothTile
 
-                    spacing: root.circleGap
+                    readonly property bool btOn: bluetoothService.enabled
+                    readonly property string btStatus: {
+                        if (!bluetoothService.enabled) return "Off"
+                        const devs = bluetoothService.devices || []
+                        for (let i = 0; i < devs.length; i++)
+                            if (devs[i] && devs[i].connected) return devs[i].name || "Connected"
+                        return "On"
+                    }
 
-                    ControlTile {
-                        id: bluetoothTile
+                    width: 211
+                    height: 68
+                    radius: height / 2
+                    color: {
+                        const c = btHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+                        return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
+                    }
 
-                        width: root.circleSize
-                        height: root.circleSize
+                    HoverHandler {
+                        id: btHover
 
-                        round: true
-                        active: bluetoothService.enabled
-                        label: "Bluetooth"
-                        iconSource: ("file://" + Quickshell.shellPath("assets/dynamic bluetooth/" + (bluetoothService.enabled ? "bluetooth-on-svgrepo-com.svg" : "bluetooth-off-svgrepo-com.svg"))).replace(/ /g, "%20")
+                        cursorShape: Qt.PointingHandCursor
+                    }
 
-                        MouseArea {
-                            anchors.fill: parent
-
-                            cursorShape: Qt.PointingHandCursor
-
-                            onClicked: root.bluetoothPanelOpen = true
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: height / 2
+                        gradient: Gradient {
+                            GradientStop {
+                                position: 0
+                                color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                            }
+                            GradientStop {
+                                position: 0.4
+                                color: "transparent"
+                            }
+                            GradientStop {
+                                position: 1
+                                color: "transparent"
+                            }
                         }
                     }
 
-                    ControlTile {
-                        id: hotspotTile
-
-                        width: root.circleSize
-                        height: root.circleSize
-
-                        round: true
-                        active: hotspotService.enabled
-                        label: "Mobile"
-                        iconSource: "file://" + Quickshell.shellPath("assets/wifi-tethering.svg")
-
-                        MouseArea {
-                            anchors.fill: parent
-
-                            cursorShape: Qt.PointingHandCursor
-
-                            onClicked: root.hotspotPanelOpen = true
-                        }
-                    }
-                }
-
-                ControlTile {
-                    id: focusTile
-
-                    width: root.colWidth
-                    height: root.focusHeight
-
-                    // Full pill, matching the Wi-Fi tile.
-                    radiusOverride: height / 2
-
-                    // "Focus" == Do Not Disturb: suppresses notification toasts
-                    // (history still recorded). Bound straight to
-                    // NotificationService.doNotDisturb. Icon + label are drawn by
-                    // the Row below; ControlTile just supplies the tile
-                    // background, active fill and hover state.
-                    label: "Focus"
-                    active: NotificationService.doNotDisturb
 
                     Row {
-                        anchors.centerIn: parent
-                        spacing: 8
+                        anchors {
+                            left: parent.left
+                            right: parent.right
+                            verticalCenter: parent.verticalCenter
+                        }
+
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 16
+
+                        spacing: 12
 
                         Item {
-                            width: 20
-                            height: 20
-                            anchors.verticalCenter: parent.verticalCenter
+                            width: 46
+                            height: 46
+
+                            Rectangle {
+                                anchors.centerIn: parent
+
+                                width: 46
+                                height: 46
+                                radius: width / 2
+                                color: bluetoothTile.btOn ? Theme.activeTile : Theme.surfaceHover
+                            }
 
                             Image {
-                                id: focusIconImg
+                                id: btHeroIcon
 
-                                anchors.fill: parent
-                                sourceSize.width: 40
-                                sourceSize.height: 40
+                                anchors.centerIn: parent
+
+                                width: 30
+                                height: 30
+                                sourceSize.width: 60
+                                sourceSize.height: 60
                                 fillMode: Image.PreserveAspectFit
                                 asynchronous: true
                                 smooth: true
                                 mipmap: true
                                 visible: false
 
-                                source: "file://" + Quickshell.shellPath("assets/bell-off-svgrepo-com.svg")
+                                source: ("file://" + Quickshell.shellPath("assets/dynamic bluetooth/" + (bluetoothService.enabled ? "bluetooth-on-svgrepo-com.svg" : "bluetooth-off-svgrepo-com.svg"))).replace(/ /g, "%20")
                             }
 
                             ColorOverlay {
-                                anchors.fill: focusIconImg
-                                source: focusIconImg
-                                color: focusTile.active ? Theme.accent : Theme.icon
+                                anchors.fill: btHeroIcon
+                                source: btHeroIcon
+                                color: bluetoothTile.btOn ? Theme.accent : Theme.icon
+                            }
 
-                                Behavior on color {
-                                    ColorAnimation { duration: 120; easing.type: Easing.OutCubic }
-                                }
+                            MouseArea {
+                                anchors.centerIn: parent
+
+                                width: 44
+                                height: 44
+                                cursorShape: Qt.PointingHandCursor
+
+                                onClicked: bluetoothService.togglePower()
                             }
                         }
 
-                        Text {
+                        Column {
                             anchors.verticalCenter: parent.verticalCenter
 
-                            text: "Focus"
-                            color: focusTile.active ? Theme.accent : Theme.text
-                            font.family: Theme.fontFamily
-                            font.weight: Font.Bold
-                            font.pixelSize: 13
+                            width: 130
 
-                            Behavior on color {
-                                ColorAnimation { duration: 120; easing.type: Easing.OutCubic }
+                            spacing: 2
+
+                            Text {
+                                width: parent.width
+                                elide: Text.ElideRight
+
+                                text: "Bluetooth"
+                                color: Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 14
+                                font.weight: Font.DemiBold
+                            }
+
+                            Text {
+                                width: parent.width
+                                elide: Text.ElideRight
+
+                                text: bluetoothTile.btStatus
+
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
                             }
                         }
                     }
+
+                    MouseArea {
+                        anchors {
+                            left: parent.left
+                            right: parent.right
+                            top: parent.top
+                            bottom: parent.bottom
+                        }
+
+                        anchors.leftMargin: 62
+                        anchors.rightMargin: 14
+
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: root.bluetoothPanelOpen = true
+                    }
+                }
+            }
+
+            Grid {
+                anchors.horizontalCenter: parent.horizontalCenter
+
+                columns: 4
+                spacing: 12
+
+                ControlTile {
+                    id: hotspotTile
+
+                    width: 96
+                    height: 96
+
+                    round: true
+                    active: hotspotService.enabled
+                    label: "Mobile"
+                    iconSource: "file://" + Quickshell.shellPath("assets/wifi-tethering.svg")
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: root.hotspotPanelOpen = true
+                    }
+                }
+
+                ControlTile {
+                    id: focusTile
+
+                    width: 96
+                    height: 96
+
+                    round: true
+                    active: NotificationService.doNotDisturb
+                    label: "Focus"
+                    iconSource: "file://" + Quickshell.shellPath("assets/bell-off-svgrepo-com.svg")
 
                     MouseArea {
                         anchors.fill: parent
@@ -661,249 +736,16 @@ PanelWindow {
                         onClicked: NotificationService.toggleDnd()
                     }
                 }
-            }
 
-            Column {
-                id: rightColumn
-
-                width: root.colWidth
-
-                spacing: root.rowGap
-
-                Rectangle {
-                    id: mediaTile
-
-                    width: parent.width
-                    height: root.mediaHeight
-
-                // Elevated (softer, still rectangular - not a pill).
-                radius: 29
-                color: {
-                    const c = mediaHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
-                    return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
-                }
-
-                HoverHandler {
-                    id: mediaHover
-
-                    cursorShape: Qt.PointingHandCursor
-                }
-
-                // Shared glass highlight (see ControlTile): full-bleed rect
-                // with the tile's own radius; falloff shaped by stops. Below
-                // the artwork/info content.
-                Rectangle {
-                    anchors.fill: parent
-                    radius: 29
-                    gradient: Gradient {
-                        GradientStop {
-                            position: 0
-                            color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
-                        }
-                        GradientStop {
-                            position: 0.4
-                            color: "transparent"
-                        }
-                        GradientStop {
-                            position: 1
-                            color: "transparent"
-                        }
-                    }
-                }
-
-                MouseArea {
-                    anchors.fill: parent
-
-                    cursorShape: Qt.PointingHandCursor
-
-                    onClicked: mprisService.raise()
-                }
-
-                Rectangle {
-                    id: mediaArt
-
-                    anchors.top: parent.top
-                    anchors.left: parent.left
-                    anchors.topMargin: 18
-                    anchors.leftMargin: 18
-
-                    width: 80
-                    height: 80
-                    radius: 16
-                    clip: true
-                    color: Theme.surface
-
-                    Image {
-                        id: mediaArtImage
-
-                        anchors.fill: parent
-
-                        source: mprisService.artUrl
-                        fillMode: Image.PreserveAspectCrop
-                        asynchronous: true
-                        cache: true
-                        visible: mprisService.artUrl !== "" && mediaArtImage.status === Image.Ready
-
-                        layer.enabled: true
-                        layer.smooth: true
-                        layer.effect: OpacityMask {
-                            maskSource: Rectangle {
-                                width: mediaArtImage.width
-                                height: mediaArtImage.height
-                                radius: mediaArt.radius
-                            }
-                        }
-                    }
-
-                    IconImage {
-                        anchors.centerIn: parent
-
-                        width: 36
-                        height: 36
-
-                        source: Quickshell.iconPath("multimedia-player-symbolic", "applications-multimedia")
-                        asynchronous: true
-                        visible: !mediaArtImage.visible
-                    }
-                }
-
-                Column {
-                    id: mediaInfo
-
-                    anchors.top: mediaArt.bottom
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.topMargin: 10
-                    anchors.leftMargin: 18
-                    anchors.rightMargin: 18
-
-                    spacing: 3
-
-                    Text {
-                        width: parent.width
-                        elide: Text.ElideRight
-
-                        text: mprisService.trackTitle !== "" ? mprisService.trackTitle : "Nothing playing"
-                        color: Theme.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 14
-                        font.weight: Font.DemiBold
-                    }
-
-                    Text {
-                        width: parent.width
-                        elide: Text.ElideRight
-
-                        visible: mprisService.trackArtist !== ""
-                        text: mprisService.trackArtist
-                        color: Theme.textMuted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 11
-                    }
-                }
-
-                Row {
-                    id: mediaControls
-
-                    anchors.bottom: parent.bottom
-                    anchors.bottomMargin: 14
-                    anchors.horizontalCenter: parent.horizontalCenter
-
-                    spacing: 24
-
-                    MouseArea {
-                        width: 32
-                        height: 32
-                        enabled: mprisService.canPrev
-                        cursorShape: Qt.PointingHandCursor
-
-                        onClicked: mprisService.previous()
-
-                        HoverHandler {
-                            id: mediaPrevHover
-                        }
-
-                        IconImage {
-                            anchors.centerIn: parent
-
-                            width: 20
-                            height: 20
-                            opacity: !mprisService.canPrev ? 0.3 : (mediaPrevHover.hovered ? 1 : 0.8)
-
-                            source: Quickshell.iconPath("media-skip-backward-symbolic", "media-skip-backward")
-                            asynchronous: true
-                        }
-                    }
-
-                    MouseArea {
-                        width: 32
-                        height: 32
-                        enabled: mprisService.canToggle
-                        cursorShape: Qt.PointingHandCursor
-
-                        onClicked: mprisService.playPause()
-
-                        HoverHandler {
-                            id: mediaPlayHover
-                        }
-
-                        IconImage {
-                            anchors.centerIn: parent
-
-                            width: 26
-                            height: 26
-                            opacity: !mprisService.canToggle ? 0.3 : (mediaPlayHover.hovered ? 1 : 0.9)
-
-                            source: mprisService.isPlaying
-                                ? Quickshell.iconPath("media-playback-pause-symbolic", "media-playback-pause")
-                                : Quickshell.iconPath("media-playback-start-symbolic", "media-playback-start")
-                            asynchronous: true
-                        }
-                    }
-
-                    MouseArea {
-                        width: 32
-                        height: 32
-                        enabled: mprisService.canNext
-                        cursorShape: Qt.PointingHandCursor
-
-                        onClicked: mprisService.next()
-
-                        HoverHandler {
-                            id: mediaNextHover
-                        }
-
-                        IconImage {
-                            anchors.centerIn: parent
-
-                            width: 20
-                            height: 20
-                            opacity: !mprisService.canNext ? 0.3 : (mediaNextHover.hovered ? 1 : 0.8)
-
-                            source: Quickshell.iconPath("media-skip-forward-symbolic", "media-skip-forward")
-                            asynchronous: true
-                        }
-                    }
-                }
-            }
-
-            Row {
-                anchors.horizontalCenter: parent.horizontalCenter
-
-                spacing: root.circleGap
-
-                // Caffeine - paired with Mirror Screen in the round-tiles row.
-                // Native Wayland idle-inhibit lives on the Bar; this tile is
-                // just the toggle. See CaffeineService.qml.
                 ControlTile {
                     id: caffeineTile
 
-                    width: root.circleSize
-                    height: root.circleSize
+                    width: 96
+                    height: 96
 
                     round: true
-                    label: "Caffeine"
                     active: CaffeineService.enabled
+                    label: "Caffeine"
                     iconSource: "file://" + Quickshell.shellPath("assets/coffee-svgrepo-com.svg")
 
                     MouseArea {
@@ -918,15 +760,12 @@ PanelWindow {
                 ControlTile {
                     id: mirrorTile
 
-                    width: root.circleSize
-                    height: root.circleSize
+                    width: 96
+                    height: 96
 
                     round: true
-                    // Instant Extend <-> Mirror toggle - reuses DisplayService's
-                    // applyPreset + applyLive (live + persist). Does NOT open the
-                    // Display Manager. Active style follows the real mirror state.
-                    label: "Mirror Screen"
                     active: DisplayService.mirrorActive
+                    label: "Mirror Screen"
                     iconSource: "file://" + Quickshell.shellPath("assets/display-mode.svg")
                     opacity: DisplayService.canMirror ? 1 : 0.4
 
@@ -939,9 +778,90 @@ PanelWindow {
                         onClicked: DisplayService.toggleMirror()
                     }
                 }
+
+                ControlTile {
+                    id: ecoTile
+
+                    width: 96
+                    height: 96
+
+                    round: true
+                    active: EcoService.ecoMode
+                    label: "Eco Mode"
+                    iconSource: "file://" + Quickshell.shellPath("assets/leaf-svgrepo-com.svg")
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: EcoService.toggle()
+                    }
+                }
+
+                ControlTile {
+                    id: nightLightTile
+
+                    width: 96
+                    height: 96
+
+                    round: true
+                    active: nightLightService.active
+                    label: "Night Light"
+                    iconSource: "file://" + Quickshell.shellPath("assets/moon-svgrepo-com.svg")
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: nightLightService.toggle()
+                    }
+                }
+
+                ControlTile {
+                    id: colorPickerTile
+
+                    width: 96
+                    height: 96
+
+                    round: true
+                    label: "Color Picker"
+                    iconSource: "file://" + Quickshell.shellPath("assets/picker-svgrepo-com.svg")
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: {
+                            root.pendingColorPick = true
+                            root.close()
+                        }
+                    }
+                }
+
+                ControlTile {
+                    id: audioOutputTile
+
+                    width: 96
+                    height: 96
+
+                    round: true
+                    active: root.audioOutputPanelOpen
+                    label: "Output"
+                    iconSource: "file://" + Quickshell.shellPath("assets/media-output.svg")
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: root.audioOutputPanelOpen = true
+                    }
+                }
             }
         }
-    }
 
     Rectangle {
         id: displayTile
@@ -1144,103 +1064,6 @@ PanelWindow {
             }
         }
 
-        Row {
-            anchors {
-                top: soundTile.bottom
-                horizontalCenter: parent.horizontalCenter
-            }
-
-            anchors.topMargin: root.rowGap
-
-            height: root.circleSize
-
-            spacing: root.circleGap
-
-            ControlTile {
-                id: ecoTile
-
-                width: root.circleSize
-                height: root.circleSize
-
-                round: true
-                active: EcoService.ecoMode
-                label: "Eco Mode"
-                iconSource: "file://" + Quickshell.shellPath("assets/leaf-svgrepo-com.svg")
-
-                MouseArea {
-                    anchors.fill: parent
-
-                    cursorShape: Qt.PointingHandCursor
-
-                    onClicked: EcoService.toggle()
-                }
-            }
-
-            ControlTile {
-                id: nightLightTile
-
-                width: root.circleSize
-                height: root.circleSize
-
-                round: true
-                active: nightLightService.active
-                label: "Night Light"
-                // Local solid-fill SVG so it uses the same ColorOverlay/tint
-                // path (and active inversion) as Mic / Output.
-                iconSource: "file://" + Quickshell.shellPath("assets/moon-svgrepo-com.svg")
-
-                MouseArea {
-                    anchors.fill: parent
-
-                    cursorShape: Qt.PointingHandCursor
-
-                    onClicked: nightLightService.toggle()
-                }
-            }
-
-            ControlTile {
-                id: colorPickerTile
-
-                width: root.circleSize
-                height: root.circleSize
-
-                round: true
-                active: hyprpickerProc.running
-                label: "Color Picker"
-                iconSource: "file://" + Quickshell.shellPath("assets/picker-svgrepo-com.svg")
-
-                MouseArea {
-                    anchors.fill: parent
-
-                    cursorShape: Qt.PointingHandCursor
-
-                    onClicked: {
-                        root.pendingColorPick = true
-                        root.close()
-                    }
-                }
-            }
-
-            ControlTile {
-                id: audioOutputTile
-
-                width: root.circleSize
-                height: root.circleSize
-
-                round: true
-                active: root.audioOutputPanelOpen
-                label: "Output"
-                iconSource: "file://" + Quickshell.shellPath("assets/media-output.svg")
-
-                MouseArea {
-                    anchors.fill: parent
-
-                    cursorShape: Qt.PointingHandCursor
-
-                    onClicked: root.audioOutputPanelOpen = true
-                }
-            }
-        }
     }
 
     Rectangle {
