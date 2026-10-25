@@ -63,10 +63,10 @@ PanelWindow {
     readonly property real rowGap: 12
     readonly property real panelPadding: 14
     readonly property real heroHeight: 68
-    readonly property real gridTileSize: 100
+    readonly property real gridTileSize: 103
     readonly property real gridTileHeight: 64
     readonly property real sliderHeight: 68
-    readonly property real tilesHeight: root.heroHeight + 12 + root.gridTileHeight * 2 + 12
+    readonly property real tilesHeight: root.heroHeight + 8 + root.gridTileHeight * 2 + 8
     readonly property real contentHeight: root.tilesHeight + root.rowGap + root.sliderHeight + root.rowGap + root.sliderHeight + root.panelPadding * 2
 
     implicitWidth: root.colWidth * 2 + root.colGap
@@ -375,19 +375,19 @@ PanelWindow {
 
             height: root.tilesHeight
 
-            spacing: 12
+            spacing: 8
 
             Row {
                 anchors.horizontalCenter: parent.horizontalCenter
 
-                spacing: 12
+                spacing: 8
 
                 Rectangle {
                     id: wifiTile
 
                     readonly property bool wifiOn: wifiService.enabled
 
-                    width: 212
+                    width: 214
                     height: 68
 
                     // Full pill. The outer capsule ALWAYS stays dark - only the
@@ -559,7 +559,7 @@ PanelWindow {
                         return "On"
                     }
 
-                    width: 212
+                    width: 214
                     height: 68
                     radius: height / 2
                     color: {
@@ -706,7 +706,7 @@ PanelWindow {
                 anchors.horizontalCenter: parent.horizontalCenter
 
                 columns: 4
-                spacing: 12
+                spacing: 8
 
                 ControlTile {
                     id: hotspotTile

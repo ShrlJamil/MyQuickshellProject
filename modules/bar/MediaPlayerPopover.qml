@@ -89,7 +89,7 @@ PanelWindow {
 
         anchors.centerIn: parent
         radius: Theme.cornerRadius
-        color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
+        color: Qt.rgba(Theme.backgroundInset.r, Theme.backgroundInset.g, Theme.backgroundInset.b, Theme.moduleSurfaceOpacity)
         border.width: 1
         border.color: Theme.surfaceHover
 

@@ -310,7 +310,7 @@ PanelWindow {
         // Hover-only: it never steals taps from the rows/buttons below it.
         HoverHandler { id: pillHover }
 
-        color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
+        color: Qt.rgba(Theme.backgroundInset.r, Theme.backgroundInset.g, Theme.backgroundInset.b, Theme.moduleSurfaceOpacity)
         border.width: 1
         border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
 
@@ -381,7 +381,7 @@ PanelWindow {
                 id: cover
                 width: 24
                 height: 24
-                radius: 6
+                radius: width / 2
                 clip: true
                 color: Theme.surface
                 anchors.verticalCenter: parent.verticalCenter
@@ -450,7 +450,7 @@ PanelWindow {
                 Text {
                     id: metaScroll
                     text: root.metaString + (metaView.overflow ? metaSep.text + root.metaString : "")
-                    color: root.playing ? Theme.text : Theme.textDim
+                    color: Theme.text
                     font.family: Theme.fontFamily
                     font.pixelSize: 12
                     font.weight: Font.DemiBold
@@ -543,7 +543,7 @@ PanelWindow {
                 y: 18
                 width: 88
                 height: 88
-                radius: 14
+                radius: width / 2
                 clip: true
                 color: Theme.surface
 
@@ -615,7 +615,7 @@ PanelWindow {
                 Text {
                     width: parent.width
                     text: root.hasMedia ? root.mediaService.title : ""
-                    color: root.playing ? Theme.text : Theme.textDim
+                    color: Theme.text
                     font.family: Theme.fontFamily
                     font.pixelSize: 15
                     font.weight: Font.DemiBold

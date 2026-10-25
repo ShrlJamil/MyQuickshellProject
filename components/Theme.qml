@@ -49,13 +49,16 @@ Item {
     readonly property real _seedHue: root._palAccent.hslHue >= 0 ? root._palAccent.hslHue
         : (root._palBackground.hslHue >= 0 ? root._palBackground.hslHue : 0.62)
     readonly property real _seedSat: root._palAccent.hslSaturation
-    // Neutral chroma: an echo of the seed, heavily compressed and capped.
-    readonly property real _neutralSat: Math.max(0.02, Math.min(0.13, root._seedSat * 0.30))
-    // Base tone: the palette background's lightness, clamped into the dark
+    // Neutral chroma: a solid echo of the seed (over half its saturation,
+    // capped) - dark here means a DEEPER SHADE OF THE WALLPAPER'S COLOUR
+    // (dark blue from a blue wallpaper), never near-black grey. HSL at low
+    // lightness needs this much saturation for the tint to stay visible.
+    readonly property real _neutralSat: Math.max(0.12, Math.min(0.45, root._seedSat * 0.55))
+    // Base tone: the palette background's lightness, clamped into a dark
     // register so a bright-ish palette cannot lift the whole shell.
-    readonly property real _baseL: Math.max(0.035, Math.min(0.08, root._palBackground.hslLightness))
-    // Container (ON-state) chroma: half the seed's, capped muted.
-    readonly property real _containerSat: Math.max(0.08, Math.min(0.30, root._seedSat * 0.50))
+    readonly property real _baseL: Math.max(0.05, Math.min(0.11, root._palBackground.hslLightness))
+    // Container (ON-state) chroma: over half the seed's, capped muted.
+    readonly property real _containerSat: Math.max(0.10, Math.min(0.38, root._seedSat * 0.55))
 
     function _tone(lightness) {
         return Qt.hsla(root._seedHue, root._neutralSat, lightness, 1)
@@ -63,11 +66,11 @@ Item {
 
     // ---- Semantic surface tokens (derived) --------------------------------
     property color background: root._tone(root._baseL)
-    property color surface: root._tone(root._baseL + 0.042)
-    property color surfaceRaised: root._tone(root._baseL + 0.082)
-    property color surfaceOverlay: root._tone(root._baseL + 0.122)
+    property color surface: root._tone(root._baseL + 0.05)
+    property color surfaceRaised: root._tone(root._baseL + 0.095)
+    property color surfaceOverlay: root._tone(root._baseL + 0.14)
     property color backgroundSunken: root._tone(root._baseL * 0.70)
-    property color backgroundInset: root._tone(root._baseL * 0.48)
+    property color backgroundInset: root._tone(root._baseL * 0.52)
 
     // Bar widgets' ACTIVE (open-state) fill = the neutral container tone,
     // same as `surface`: one family everywhere. (Pre-experiment this was a
