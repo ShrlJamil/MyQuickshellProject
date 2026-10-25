@@ -494,7 +494,7 @@ PanelWindow {
                 styleColor: Theme.textShadow
                 font.family: Theme.fontFamily
                 font.weight: Font.Black
-                font.pixelSize: 14
+                font.pixelSize: 16
             }
         }
 
