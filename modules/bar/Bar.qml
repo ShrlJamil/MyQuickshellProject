@@ -566,12 +566,11 @@ PanelWindow {
 
             screen: root.screen
 
-            // Far-right edge of the bar (the clock used to sit here).
             anchors {
                 verticalCenter: parent.verticalCenter
-                right: parent.right
+                right: statusCluster.left
             }
-            anchors.rightMargin: 8
+            anchors.rightMargin: 4
         }
 
         // Caffeine indicator - only present while CaffeineService.enabled.
@@ -753,14 +752,14 @@ PanelWindow {
             }
         }
 
-        // Microphone mute - sits just left of the Wi-Fi indicator. Click
+        // Microphone mute - sits just left of the battery. Click
         // toggles the default PipeWire source mute; glyph swaps on/off.
         Item {
             id: micIndicator
 
             anchors {
                 verticalCenter: parent.verticalCenter
-                right: statusCluster.left
+                right: battery.left
             }
             anchors.rightMargin: 4
 
@@ -828,11 +827,13 @@ PanelWindow {
             barState: root.barState
             screen: root.screen
 
+            // Far-right edge of the bar (experiment: cluster last, right of
+            // the battery).
             anchors {
                 verticalCenter: parent.verticalCenter
-                right: battery.left
+                right: parent.right
             }
-            anchors.rightMargin: 4
+            anchors.rightMargin: 8
         }
     }
 
