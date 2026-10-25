@@ -554,7 +554,7 @@ PanelWindow {
                         round: true
                         active: bluetoothService.enabled
                         label: "Bluetooth"
-                        iconSource: "file://" + Quickshell.shellPath("assets/bluetooth-svgrepo-com.svg")
+                        iconSource: ("file://" + Quickshell.shellPath("assets/dynamic bluetooth/" + (bluetoothService.enabled ? "bluetooth-on-svgrepo-com.svg" : "bluetooth-off-svgrepo-com.svg"))).replace(/ /g, "%20")
 
                         MouseArea {
                             anchors.fill: parent
