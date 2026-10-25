@@ -271,7 +271,7 @@ Just run `wallust` against a wallpaper as usual — the whole shell picks the ne
 - [x] Calculator, command, web, and clipboard search modes
 - [x] Centralized theming via `palette.json` (+ wallust integration)
 - [x] Static top bar (per-monitor, tray, indicators, popovers)
-- [x] Dynamic center surfaces: power, display, wallpapers, media, capture
+- [x] Dynamic center surfaces: display, wallpapers, media (power menu and capture picker are standalone windows)
 - [x] Power menu with hold-to-confirm, keyboard nav, multi-monitor-safe focus grab
 - [x] MPRIS media stack (preview + expanded player, click-to-expand, prefetch)
 - [x] Control Center (audio/network/bluetooth/hotspot tiles)

@@ -1567,7 +1567,6 @@ PanelWindow {
     DynamicCenter {
         id: dynamicCenter
 
-        screen: root.screen
         anchors.horizontalCenter: parent.horizontalCenter
         activeSurface: barState.screen === root.screen && (barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact")
             ? barState.mode
