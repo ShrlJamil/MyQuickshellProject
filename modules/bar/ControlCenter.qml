@@ -28,6 +28,30 @@ PanelWindow {
     property bool wifiPanelOpen: false
     property bool bluetoothPanelOpen: false
     property bool hotspotPanelOpen: false
+
+    // Airplane mode (replaces the Mobile/Hotspot tile): the tile reads
+    // ACTIVE when both radios are off - derived, so it stays in sync
+    // with the hero toggles. Switching on snapshots the radio states
+    // and turns both off; switching off restores the snapshot.
+    property bool _pilotWifi: true
+    property bool _pilotBt: false
+    readonly property bool airplaneActive: !wifiService.enabled && !bluetoothService.enabled
+
+    function toggleAirplane() {
+        if (root.airplaneActive) {
+            if (root._pilotWifi && !wifiService.enabled)
+                wifiService.toggle()
+            if (root._pilotBt && !bluetoothService.enabled)
+                bluetoothService.togglePower()
+        } else {
+            root._pilotWifi = wifiService.enabled
+            root._pilotBt = bluetoothService.enabled
+            if (wifiService.enabled)
+                wifiService.toggle()
+            if (bluetoothService.enabled)
+                bluetoothService.togglePower()
+        }
+    }
     property bool audioOutputPanelOpen: false
 
     visible: root.open || root.closing
@@ -709,30 +733,30 @@ PanelWindow {
                 spacing: 5
 
                 ControlTile {
-                    id: hotspotTile
+                    id: airplaneTile
 
-                    width: 100
-                    height: 64
+                    width: root.gridTileSize
+                    height: root.gridTileHeight
 
                     round: true
-                    active: hotspotService.enabled
-                    label: "Mobile"
-                    iconSource: "file://" + Quickshell.shellPath("assets/wifi-tethering.svg")
+                    active: root.airplaneActive
+                    label: "Airplane"
+                    iconSource: "file://" + Quickshell.shellPath("assets/flight-svgrepo-com.svg")
 
                     MouseArea {
                         anchors.fill: parent
 
                         cursorShape: Qt.PointingHandCursor
 
-                        onClicked: root.hotspotPanelOpen = true
+                        onClicked: root.toggleAirplane()
                     }
                 }
 
                 ControlTile {
                     id: focusTile
 
-                    width: 100
-                    height: 64
+                    width: root.gridTileSize
+                    height: root.gridTileHeight
 
                     round: true
                     active: NotificationService.doNotDisturb
@@ -751,8 +775,8 @@ PanelWindow {
                 ControlTile {
                     id: caffeineTile
 
-                    width: 100
-                    height: 64
+                    width: root.gridTileSize
+                    height: root.gridTileHeight
 
                     round: true
                     active: CaffeineService.enabled
@@ -771,8 +795,8 @@ PanelWindow {
                 ControlTile {
                     id: mirrorTile
 
-                    width: 100
-                    height: 64
+                    width: root.gridTileSize
+                    height: root.gridTileHeight
 
                     round: true
                     active: DisplayService.mirrorActive
@@ -793,8 +817,8 @@ PanelWindow {
                 ControlTile {
                     id: ecoTile
 
-                    width: 100
-                    height: 64
+                    width: root.gridTileSize
+                    height: root.gridTileHeight
 
                     round: true
                     active: EcoService.ecoMode
@@ -813,8 +837,8 @@ PanelWindow {
                 ControlTile {
                     id: nightLightTile
 
-                    width: 100
-                    height: 64
+                    width: root.gridTileSize
+                    height: root.gridTileHeight
 
                     round: true
                     active: nightLightService.active
@@ -833,8 +857,8 @@ PanelWindow {
                 ControlTile {
                     id: colorPickerTile
 
-                    width: 100
-                    height: 64
+                    width: root.gridTileSize
+                    height: root.gridTileHeight
 
                     round: true
                     label: "Color Picker"
@@ -855,8 +879,8 @@ PanelWindow {
                 ControlTile {
                     id: audioOutputTile
 
-                    width: 100
-                    height: 64
+                    width: root.gridTileSize
+                    height: root.gridTileHeight
 
                     round: true
                     active: root.audioOutputPanelOpen
@@ -2883,7 +2907,7 @@ PanelWindow {
     Rectangle {
         id: hotspotPanel
 
-        readonly property var originTile: hotspotTile
+        readonly property var originTile: airplaneTile
         readonly property point originPos: (drift.y, root.open, hotspotPanel.originTile)
             ? hotspotPanel.originTile.mapToItem(hotspotPanel.parent, 0, 0)
             : Qt.point(0, 0)
