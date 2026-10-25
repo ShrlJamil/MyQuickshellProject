@@ -48,15 +48,15 @@ PanelWindow {
     // real panel geometry — never a hardcoded screen resolution.
     anchors {
         top: true
-        right: true
+        left: true
         bottom: true
     }
 
     // top is probed (see below); bottom leaves an aesthetic breathing gap
-    // balanced with the right inset so the panel reads as floating.
+    // balanced with the left inset so the panel reads as floating.
     margins {
         top: root.topMargin
-        right: 12
+        left: 12
         bottom: 20
     }
 
@@ -187,11 +187,11 @@ PanelWindow {
             }
         }
 
-        // Fast scale-fade from the bar's top-right corner + a tiny -8px drift.
+        // Fast scale-fade from the bar's top-left corner + a tiny -8px drift.
         // No full-height slide.
         opacity: 0
         scale: 0.92
-        transformOrigin: Item.TopRight
+        transformOrigin: Item.TopLeft
 
         transform: Translate {
             id: drift

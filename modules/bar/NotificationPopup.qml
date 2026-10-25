@@ -57,12 +57,12 @@ PanelWindow {
 
     anchors {
         top: true
-        right: true
+        left: true
     }
 
     margins {
         top: 48
-        right: 12
+        left: 12
     }
 
     // Window tracks the content so there is no large empty area; the toasts
@@ -74,7 +74,7 @@ PanelWindow {
     Column {
         id: stack
 
-        anchors.right: parent.right
+        anchors.left: parent.left
         width: 372
         spacing: 8
         clip: true
@@ -230,7 +230,7 @@ PanelWindow {
                     border.width: 1
                     border.color: Theme.surfaceHover
 
-                    x: (slot.entered && !slot.closing) ? 0 : (slot.width + 24)
+                    x: (slot.entered && !slot.closing) ? 0 : -(slot.width + 24)
                     opacity: (slot.entered && !slot.closing) ? 1 : 0
 
                     Behavior on x {
