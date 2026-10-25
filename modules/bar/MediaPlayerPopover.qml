@@ -34,7 +34,7 @@ PanelWindow {
     }
 
     margins {
-        top: 48
+        top: 44
         right: Math.max(8, Math.min(root.screenWidth - root.anchorCenter - root.implicitWidth / 2,
             root.screenWidth - root.implicitWidth - 8))
     }

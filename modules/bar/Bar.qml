@@ -70,7 +70,7 @@ PanelWindow {
     // corners so the same path draws today's plain rectangle. The y guard
     // keeps the scoop attached to the bar (a gapped window means no hug).
     // Window-state only: DynamicCenter must not kill the concave. DC paints
-    // below the bar (y>=40) while these Shapes live at y=40..60 beside it.
+    // below the bar (y>=36) while these Shapes live at y=36..56 beside it.
     readonly property bool _scoopOn: root._haveSolo && root._geoValid && !root._winFloat
         && root._winY <= 44 && root._scoopW > 40
     readonly property real _scoopL0: Math.max(0, Math.min(barContent.width, root._winX))
@@ -278,7 +278,7 @@ PanelWindow {
 
     color: "transparent"
 
-    exclusiveZone: 40
+    exclusiveZone: 36
     focusable: root.surfaceActive
 
     mask: root.surfaceActive ? activeMask : idleMask
@@ -319,7 +319,7 @@ PanelWindow {
         x: 0
         y: 0
         width: parent.width
-        height: 40
+        height: 36
         clip: true
         z: 999
 
@@ -842,7 +842,7 @@ PanelWindow {
         // Remove after test; do NOT restyle into a final design.
         Shape {
             x: root._scoopL0
-            y: 40
+            y: 36
             width: 40
             height: 20
             z: 1000
@@ -860,7 +860,7 @@ PanelWindow {
         }
         Shape {
             x: root._scoopR0 - 40
-            y: 40
+            y: 36
             width: 40
             height: 20
             z: 1000

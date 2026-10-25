@@ -34,9 +34,9 @@ PanelWindow {
     // `hyprctl -j layers` probe (identical mechanism to ControlCenter) instead
     // of a hardcoded offset. Any missing / implausible result falls back to the
     // fixed default so the window can never fly off-screen.
-    readonly property real barStripHeight: 40
+    readonly property real barStripHeight: 36
     readonly property real barGap: 8
-    readonly property int barTopMarginDefault: 48
+    readonly property int barTopMarginDefault: 44
     // Max the probe may move the panel off the default before its result is
     // treated as garbage (stale / incomplete JSON) and discarded.
     readonly property int barTopMarginMaxDelta: 120

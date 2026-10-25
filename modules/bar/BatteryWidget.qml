@@ -17,12 +17,12 @@ Item {
 
     visible: BatteryService.available
     implicitWidth: root.visible ? (layout.implicitWidth + 14) : 0
-    implicitHeight: 40
+    implicitHeight: 36
 
     Rectangle {
         anchors.fill: parent
-        anchors.topMargin: 3
-        anchors.bottomMargin: 3
+        anchors.topMargin: 1
+        anchors.bottomMargin: 1
         radius: 17
         color: root.popoverOpen ? Theme.surface
             : ((tap.pressed || hover.hovered) ? Theme.surfaceHover : "transparent")
@@ -164,9 +164,9 @@ Item {
             right: true
         }
 
-        // top: just below the 40px bar with a clean 8px gap (no overlap).
+        // top: just below the 36px bar with a clean 8px gap (no overlap).
         margins {
-            top: 40
+            top: 36
             right: Math.max(8, Math.round(pop.centeredRight))
         }
 

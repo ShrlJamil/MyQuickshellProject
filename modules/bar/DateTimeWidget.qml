@@ -21,8 +21,8 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        anchors.topMargin: 3
-        anchors.bottomMargin: 3
+        anchors.topMargin: 1
+        anchors.bottomMargin: 1
         radius: 17
         color: root.centerOpen ? Theme.surface
             : ((tap.pressed || hover.hovered) ? Theme.surfaceHover : "transparent")

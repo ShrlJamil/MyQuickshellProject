@@ -12,7 +12,7 @@ Item {
     signal closeRequested()
 
     anchors.horizontalCenter: parent.horizontalCenter
-    y: 40
+    y: 36
     width: parent.width
     clip: true
 

@@ -41,9 +41,9 @@ PanelWindow {
         right: true
     }
 
-    readonly property real barStripHeight: 40
+    readonly property real barStripHeight: 36
     readonly property real barGap: 8
-    readonly property int barTopMarginDefault: 48
+    readonly property int barTopMarginDefault: 44
     // Largest amount the async bar probe is allowed to move the panel away from
     // the default before its result is treated as garbage (stale/incomplete
     // hyprctl JSON) and discarded.
