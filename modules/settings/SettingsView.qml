@@ -3,6 +3,7 @@ import Qt5Compat.GraphicalEffects
 import Quickshell
 import "../../components"
 import "../display"
+import "../wallpapers"
 
 FocusScope {
     id: root
@@ -307,7 +308,7 @@ FocusScope {
             Text {
                 id: detailTitle
 
-                visible: root.categoryIndex !== SettingsService.displayCategory
+                visible: root.categoryIndex !== SettingsService.displayCategory && root.categoryIndex !== SettingsService.wallpaperCategory
 
                 anchors {
                     top: parent.top
@@ -329,7 +330,7 @@ FocusScope {
             Text {
                 id: detailDescription
 
-                visible: root.categoryIndex !== SettingsService.displayCategory
+                visible: root.categoryIndex !== SettingsService.displayCategory && root.categoryIndex !== SettingsService.wallpaperCategory
 
                 anchors {
                     top: detailTitle.bottom
@@ -351,7 +352,7 @@ FocusScope {
             Rectangle {
                 id: divider
 
-                visible: root.categoryIndex !== SettingsService.displayCategory
+                visible: root.categoryIndex !== SettingsService.displayCategory && root.categoryIndex !== SettingsService.wallpaperCategory
 
                 anchors {
                     top: detailDescription.bottom
@@ -369,7 +370,7 @@ FocusScope {
             Rectangle {
                 id: placeholder
 
-                visible: root.categoryIndex !== SettingsService.displayCategory
+                visible: root.categoryIndex !== SettingsService.displayCategory && root.categoryIndex !== SettingsService.wallpaperCategory
 
                 anchors {
                     top: divider.bottom
@@ -463,6 +464,17 @@ FocusScope {
                 visible: root.categoryIndex === SettingsService.displayCategory
 
                 onCloseRequested: root.closeRequested()
+            }
+
+            // Same arrangement for the Wallpaper page: a thin view over
+            // the shared WallpaperService with its own headings, so the
+            // generic chrome hides for this category too.
+            WallpaperPage {
+                id: wallpaperPage
+
+                anchors.fill: parent
+                anchors.margins: 12
+                visible: root.categoryIndex === SettingsService.wallpaperCategory
             }
         }
     }

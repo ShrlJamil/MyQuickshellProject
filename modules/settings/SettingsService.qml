@@ -15,6 +15,7 @@ QtObject {
     // of "Display" in SettingsView.categories.
     property int categoryIndex: 0
     readonly property int displayCategory: 2
+    readonly property int wallpaperCategory: 1
 
     function show(target) {
         if (target)
