@@ -13,8 +13,8 @@ Item {
 
     property bool show: false
 
-    readonly property int pillHeight: 26
-    readonly property int artworkSize: 18
+    readonly property int pillHeight: 30
+    readonly property int artworkSize: 22
     readonly property int padH: 8
     readonly property int artGap: 6
     readonly property int maxTextWidth: 168

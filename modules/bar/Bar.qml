@@ -387,8 +387,8 @@ PanelWindow {
             // Bar left outer padding (mirrors dateTime's right padding).
             anchors.leftMargin: 8
 
-            width: 32
-            height: 32
+            width: 36
+            height: 36
 
             Rectangle {
                 anchors.fill: parent
@@ -401,10 +401,10 @@ PanelWindow {
                 id: archImg
 
                 anchors.centerIn: parent
-                width: 20
-                height: 20
-                sourceSize.width: 40
-                sourceSize.height: 40
+                width: 24
+                height: 24
+                sourceSize.width: 48
+                sourceSize.height: 48
                 fillMode: Image.PreserveAspectFit
                 asynchronous: true
                 smooth: true
@@ -774,8 +774,8 @@ PanelWindow {
                 id: activeWindowIcon
 
                 visible: activeWindowRow.rawAppId.length > 0
-                width: visible ? 16 : 0
-                height: 16
+                width: visible ? 20 : 0
+                height: 20
                 anchors.verticalCenter: parent.verticalCenter
 
                 source: activeWindowRow.resolveWindowIcon(activeWindowRow.rawAppId)
@@ -899,9 +899,9 @@ PanelWindow {
             anchors.rightMargin: CaffeineService.enabled ? 4 : 0
 
             visible: CaffeineService.enabled
-            width: CaffeineService.enabled ? 28 : 0
+            width: CaffeineService.enabled ? 34 : 0
             implicitWidth: width
-            height: 28
+            height: 34
 
             Rectangle {
                 anchors.fill: parent
@@ -913,10 +913,10 @@ PanelWindow {
                 id: caffeineIndicatorImg
 
                 anchors.centerIn: parent
-                width: 20
-                height: 20
-                sourceSize.width: 40
-                sourceSize.height: 40
+                width: 24
+                height: 24
+                sourceSize.width: 48
+                sourceSize.height: 48
                 fillMode: Image.PreserveAspectFit
                 asynchronous: true
                 smooth: true
@@ -976,8 +976,8 @@ PanelWindow {
 
                     required property var modelData
 
-                    width: 28
-                    height: 28
+                    width: 34
+                    height: 34
 
                     Rectangle {
                         anchors.fill: parent
@@ -987,8 +987,8 @@ PanelWindow {
 
                     IconImage {
                         anchors.centerIn: parent
-                        width: 22
-                        height: 22
+                        width: 26
+                        height: 26
                         smooth: true
                         asynchronous: true
 
@@ -1075,8 +1075,8 @@ PanelWindow {
             }
             anchors.rightMargin: 4
 
-            width: 28
-            height: 28
+            width: 34
+            height: 34
 
             Rectangle {
                 anchors.fill: parent
@@ -1088,8 +1088,8 @@ PanelWindow {
                 id: micIndicatorImg
 
                 anchors.centerIn: parent
-                width: 16
-                height: 16
+                width: 20
+                height: 20
                 sourceSize.width: 40
                 sourceSize.height: 40
                 fillMode: Image.PreserveAspectFit

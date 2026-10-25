@@ -24,9 +24,9 @@ Item {
         && root.barState.mode === "center" && root.barState.screen === root.screen
 
     implicitWidth: clusterRow.implicitWidth + 16
-    implicitHeight: 28
+    implicitHeight: 34
     width: implicitWidth
-    height: 28
+    height: 34
 
     // Own service instances, the ControlCenter pattern: both track their
     // backends (PipeWire / BlueZ) reactively, so state converges with the
@@ -59,7 +59,7 @@ Item {
         id: clusterRow
 
         anchors.centerIn: parent
-        spacing: 2
+        spacing: 4
 
         // ---- Wi-Fi ------------------------------------------------------
         // Glyph logic transplanted unchanged from the old standalone
@@ -67,8 +67,8 @@ Item {
         Item {
             id: wifiSlot
 
-            width: 28
-            height: 28
+            width: 34
+            height: 34
 
             readonly property bool wifiOn: NetworkService.wifiEnabled
             readonly property bool online: NetworkService.connected
@@ -91,8 +91,8 @@ Item {
                 id: wifiIcon
 
                 anchors.centerIn: parent
-                width: 22
-                height: 22
+                width: 26
+                height: 26
 
                 source: Quickshell.iconPath(wifiSlot.glyph, "network-wireless")
                 asynchronous: true
@@ -119,8 +119,8 @@ Item {
         Item {
             id: btSlot
 
-            width: 28
-            height: 28
+            width: 34
+            height: 34
 
             // State glyphs (assets/dynamic bluetooth/*): off while the radio
             // is off, connect while a device is connected, signal while
@@ -140,10 +140,10 @@ Item {
                 id: btIcon
 
                 anchors.centerIn: parent
-                width: 18
-                height: 18
-                sourceSize.width: 36
-                sourceSize.height: 36
+                width: 22
+                height: 22
+                sourceSize.width: 44
+                sourceSize.height: 44
                 fillMode: Image.PreserveAspectFit
                 asynchronous: true
                 smooth: true
@@ -175,8 +175,8 @@ Item {
         Item {
             id: volSlot
 
-            width: 28
-            height: 28
+            width: 34
+            height: 34
 
             readonly property bool silent: audioSvc.muted || audioSvc.volume <= 0
 
@@ -194,10 +194,10 @@ Item {
                 id: volIcon
 
                 anchors.centerIn: parent
-                width: 20
-                height: 20
-                sourceSize.width: 40
-                sourceSize.height: 40
+                width: 24
+                height: 24
+                sourceSize.width: 48
+                sourceSize.height: 48
                 fillMode: Image.PreserveAspectFit
                 asynchronous: true
                 smooth: true
