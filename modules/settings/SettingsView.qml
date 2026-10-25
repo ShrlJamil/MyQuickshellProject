@@ -69,11 +69,14 @@ FocusScope {
         }
     }
 
+    // Deliberately square and full-bleed: this view fills a real application
+    // window, so corner rounding belongs to the compositor (his Hyprland
+    // rounding rules), not to the app - an app-drawn radius would double up
+    // with the compositor's own corner shape.
     Rectangle {
         id: baseLayer
 
         anchors.fill: parent
-        radius: Theme.cornerRadius
         color: Theme.background
         border.width: 1
         border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
