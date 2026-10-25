@@ -434,11 +434,10 @@ ShellRoot {
         delegate: PowerMenuWindow {}
     }
 
-    Variants {
-        model: Quickshell.screens.map(screen => ({ screen: screen }))
-
-        delegate: SettingsWindow {}
-    }
+    // Settings is ONE floating application window for the whole shell (see
+    // SettingsWindow.qml) - no per-screen Variants: Hyprland places and
+    // manages it like any other app, gated only by SettingsService.open.
+    SettingsWindow {}
 
     Variants {
         // OSD stays on every screen by design: the volume/brightness/caps
