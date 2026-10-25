@@ -60,12 +60,13 @@ PanelWindow {
 
     readonly property real colWidth: 210
     readonly property real colGap: 12
-    readonly property real rowGap: 10
+    readonly property real rowGap: 12
+    readonly property real panelPadding: 14
     readonly property real heroHeight: 68
-    readonly property real gridTileSize: 96
+    readonly property real gridTileSize: 92
     readonly property real sliderHeight: 100
     readonly property real tilesHeight: root.heroHeight + 12 + root.gridTileSize * 2 + 12
-    readonly property real contentHeight: root.tilesHeight + root.rowGap + root.sliderHeight + root.rowGap + root.sliderHeight
+    readonly property real contentHeight: root.tilesHeight + root.rowGap + root.sliderHeight + root.rowGap + root.sliderHeight + root.panelPadding * 2
 
     implicitWidth: root.colWidth * 2 + root.colGap
     implicitHeight: root.contentHeight
@@ -258,7 +259,7 @@ PanelWindow {
             anchors.fill: parent
 
             radius: 24
-            color: Theme.background
+            color: Theme.backgroundSunken
         }
 
         // Fast scale-fade from the bar trigger's corner (top-right, matching the
@@ -361,7 +362,16 @@ PanelWindow {
         Column {
             id: columns
 
-            width: parent.width
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: parent.top
+            }
+
+            anchors.leftMargin: root.panelPadding
+            anchors.rightMargin: root.panelPadding
+            anchors.topMargin: root.panelPadding
+
             height: root.tilesHeight
 
             spacing: 12
@@ -369,21 +379,21 @@ PanelWindow {
             Row {
                 anchors.horizontalCenter: parent.horizontalCenter
 
-                spacing: 10
+                spacing: 12
 
                 Rectangle {
                     id: wifiTile
 
                     readonly property bool wifiOn: wifiService.enabled
 
-                    width: 211
+                    width: 196
                     height: 68
 
                     // Full pill. The outer capsule ALWAYS stays dark - only the
                     // inner wifiActiveCircle reflects the on/off state.
                     radius: height / 2
                     color: {
-                        const c = wifiHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+                        const c = wifiHover.hovered ? Qt.lighter(Theme.backgroundInset, 1.35) : Theme.backgroundInset
                         return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
                     }
 
@@ -484,12 +494,12 @@ PanelWindow {
                         Column {
                             anchors.verticalCenter: parent.verticalCenter
 
-                            width: 130
+                            width: 110
 
                             spacing: 2
 
                             Text {
-                                width: 211
+                                width: parent.width
                                 elide: Text.ElideRight
 
                                 text: "Wi-Fi"
@@ -500,7 +510,7 @@ PanelWindow {
                             }
 
                             Text {
-                                width: 211
+                                width: parent.width
                                 elide: Text.ElideRight
 
                                 text: {
@@ -548,11 +558,11 @@ PanelWindow {
                         return "On"
                     }
 
-                    width: 211
+                    width: 196
                     height: 68
                     radius: height / 2
                     color: {
-                        const c = btHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+                        const c = btHover.hovered ? Qt.lighter(Theme.backgroundInset, 1.35) : Theme.backgroundInset
                         return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
                     }
 
@@ -645,7 +655,7 @@ PanelWindow {
                         Column {
                             anchors.verticalCenter: parent.verticalCenter
 
-                            width: 130
+                            width: 110
 
                             spacing: 2
 
@@ -700,8 +710,8 @@ PanelWindow {
                 ControlTile {
                     id: hotspotTile
 
-                    width: 96
-                    height: 96
+                    width: 92
+                    height: 92
 
                     round: true
                     active: hotspotService.enabled
@@ -720,8 +730,8 @@ PanelWindow {
                 ControlTile {
                     id: focusTile
 
-                    width: 96
-                    height: 96
+                    width: 92
+                    height: 92
 
                     round: true
                     active: NotificationService.doNotDisturb
@@ -740,8 +750,8 @@ PanelWindow {
                 ControlTile {
                     id: caffeineTile
 
-                    width: 96
-                    height: 96
+                    width: 92
+                    height: 92
 
                     round: true
                     active: CaffeineService.enabled
@@ -760,8 +770,8 @@ PanelWindow {
                 ControlTile {
                     id: mirrorTile
 
-                    width: 96
-                    height: 96
+                    width: 92
+                    height: 92
 
                     round: true
                     active: DisplayService.mirrorActive
@@ -782,8 +792,8 @@ PanelWindow {
                 ControlTile {
                     id: ecoTile
 
-                    width: 96
-                    height: 96
+                    width: 92
+                    height: 92
 
                     round: true
                     active: EcoService.ecoMode
@@ -802,8 +812,8 @@ PanelWindow {
                 ControlTile {
                     id: nightLightTile
 
-                    width: 96
-                    height: 96
+                    width: 92
+                    height: 92
 
                     round: true
                     active: nightLightService.active
@@ -822,8 +832,8 @@ PanelWindow {
                 ControlTile {
                     id: colorPickerTile
 
-                    width: 96
-                    height: 96
+                    width: 92
+                    height: 92
 
                     round: true
                     label: "Color Picker"
@@ -844,8 +854,8 @@ PanelWindow {
                 ControlTile {
                     id: audioOutputTile
 
-                    width: 96
-                    height: 96
+                    width: 92
+                    height: 92
 
                     round: true
                     active: root.audioOutputPanelOpen
@@ -873,13 +883,15 @@ PanelWindow {
             }
 
             anchors.topMargin: root.rowGap
+            anchors.leftMargin: root.panelPadding
+            anchors.rightMargin: root.panelPadding
 
             height: root.sliderHeight
 
             // Full pill.
             radius: height / 2
             color: {
-                const c = displayHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+                const c = displayHover.hovered ? Qt.lighter(Theme.backgroundInset, 1.35) : Theme.backgroundInset
                 return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
             }
 
@@ -971,13 +983,15 @@ PanelWindow {
             }
 
             anchors.topMargin: root.rowGap
+            anchors.leftMargin: root.panelPadding
+            anchors.rightMargin: root.panelPadding
 
             height: root.sliderHeight
 
             // Full pill.
             radius: height / 2
             color: {
-                const c = soundHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+                const c = soundHover.hovered ? Qt.lighter(Theme.backgroundInset, 1.35) : Theme.backgroundInset
                 return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
             }
 

@@ -24,7 +24,7 @@ Item {
         anchors.topMargin: 3
         anchors.bottomMargin: 3
         radius: 15
-        color: root.popoverOpen ? Theme.surface
+        color: root.popoverOpen ? Theme.surfaceDesaturated
             : ((tap.pressed || hover.hovered) ? Theme.surfaceHover : "transparent")
     }
 

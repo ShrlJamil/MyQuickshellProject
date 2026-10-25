@@ -51,7 +51,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: 15
-        color: root.centerOpen ? Theme.surface
+        color: root.centerOpen ? Theme.surfaceDesaturated
             : (clusterTap.pressed || clusterHover.hovered ? Theme.surfaceHover : "transparent")
     }
 
