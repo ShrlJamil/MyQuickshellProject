@@ -42,6 +42,9 @@ Item {
     // Parsed for compatibility; the tonal recipe currently derives
     // activeTile from the seed instead of using the palette's value.
     property color _palActiveTile: "#c4c9d1"
+    // Same treatment: parsed, but the icon colour is derived from the
+    // seed (see `icon` below), not taken from the palette's constant.
+    property color _palIcon: "#F2F4F5"
 
     // ---- Tonal recipe (THE tuning knobs) ----------------------------------
     // Seed hue: the accent's hue; fall back to the background's, then to a
@@ -119,9 +122,11 @@ Item {
     property real moduleSurfaceOpacity: 1
     property real barSurfaceOpacity: 0
 
-    // Active/ON-state icon color (white, constant across wallpapers so icons
-    // stay readable). Sourced from the Wallust palette (`icon`).
-    property color icon: "#F2F4F5"
+    // Icon colour: NOT a neutral white - the seed (accent) mixed 82%
+    // toward white, so icons carry a faint tint of the wallpaper's own
+    // colour family instead of a milky generic white (Material You's
+    // on-surface idea). Still light enough to read as "white" anywhere.
+    property color icon: root.tint(root._palAccent, 0.82)
 
     // Material prototype (static bar only): ultra-subtle directional top
     // highlight + bottom edge key over the blurred backdrop. Neutral white at
@@ -217,7 +222,7 @@ Item {
         if (paletteAdapter.textMuted) root.textMuted = paletteAdapter.textMuted
         if (paletteAdapter.accent) root._palAccent = paletteAdapter.accent
         if (paletteAdapter.activeTile) root._palActiveTile = paletteAdapter.activeTile
-        if (paletteAdapter.icon) root.icon = paletteAdapter.icon
+        if (paletteAdapter.icon) root._palIcon = paletteAdapter.icon
         if (paletteAdapter.color0) root.color0 = paletteAdapter.color0
         if (paletteAdapter.color1) root.color1 = paletteAdapter.color1
         if (paletteAdapter.color2) root.color2 = paletteAdapter.color2

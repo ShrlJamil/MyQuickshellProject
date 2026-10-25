@@ -43,7 +43,7 @@ Item {
             // Inactive tiles stay translucent material.
             if (root.active)
                 return hover.hovered ? Theme.activeTileHover : Theme.activeTile
-            const c = hover.hovered ? Theme.backgroundSunken : Theme.backgroundInset
+            const c = hover.hovered ? Theme.background : Theme.backgroundSunken
             return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
         }
 

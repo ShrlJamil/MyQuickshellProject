@@ -49,7 +49,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: height / 2
-        color: Theme.surface
+        color: Theme.backgroundInset
     }
 
     Rectangle {
@@ -58,7 +58,7 @@ Item {
         width: root.artworkSize
         height: root.artworkSize
         radius: width / 2
-        color: Theme.background
+        color: Theme.surface
 
         anchors.left: parent.left
         anchors.leftMargin: root.padH

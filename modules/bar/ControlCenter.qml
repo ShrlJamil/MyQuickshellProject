@@ -63,10 +63,10 @@ PanelWindow {
     readonly property real rowGap: 12
     readonly property real panelPadding: 14
     readonly property real heroHeight: 68
-    readonly property real gridTileSize: 103
+    readonly property real gridTileSize: 105
     readonly property real gridTileHeight: 64
     readonly property real sliderHeight: 68
-    readonly property real tilesHeight: root.heroHeight + 8 + root.gridTileHeight * 2 + 8
+    readonly property real tilesHeight: root.heroHeight + 5 + root.gridTileHeight * 2 + 5
     readonly property real contentHeight: root.tilesHeight + root.rowGap + root.sliderHeight + root.rowGap + root.sliderHeight + root.panelPadding * 2
 
     implicitWidth: root.colWidth * 2 + root.colGap
@@ -260,7 +260,7 @@ PanelWindow {
             anchors.fill: parent
 
             radius: 24
-            color: Theme.backgroundSunken
+            color: Theme.background
         }
 
         // Fast scale-fade from the bar trigger's corner (top-right, matching the
@@ -375,26 +375,26 @@ PanelWindow {
 
             height: root.tilesHeight
 
-            spacing: 8
+            spacing: 5
 
             Row {
                 anchors.horizontalCenter: parent.horizontalCenter
 
-                spacing: 8
+                spacing: 5
 
                 Rectangle {
                     id: wifiTile
 
                     readonly property bool wifiOn: wifiService.enabled
 
-                    width: 214
+                    width: 215
                     height: 68
 
                     // Full pill. The outer capsule ALWAYS stays dark - only the
                     // inner wifiActiveCircle reflects the on/off state.
                     radius: height / 2
                     color: {
-                        const c = wifiHover.hovered ? Theme.backgroundSunken : Theme.backgroundInset
+                        const c = wifiHover.hovered ? Theme.background : Theme.backgroundSunken
                         return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
                     }
 
@@ -559,11 +559,11 @@ PanelWindow {
                         return "On"
                     }
 
-                    width: 214
+                    width: 215
                     height: 68
                     radius: height / 2
                     color: {
-                        const c = btHover.hovered ? Theme.backgroundSunken : Theme.backgroundInset
+                        const c = btHover.hovered ? Theme.background : Theme.backgroundSunken
                         return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
                     }
 
@@ -706,7 +706,7 @@ PanelWindow {
                 anchors.horizontalCenter: parent.horizontalCenter
 
                 columns: 4
-                spacing: 8
+                spacing: 5
 
                 ControlTile {
                     id: hotspotTile
@@ -892,7 +892,7 @@ PanelWindow {
             // Full pill.
             radius: height / 2
             color: {
-                const c = displayHover.hovered ? Theme.backgroundSunken : Theme.backgroundInset
+                const c = displayHover.hovered ? Theme.background : Theme.backgroundSunken
                 return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
             }
 
@@ -973,7 +973,7 @@ PanelWindow {
             // Full pill.
             radius: height / 2
             color: {
-                const c = soundHover.hovered ? Theme.backgroundSunken : Theme.backgroundInset
+                const c = soundHover.hovered ? Theme.background : Theme.backgroundSunken
                 return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
             }
 
