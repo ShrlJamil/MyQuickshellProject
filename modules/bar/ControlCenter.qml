@@ -489,8 +489,8 @@ PanelWindow {
 
                                 anchors.centerIn: parent
 
-                                width: 30
-                                height: 30
+                                width: 24
+                                height: 24
 
                                 source: Quickshell.iconPath("network-wireless-symbolic", "network-wireless")
                                 asynchronous: true
@@ -647,10 +647,10 @@ PanelWindow {
 
                                 anchors.centerIn: parent
 
-                                width: 30
-                                height: 30
-                                sourceSize.width: 60
-                                sourceSize.height: 60
+                                width: 24
+                                height: 24
+                                sourceSize.width: 48
+                                sourceSize.height: 48
                                 fillMode: Image.PreserveAspectFit
                                 asynchronous: true
                                 smooth: true
