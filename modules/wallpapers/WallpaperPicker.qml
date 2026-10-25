@@ -7,19 +7,20 @@ import "../../components"
 
 // Wallpaper picker - a compact single-row DynamicCenter surface. A horizontal
 // thumbnail strip with < / > arrows, full keyboard nav (Left/H, Right/L, Enter/
-// Space to apply, Esc to close), and inline apply via Process (mirrors
-// ~/.local/bin/walset-backend: awww per monitor + wallust + matugen + hyprlock
-// copy + notify). Carries the concave-top-corner frame like the other surfaces.
+// Space to apply, Esc to close). All collection and apply logic lives in the
+// shared WallpaperService (stepwise awww + wallust + matugen pipeline); this
+// surface only renders the carousel and forwards intent. Applying still
+// closes the surface - the pipeline runs to completion inside the service,
+// so closing never cancels or loses it. Carries the concave-top-corner
+// frame like the other surfaces.
 Item {
     id: root
 
     signal closeRequested()
 
-    // Kept for callers / debugging - mirrors the strip's current item.
+    // Kept for callers / debugging - mirrors the service's selection.
     property int selectedIndex: -1
     property string selectedPath: ""
-
-    readonly property string wallpaperDir: Quickshell.env("HOME") + "/Pictures/Wallpapers"
 
     // Natural size DynamicCenter fits its frame to (the carousel + arrows are
     // laid out for the standard width). Constant -> no loop.
@@ -34,30 +35,25 @@ Item {
     Component.onCompleted: root._reloadWallpapers()
 
     function _pathAt(i) {
-        if (i < 0 || i >= wallModel.count)
-            return ""
-        const o = wallModel.get(i)
-        const u = String((o && o.fileUrl) || "")
-        return decodeURIComponent(u.replace(/^file:\/\//, ""))
+        return WallpaperService.pathAt(i)
     }
 
     function step(dir) {
-        if (wallModel.count === 0)
+        if (WallpaperService.wallpapers.count === 0)
             return
         const base = strip.currentIndex < 0 ? 0 : strip.currentIndex
-        strip.currentIndex = Math.max(0, Math.min(wallModel.count - 1, base + dir))
+        strip.currentIndex = Math.max(0, Math.min(WallpaperService.wallpapers.count - 1, base + dir))
     }
 
     function applyIndex(i) {
         const p = root._pathAt(i)
         if (p === "")
             return
-        root.selectedIndex = i
-        root.selectedPath = p
+        WallpaperService.select(p)
         strip.currentIndex = i
-        wallpaperProc.img = p
-        if (!wallpaperProc.running)
-            wallpaperProc.running = true
+        // Accepted or queued by the service - either way the apply will
+        // really happen, so the surface closes exactly like it used to.
+        WallpaperService.apply(p)
         root.closeRequested()
     }
 
@@ -86,83 +82,30 @@ Item {
         }
     }
 
-    property bool _rebuilding: false
-
-    ListModel {
-        id: wallModel
-
-        onCountChanged: if (!root._rebuilding && strip.currentIndex < 0 && wallModel.count > 0) strip.currentIndex = 0
-    }
-
-    Process {
-        id: dirProc
-
-        command: ["find", root.wallpaperDir, "-maxdepth", "1", "-type", "f", "-printf", "%f\n"]
-        stdout: StdioCollector { id: dirOut; waitForEnd: true }
-
-        onExited: (code) => {
-            if (code === 0)
-                root._populate(dirOut.text)
-        }
-    }
-
     function _reloadWallpapers() {
-        if (!dirProc.running)
-            dirProc.running = true
+        WallpaperService.reload()
     }
 
-    function _populate(text) {
-        var keep = root.selectedPath
-        var rows = String(text || "").split("\n")
-        var items = []
-        for (var i = 0; i < rows.length; i++) {
-            var nm = rows[i].trim()
-            if (nm.length === 0 || nm.charAt(0) === ".")
-                continue
-            if (!/\.(jpe?g|png|webp)$/i.test(nm))
-                continue
-            items.push(nm)
-        }
-        items.sort()
-        root._rebuilding = true
-        wallModel.clear()
-        for (var j = 0; j < items.length; j++)
-            wallModel.append({ fileUrl: "file://" + encodeURI(root.wallpaperDir + "/" + items[j]) })
-        root._rebuilding = false
-        if (strip.currentIndex < 0 && wallModel.count > 0)
+    // Keep the strip and the mirrored selection properties in step with
+    // the shared service: carousel moves write the selection through
+    // (onCurrentIndexChanged below), while service-side changes (the
+    // Settings page, a finished rescan) flow back in here.
+    function _syncFromService() {
+        root.selectedPath = WallpaperService.selectedPath
+        root.selectedIndex = WallpaperService.indexOfPath(WallpaperService.selectedPath)
+        if (strip.currentIndex === root.selectedIndex)
+            return
+        if (root.selectedIndex >= 0)
+            strip.currentIndex = root.selectedIndex
+        else if (WallpaperService.wallpapers.count > 0 && strip.currentIndex < 0)
             strip.currentIndex = 0
-        if (keep !== "" && wallModel.count > 0) {
-            for (var k = 0; k < wallModel.count; k++) {
-                if (root._pathAt(k) === keep) {
-                    strip.currentIndex = k
-                    break
-                }
-            }
-        }
     }
 
-    // Inline wallpaper + theme apply. $1 == image path.
-    Process {
-        id: wallpaperProc
+    Connections {
+        target: WallpaperService
 
-        property string img: ""
-
-        command: ["bash", "-c",
-            'export WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-wayland-1}; ' +
-            'export XDG_RUNTIME_DIR=${XDG_RUNTIME_DIR:-/run/user/$(id -u)}; ' +
-            'IMAGE="$1"; ' +
-            'pgrep -x awww-daemon >/dev/null || { awww-daemon & sleep 0.3; }; ' +
-            'for m in $(hyprctl monitors -j | jq -r ".[].name"); do ' +
-            '  awww img -o "$m" "$IMAGE" --transition-type grow --transition-pos center ' +
-            '  --transition-duration 2 --transition-fps 120 --transition-bezier .43,1.19,1,.4; ' +
-            'done; ' +
-            'wallust run "$IMAGE" --skip-sequences; ' +
-            'matugen -t scheme-tonal-spot --contrast 0.4 --prefer saturation image "$IMAGE" --source-color-index 0; ' +
-            'mkdir -p "$HOME/Pictures/hyprlock" && cp "$IMAGE" "$HOME/Pictures/hyprlock/current_wallpaper.jpg"; ' +
-            'notify-send "Theme Applied" "Wallpaper and theme updated successfully!" -i "$IMAGE"',
-            "walset-inline", wallpaperProc.img]
-
-        onExited: (code) => console.log("[WallpaperPicker] apply exited", code)
+        function onSelectedPathChanged() { root._syncFromService() }
+        function onScanFinished() { root._syncFromService() }
     }
 
     // ---- concave DynamicCenter frame ---------------------------------------
@@ -294,7 +237,7 @@ Item {
             orientation: ListView.Horizontal
             spacing: 12
             clip: true
-            model: wallModel
+            model: WallpaperService.wallpapers
             currentIndex: -1
 
             // Recycle delegates during fast scrolling instead of churning
@@ -310,10 +253,8 @@ Item {
             preferredHighlightEnd: (strip.width - 164) / 2
 
             onCurrentIndexChanged: {
-                if (strip.currentIndex >= 0) {
-                    root.selectedIndex = strip.currentIndex
-                    root.selectedPath = root._pathAt(strip.currentIndex)
-                }
+                if (strip.currentIndex >= 0)
+                    WallpaperService.select(root._pathAt(strip.currentIndex))
             }
 
             delegate: Item {
