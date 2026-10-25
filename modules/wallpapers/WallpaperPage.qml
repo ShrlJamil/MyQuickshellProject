@@ -3,12 +3,10 @@ import QtQuick.Dialogs
 import Qt5Compat.GraphicalEffects
 import "../../components"
 
-// The Settings Wallpaper page (MVP). A thin view over the shared
-// WallpaperService - the same service the DynamicCenter carousel uses -
-// so both surfaces always agree on the collection, the selection, the
-// active wallpaper and the apply history. Applying never closes
-// Settings: the pipeline runs inside the service and this page just
-// reflects its status.
+// The Settings Wallpaper page. A thin view over WallpaperService,
+// which owns the collection, the selection, the active wallpaper and
+// the apply history. Applying never closes Settings: the pipeline runs
+// inside the service and this page just reflects its status.
 Item {
     id: root
 
@@ -92,59 +90,11 @@ Item {
         wrapMode: Text.WordWrap
     }
 
-    // ---- controls ---------------------------------------------------------------
-    Row {
-        id: controls
-
-        anchors {
-            top: pageDesc.bottom
-            left: parent.left
-            topMargin: 14
-            leftMargin: 10
-        }
-
-        spacing: 8
-
-        PageButton {
-            label: "Import Wallpaper"
-            disabled: WallpaperService.busy
-            onActivated: importDialog.open()
-        }
-
-        PageButton {
-            label: WallpaperService.status === "applying" ? "Applying…" : "Apply"
-            accent: true
-            disabled: WallpaperService.busy || !WallpaperService.selectedPath
-            onActivated: WallpaperService.apply(WallpaperService.selectedPath)
-        }
-    }
-
-    Text {
-        id: statusText
-
-        anchors {
-            left: controls.right
-            right: parent.right
-            top: pageDesc.bottom
-            topMargin: 14
-            leftMargin: 12
-            rightMargin: 10
-        }
-
-        height: 30
-        verticalAlignment: Text.AlignVCenter
-        text: WallpaperService.statusMessage
-        color: WallpaperService.status === "error" ? Theme.accent : Theme.textMuted
-        font.family: Theme.fontFamily
-        font.pixelSize: 11
-        elide: Text.ElideRight
-    }
-
     Rectangle {
         id: divider
 
         anchors {
-            top: controls.bottom
+            top: pageDesc.bottom
             left: parent.left
             right: parent.right
             topMargin: 14
@@ -156,123 +106,12 @@ Item {
         color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
     }
 
-    // ---- recently used -----------------------------------------------------------
-    Text {
-        id: recentLabel
-
-        visible: WallpaperService.history.length > 0
-
-        anchors {
-            top: divider.bottom
-            left: parent.left
-            topMargin: 14
-            leftMargin: 10
-        }
-
-        text: "Recently Used"
-        color: Theme.text
-        font.family: Theme.fontFamily
-        font.pixelSize: 12
-        font.weight: Font.DemiBold
-    }
-
-    ListView {
-        id: recentStrip
-
-        visible: WallpaperService.history.length > 0
-
-        anchors {
-            top: recentLabel.bottom
-            left: parent.left
-            right: parent.right
-            topMargin: 8
-            leftMargin: 10
-            rightMargin: 10
-        }
-
-        height: 62
-        orientation: ListView.Horizontal
-        spacing: 8
-        clip: true
-        model: WallpaperService.history
-
-        delegate: Rectangle {
-            id: recentCell
-
-            required property var modelData
-
-            readonly property bool isSelected: modelData === WallpaperService.selectedPath
-            readonly property bool isActive: modelData === WallpaperService.activePath
-
-            width: 106
-            height: 58
-            radius: 8
-            color: Theme.surfaceHover
-            border.width: recentCell.isSelected ? 2 : 1
-            border.color: recentCell.isSelected ? Theme.accent : Qt.rgba(1, 1, 1, 0.05)
-
-            Image {
-                id: recentImg
-
-                anchors.fill: parent
-                anchors.margins: 1
-
-                source: WallpaperService.urlForPath(modelData)
-                sourceSize.width: 212
-                fillMode: Image.PreserveAspectCrop
-                asynchronous: true
-                cache: true
-
-                // Rounded via layer OpacityMask - the codebase's proven
-                // pattern (Item.clip does not round an Image).
-                layer.enabled: recentImg.status === Image.Ready
-                layer.smooth: true
-                layer.effect: OpacityMask {
-                    maskSource: Rectangle {
-                        width: recentImg.width
-                        height: recentImg.height
-                        radius: 7
-                    }
-                }
-            }
-
-            Rectangle {
-                visible: recentCell.isActive
-                anchors {
-                    top: parent.top
-                    left: parent.left
-                    topMargin: 5
-                    leftMargin: 5
-                }
-                width: activeText.implicitWidth + 8
-                height: 14
-                radius: 4
-                color: Theme.accent
-
-                Text {
-                    id: activeText
-
-                    anchors.centerIn: parent
-                    text: "ACTIVE"
-                    color: Theme.background
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 8
-                    font.weight: Font.Bold
-                }
-            }
-
-            TapHandler {
-                onTapped: WallpaperService.select(modelData)
-            }
-        }
-    }
-
     // ---- collection ----------------------------------------------------------------
     Text {
         id: collectionLabel
 
         anchors {
-            top: recentStrip.visible ? recentStrip.bottom : divider.bottom
+            top: divider.bottom
             left: parent.left
             topMargin: 14
             leftMargin: 10
@@ -292,11 +131,11 @@ Item {
             top: collectionLabel.bottom
             left: parent.left
             right: parent.right
-            bottom: parent.bottom
+            bottom: footerDivider.top
             topMargin: 8
             leftMargin: 4
             rightMargin: 4
-            bottomMargin: 6
+            bottomMargin: 8
         }
 
         clip: true
@@ -414,11 +253,84 @@ Item {
         }
     }
 
+    // ---- footer (pinned; only the grid scrolls) --------------------------------------
+    Rectangle {
+        id: footerDivider
+
+        anchors {
+            bottom: footer.top
+            left: parent.left
+            right: parent.right
+            bottomMargin: 10
+            leftMargin: 10
+            rightMargin: 10
+        }
+
+        height: 1
+        color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+    }
+
+    Item {
+        id: footer
+
+        anchors {
+            left: parent.left
+            right: parent.right
+            bottom: parent.bottom
+            leftMargin: 10
+            rightMargin: 10
+            bottomMargin: 10
+        }
+
+        height: 30
+
+        Text {
+            id: statusText
+
+            anchors {
+                left: parent.left
+                right: footerButtons.left
+                verticalCenter: parent.verticalCenter
+                rightMargin: 12
+            }
+
+            text: WallpaperService.statusMessage
+            color: WallpaperService.status === "error" ? Theme.accent : Theme.textMuted
+            font.family: Theme.fontFamily
+            font.pixelSize: 11
+            elide: Text.ElideRight
+        }
+
+        Row {
+            id: footerButtons
+
+            anchors {
+                right: parent.right
+                verticalCenter: parent.verticalCenter
+            }
+
+            spacing: 8
+
+            PageButton {
+                label: "Browse…"
+                disabled: WallpaperService.busy
+                onActivated: importDialog.open()
+            }
+
+            PageButton {
+                label: WallpaperService.status === "applying" ? "Applying…" : "Apply"
+                accent: true
+                disabled: WallpaperService.busy || !WallpaperService.selectedPath
+                onActivated: WallpaperService.apply(WallpaperService.selectedPath)
+            }
+        }
+    }
+
     // ---- empty state ---------------------------------------------------------------
     Column {
         visible: WallpaperService.wallpapers.count === 0
 
-        anchors.centerIn: parent
+        anchors.centerIn: grid
         width: Math.min(360, root.width - 48)
         spacing: 8
 
@@ -436,7 +348,7 @@ Item {
         Text {
             anchors.horizontalCenter: parent.horizontalCenter
             width: parent.width
-            text: "Your collection in ~/Pictures/Wallpapers is empty. Import an image to get started."
+            text: "Your collection in ~/Pictures/Wallpapers is empty. Use Browse… below to add an image."
             color: Qt.rgba(Theme.textMuted.r, Theme.textMuted.g, Theme.textMuted.b, 0.7)
             font.family: Theme.fontFamily
             font.pixelSize: 11

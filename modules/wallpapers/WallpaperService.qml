@@ -4,11 +4,11 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
-// Shared wallpaper core for BOTH wallpaper surfaces: the DynamicCenter
-// carousel (WallpaperPicker) and the Settings Wallpaper page. Owns the
-// collection scan of ~/Pictures/Wallpapers, imports, the selection, the
-// last-applied wallpaper, a persistent apply history, and the apply
-// pipeline itself.
+// The wallpaper core behind the Settings Wallpaper page - the single
+// owner of all wallpaper logic (the DynamicCenter carousel that used to
+// share it has been removed). Owns the collection scan of
+// ~/Pictures/Wallpapers, imports, the selection, the last-applied
+// wallpaper, a persistent apply history, and the apply pipeline itself.
 //
 // The pipeline is orchestrated stepwise in QML - one Process per step,
 // exit code checked before continuing - instead of the old single
@@ -124,7 +124,7 @@ Item {
     Process {
         id: dirProc
 
-        command: ["find", root.wallpaperDir, "-maxdepth", "1", "-type", "f", "-printf", "%f\n"]
+        command: ["find", root.wallpaperDir, "-maxdepth", "1", "-type", "f", "-printf", "%T@ %f\n"]
         stdout: StdioCollector { id: dirOut; waitForEnd: true }
 
         onExited: (code) => {
@@ -141,21 +141,30 @@ Item {
     }
 
     function _populate(text) {
+        // Rows are "<mtime-epoch> <name>" (find %T@). Split only at the
+        // FIRST space so names containing spaces survive intact.
         const rows = String(text || "").split("\n")
-        const names = []
+        const items = []
         for (let i = 0; i < rows.length; i++) {
-            const nm = rows[i].trim()
+            const sp = rows[i].indexOf(" ")
+            if (sp < 0)
+                continue
+            const ts = parseFloat(rows[i].substring(0, sp))
+            const nm = rows[i].substring(sp + 1)
             if (nm.length === 0 || nm.charAt(0) === ".")
                 continue
             if (!/\.(jpe?g|png|webp)$/i.test(nm))
                 continue
-            names.push(nm)
+            items.push({ name: nm, mtime: isNaN(ts) ? 0 : ts })
         }
-        names.sort()
+        // Newest first - a fresh import (a copy gets a fresh mtime) lands
+        // at the top. The name breaks mtime ties so bulk-copied files
+        // still get one deterministic order.
+        items.sort((a, b) => (b.mtime - a.mtime) || (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
         wallModel.clear()
-        for (let j = 0; j < names.length; j++) {
-            const p = root.wallpaperDir + "/" + names[j]
-            wallModel.append({ fileUrl: root.urlForPath(p), filePath: p, fileName: names[j] })
+        for (let j = 0; j < items.length; j++) {
+            const p = root.wallpaperDir + "/" + items[j].name
+            wallModel.append({ fileUrl: root.urlForPath(p), filePath: p, fileName: items[j].name })
         }
         root._scanned = true
 
@@ -496,12 +505,18 @@ Item {
         }
     }
 
-    // Step 3: awww img, one monitor at a time, same transition as before.
+    // Step 3: awww img, one monitor at a time. Transition: a diagonal
+    // wipe - verified against the awww man page (doc/awww-img.1.scd):
+    // `wipe` is the directional sweep whose angle --transition-angle
+    // controls (degrees; 0 = right-to-left, 90 = top-to-bottom), and 45
+    // is both its default and the diagonal. 0.4s at 60fps keeps it short
+    // but smooth (the 30fps default would give a 0.4s wipe only ~12
+    // frames). The old grow tuning (pos + overshoot bezier + 120fps)
+    // goes away entirely.
     function _stepAwww() {
         awwwProc.command = ["awww", "img", "-o", root._monitors[root._monIndex], root._applyImg,
-            "--transition-type", "grow", "--transition-pos", "center",
-            "--transition-duration", "2", "--transition-fps", "120",
-            "--transition-bezier", ".43,1.19,1,.4"]
+            "--transition-type", "wipe", "--transition-angle", "45",
+            "--transition-duration", "0.4", "--transition-fps", "60"]
         awwwProc.running = true
     }
 
