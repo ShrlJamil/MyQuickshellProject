@@ -50,7 +50,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        radius: 8
+        radius: 17
         color: root.centerOpen ? Theme.surface
             : (clusterTap.pressed || clusterHover.hovered ? Theme.surfaceHover : "transparent")
     }
@@ -59,7 +59,7 @@ Item {
         id: clusterRow
 
         anchors.centerIn: parent
-        spacing: 4
+        spacing: 2
 
         // ---- Wi-Fi ------------------------------------------------------
         // Glyph logic transplanted unchanged from the old standalone
@@ -67,7 +67,7 @@ Item {
         Item {
             id: wifiSlot
 
-            width: 34
+            width: 30
             height: 34
 
             readonly property bool wifiOn: NetworkService.wifiEnabled
@@ -119,7 +119,7 @@ Item {
         Item {
             id: btSlot
 
-            width: 34
+            width: 30
             height: 34
 
             // State glyphs (assets/dynamic bluetooth/*): off while the radio
@@ -175,7 +175,7 @@ Item {
         Item {
             id: volSlot
 
-            width: 34
+            width: 30
             height: 34
 
             readonly property bool silent: audioSvc.muted || audioSvc.volume <= 0

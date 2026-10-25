@@ -16,14 +16,14 @@ Item {
     readonly property bool popoverOpen: BatteryService.popoverScreen === root.screen
 
     visible: BatteryService.available
-    implicitWidth: root.visible ? (layout.implicitWidth + 20) : 0
+    implicitWidth: root.visible ? (layout.implicitWidth + 14) : 0
     implicitHeight: 40
 
     Rectangle {
         anchors.fill: parent
         anchors.topMargin: 3
         anchors.bottomMargin: 3
-        radius: 8
+        radius: 17
         color: root.popoverOpen ? Theme.surface
             : ((tap.pressed || hover.hovered) ? Theme.surfaceHover : "transparent")
     }
@@ -32,7 +32,7 @@ Item {
         id: layout
 
         anchors.centerIn: parent
-        spacing: 5
+        spacing: 2
 
         // Custom SVG battery glyph (assets/Microsoft-battery-icon/*).
         // Deliberately NOT Quickshell.iconPath / UPower.iconName - the Qt icon

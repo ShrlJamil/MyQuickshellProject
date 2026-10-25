@@ -325,10 +325,10 @@ PanelWindow {
 
         color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.barSurfaceOpacity)
 
-        // Material prototype: directional top light + bottom edge key.
-        // The top light is a short soft falloff (not a hard hairline) so it
-        // reads as light response rather than an edge artifact; peak uses the
-        // same highlight token. All content stays above both painters.
+        // Material prototype: directional top light - a short soft falloff
+        // (not a hard hairline) so it reads as light response rather than an
+        // edge artifact; peak uses the highlight token. All content stays
+        // above it. (There is deliberately no bottom edge line.)
         Rectangle {
             x: 0
             y: 0
@@ -345,35 +345,6 @@ PanelWindow {
                 }
             }
         }
-        // Bottom edge: full line while closed; split side segments while a
-        // surface is open, so the shared span merges into the panel and only
-        // the outer edge stays bright. The two states are exact complements
-        // (no frame shows both or neither); widths track allocatedWidth live.
-        Rectangle {
-            x: 0
-            y: parent.height - 1
-            width: parent.width
-            height: 1
-            color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
-            visible: dynamicCenter.activeSurface === "idle" && dynamicCenter.allocatedHeight <= 0
-        }
-        Rectangle {
-            x: 0
-            y: parent.height - 1
-            width: (parent.width - dynamicCenter.allocatedWidth) / 2
-            height: 1
-            color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
-            visible: dynamicCenter.activeSurface !== "idle" || dynamicCenter.allocatedHeight > 0
-        }
-        Rectangle {
-            x: (parent.width + dynamicCenter.allocatedWidth) / 2
-            y: parent.height - 1
-            width: (parent.width - dynamicCenter.allocatedWidth) / 2
-            height: 1
-            color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
-            visible: dynamicCenter.activeSurface !== "idle" || dynamicCenter.allocatedHeight > 0
-        }
-
         // Arch Linux logo, pinned to the very left edge. Click toggles a
         // fastfetch-style system summary popover (see archPop below).
         Item {
@@ -899,13 +870,13 @@ PanelWindow {
             anchors.rightMargin: CaffeineService.enabled ? 4 : 0
 
             visible: CaffeineService.enabled
-            width: CaffeineService.enabled ? 34 : 0
+            width: CaffeineService.enabled ? 38 : 0
             implicitWidth: width
             height: 34
 
             Rectangle {
                 anchors.fill: parent
-                radius: 8
+                radius: 17
                 color: caffeineTap.pressed || caffeineHover.hovered ? Theme.surfaceHover : "transparent"
             }
 
@@ -976,12 +947,12 @@ PanelWindow {
 
                     required property var modelData
 
-                    width: 34
+                    width: 38
                     height: 34
 
                     Rectangle {
                         anchors.fill: parent
-                        radius: 8
+                        radius: 17
                         color: trayMouse.containsMouse ? Theme.surfaceHover : "transparent"
                     }
 
@@ -1075,12 +1046,12 @@ PanelWindow {
             }
             anchors.rightMargin: 4
 
-            width: 34
+            width: 38
             height: 34
 
             Rectangle {
                 anchors.fill: parent
-                radius: 8
+                radius: 17
                 color: micTap.pressed || micHover.hovered ? Theme.surfaceHover : "transparent"
             }
 
