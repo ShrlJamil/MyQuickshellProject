@@ -32,7 +32,7 @@ Item {
         id: layout
 
         anchors.centerIn: parent
-        spacing: 2
+        spacing: 0
 
         // Custom SVG battery glyph (assets/Microsoft-battery-icon/*).
         // Deliberately NOT Quickshell.iconPath / UPower.iconName - the Qt icon
