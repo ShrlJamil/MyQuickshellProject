@@ -37,6 +37,17 @@ PanelWindow {
     property int replyFocusHolders: 0
     readonly property bool wantKeyboard: root.replyFocusHolders > 0
 
+    // Close-collapse bookkeeping. While any toast is collapsing, the window
+    // height is FROZEN at the value captured when the first collapse began
+    // (frozenHeight), so the layer surface is not reconfigured on every
+    // animation frame: the collapse plays out inside the existing surface
+    // (the stack is top-anchored and the strip freed at the bottom is
+    // transparent), and the window shrinks in ONE configure when the closing
+    // delegate is removed. Animating the surface size per frame was the
+    // direct cause of the choppy open/close motion.
+    property int closingCount: 0
+    property real frozenHeight: 0
+
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.exclusionMode: ExclusionMode.Ignore
     WlrLayershell.keyboardFocus: root.wantKeyboard
@@ -46,24 +57,24 @@ PanelWindow {
 
     anchors {
         top: true
-        right: true
+        left: true
     }
 
     margins {
-        top: 48
-        right: 12
+        top: 44
+        left: 12
     }
 
     // Window tracks the content so there is no large empty area; the toasts
     // themselves are the only opaque surfaces.
     implicitWidth: 380
-    implicitHeight: Math.max(1, stack.implicitHeight)
+    implicitHeight: Math.max(1, root.closingCount > 0 ? root.frozenHeight : stack.implicitHeight)
     color: "transparent"
 
     Column {
         id: stack
 
-        anchors.right: parent.right
+        anchors.left: parent.left
         width: 372
         spacing: 8
         clip: true
@@ -148,6 +159,12 @@ PanelWindow {
                 function beginClose() {
                     if (slot.closing)
                         return
+                    // Freeze the window height before the collapse starts;
+                    // the first closer captures the still-complete stack
+                    // height (see root.closingCount / root.frozenHeight).
+                    if (root.closingCount === 0)
+                        root.frozenHeight = stack.implicitHeight
+                    root.closingCount++
                     // Arm the Behavior before triggering height -> 0 so the
                     // collapse animates regardless of binding evaluation order.
                     slot.closeAnimating = true
@@ -160,12 +177,31 @@ PanelWindow {
                     NumberAnimation { duration: 160; easing.type: Easing.InCubic }
                 }
 
-                // Fires just after the exit animation; hands removal back to the
-                // single source of truth.
+                // Removal is triggered by the collapse animation actually
+                // REACHING zero height, not by a fixed clock: if frames are
+                // dropped, the delegate still leaves exactly when its
+                // animation lands, never mid-flight. Guarded so every close
+                // path (this watcher, the failsafe timer, external removal)
+                // hands back to the single source of truth exactly once.
+                property bool removalSent: false
+                function finishClose() {
+                    if (slot.removalSent)
+                        return
+                    slot.removalSent = true
+                    NotificationService.dismissPopup(slot.modelData.id)
+                }
+
+                onHeightChanged: {
+                    if (slot.closing && slot.height <= 0)
+                        slot.finishClose()
+                }
+
+                // Failsafe only: fires if the height somehow never reaches
+                // zero, so a closing toast can never get stuck invisible.
                 Timer {
                     id: closeTimer
-                    interval: 180
-                    onTriggered: NotificationService.dismissPopup(slot.modelData.id)
+                    interval: 500
+                    onTriggered: slot.finishClose()
                 }
 
                 // Auto-dismiss after the entry's policy duration, computed by
@@ -194,7 +230,7 @@ PanelWindow {
                     border.width: 1
                     border.color: Theme.surfaceHover
 
-                    x: (slot.entered && !slot.closing) ? 0 : (slot.width + 24)
+                    x: (slot.entered && !slot.closing) ? 0 : -(slot.width + 24)
                     opacity: (slot.entered && !slot.closing) ? 1 : 0
 
                     Behavior on x {
@@ -500,7 +536,29 @@ PanelWindow {
                     }
                 }
 
-                Component.onCompleted: slot.entered = true
+                // Start the entry animation one beat after creation. The
+                // layer surface (freshly mapped for the first toast, freshly
+                // resized for later ones) needs a frame or two to present,
+                // and starting the 200ms slide at creation time lets the
+                // compositor eat its first frames - the toast then appears
+                // mid-slide and the entry looks chopped. Until the timer
+                // fires the card waits off-slide and invisible.
+                Timer {
+                    id: enterTimer
+
+                    interval: 32
+                    onTriggered: slot.entered = true
+                }
+
+                Component.onCompleted: enterTimer.start()
+
+                Component.onDestruction: {
+                    // Balance beginClose's freeze bookkeeping on every
+                    // destruction path (animated removal, DND clear-all,
+                    // sender-side close mid-collapse).
+                    if (slot.closing)
+                        root.closingCount--
+                }
             }
         }
     }

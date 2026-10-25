@@ -16,53 +16,57 @@ Item {
     readonly property bool popoverOpen: BatteryService.popoverScreen === root.screen
 
     visible: BatteryService.available
-    implicitWidth: root.visible ? (layout.implicitWidth + 20) : 0
-    implicitHeight: 40
+    implicitWidth: root.visible ? (layout.implicitWidth + 14) : 0
+    implicitHeight: 36
 
     Rectangle {
         anchors.fill: parent
-        anchors.topMargin: 4
-        anchors.bottomMargin: 4
-        radius: 8
-        color: (root.popoverOpen || tap.pressed || hover.hovered) ? Theme.surfaceHover : "transparent"
+        anchors.topMargin: 1
+        anchors.bottomMargin: 1
+        radius: 17
+        color: root.popoverOpen ? Theme.surface
+            : ((tap.pressed || hover.hovered) ? Theme.surfaceHover : "transparent")
     }
 
     Row {
         id: layout
 
         anchors.centerIn: parent
-        spacing: 5
+        spacing: 0
 
-        // Custom SVG battery glyph (assets/best-battery-icon/*). Deliberately
-        // NOT Quickshell.iconPath / UPower.iconName - the Qt icon theme (Kora)
-        // renders those poorly. Unified single-glyph set: the charging state is
-        // baked into its own glyph, so this is one Image + ColorOverlay, no
-        // separate flash overlay. Enlarged (38x28) to read as prominently as the
-        // Control Center bar button; still comfortably inside the 40px bar.
+        // Custom SVG battery glyph (assets/Microsoft-battery-icon/*).
+        // Deliberately NOT Quickshell.iconPath / UPower.iconName - the Qt icon
+        // theme (Kora) renders those poorly. The set is Microsoft's Fluent
+        // battery family: a 10-step fill ladder (battery-0 .. battery-9),
+        // battery-full at 100%, and a dedicated battery-charge glyph for the
+        // charging state - all rendered through the same Image + ColorOverlay.
+        // Enlarged (46x34) to read as prominently as the Control Center bar
+        // button; still comfortably inside the 40px bar.
         Item {
             id: iconBox
 
             anchors.verticalCenter: parent.verticalCenter
-            width: 38
-            implicitWidth: 38
-            height: 28
+            width: 44
+            implicitWidth: 44
+            height: 32
 
             // Charging and critically-low both read as "attention" -> accent.
             readonly property bool attention: BatteryService.charging || BatteryService.low
 
+            // Fluent ladder in 10% floor steps (0-9 -> battery-0, 10-19 ->
+            // battery-1, ..., 90-99 -> battery-9); battery-full only at
+            // exactly 100. Charging at any level shows the set's dedicated
+            // battery-charge glyph - the set has no per-level charging
+            // ladder. battery-saver / battery-warning stay unused for now:
+            // BatteryService exposes no power-saver signal, and critically
+            // low already reads through the accent tint below.
             readonly property string batteryFile: {
                 if (BatteryService.charging)
-                    return "battery-charging-svgrepo-com.svg"
-                const p = BatteryService.percent
-                if (BatteryService.full || p >= 90)
+                    return "battery-charge-svgrepo-com.svg"
+                const p = Math.max(0, Math.min(100, Math.floor(BatteryService.percent)))
+                if (p >= 100)
                     return "battery-full-svgrepo-com.svg"
-                if (p >= 65)
-                    return "battery-75-svgrepo-com.svg"
-                if (p >= 35)
-                    return "battery-half-svgrepo-com.svg"
-                if (p >= 15)
-                    return "battery-low-svgrepo-com.svg"
-                return "battery-empty-svgrepo-com.svg"
+                return "battery-" + Math.floor(p / 10) + "-svgrepo-com.svg"
             }
 
             Image {
@@ -70,8 +74,8 @@ Item {
 
                 anchors.fill: parent
                 fillMode: Image.PreserveAspectFit
-                sourceSize.width: 76
-                sourceSize.height: 56
+                sourceSize.width: 68
+                sourceSize.height: 68
                 asynchronous: true
                 smooth: true
                 mipmap: true
@@ -79,8 +83,8 @@ Item {
 
                 // Safe fallback glyph, never the icon theme.
                 property bool failed: false
-                source: "file://" + Quickshell.shellPath("assets/best-battery-icon/"
-                    + (battImg.failed ? "battery-75-svgrepo-com.svg" : iconBox.batteryFile))
+                source: "file://" + Quickshell.shellPath("assets/Microsoft-battery-icon/"
+                    + (battImg.failed ? "battery-5-svgrepo-com.svg" : iconBox.batteryFile))
                 onStatusChanged: if (status === Image.Error) battImg.failed = true
             }
 
@@ -115,7 +119,7 @@ Item {
             styleColor: Theme.textShadow
             font.family: Theme.fontFamily
             font.weight: Font.Black
-            font.pixelSize: 15
+            font.pixelSize: 16
         }
     }
 
@@ -160,9 +164,9 @@ Item {
             right: true
         }
 
-        // top: just below the 40px bar with a clean 8px gap (no overlap).
+        // top: just below the 36px bar with a clean 8px gap (no overlap).
         margins {
-            top: 40
+            top: 36
             right: Math.max(8, Math.round(pop.centeredRight))
         }
 

@@ -8,7 +8,6 @@ import Quickshell.Io
 Item {
     id: root
 
-    property bool busy: false
     property bool barVisible: false
     property string pendingMode: ""
     property bool regionSelectActive: false
@@ -21,11 +20,8 @@ Item {
     onBarVisibleChanged: console.log("[CaptureService] barVisible ->", root.barVisible)
 
     property string lastPath: ""
-    property string lastTimestamp: ""
     // drives the floating ScreenshotPreview window (bottom-right thumbnail)
     property bool bannerVisible: false
-
-    signal captured(string imagePath, string timestamp)
 
     function openBar() {
         console.log("[CaptureService] openBar()")
@@ -76,10 +72,6 @@ Item {
         }
 
         executeTimer.restart()
-    }
-
-    function captureRegion() {
-        root.triggerCapture("region")
     }
 
     function captureFullscreen() {
@@ -155,41 +147,8 @@ Item {
 
         console.log("[CaptureService] Launching command for mode:", mode)
         console.log("[CaptureService] cmd:", cmd)
-        root.busy = true
         captureProc.command = ["sh", "-c", cmd]
         captureProc.running = true
-    }
-
-    function copyLast() {
-        if (root.lastPath === "") return
-        root._run(["bash", "-c", 'wl-copy --type image/png < "$1"', "_", root.lastPath])
-    }
-
-    function copyPath() {
-        if (root.lastPath === "") return
-        root._run(["bash", "-c", 'printf "%s" "$1" | wl-copy', "_", root.lastPath])
-    }
-
-    function openLast() {
-        if (root.lastPath === "") return
-        root._run(["xdg-open", root.lastPath])
-    }
-
-    function deleteLast() {
-        if (root.lastPath === "") return
-        root._run(["rm", "-f", root.lastPath])
-        root.bannerVisible = false
-        root.lastPath = ""
-    }
-
-    function dismissBanner() {
-        root.bannerVisible = false
-    }
-
-    function _run(cmd) {
-        if (actionProc.running) return
-        actionProc.command = cmd
-        actionProc.running = true
     }
 
     Timer {
@@ -225,8 +184,6 @@ Item {
         }
 
         onExited: (exitCode, exitStatus) => {
-            root.busy = false
-
             console.log("[CaptureService] Process exited code:", exitCode, "status:", exitStatus)
             console.log("[CaptureService] stdout:", captureProc.stdout.text.trim())
             console.log("[CaptureService] stderr:", captureProc.stderr.text.trim())
@@ -235,17 +192,9 @@ Item {
             if (exitCode === 0 && out !== "") {
                 console.log("[CaptureService] Capture successful:", out)
                 root.lastPath = out
-                root.lastTimestamp = Qt.formatDateTime(new Date(), "hh:mm A")
                 root.bannerVisible = true
-                root.captured(root.lastPath, root.lastTimestamp)
             }
         }
-    }
-
-    Process {
-        id: actionProc
-
-        command: ["true"]
     }
 
     // The floating ScreenshotPreview owns its own 3.5s auto-dismiss now, so

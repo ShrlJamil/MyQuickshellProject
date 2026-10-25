@@ -1,110 +1,56 @@
 import QtQuick
-import Qt5Compat.GraphicalEffects
 import Quickshell
-import Quickshell.Hyprland
-import Quickshell.Wayland
-import "../../components"
 import "."
 
-PanelWindow {
+// Settings as a normal floating application window (xdg toplevel), NOT a
+// layer-shell panel: Hyprland manages it like any other application - it
+// appears in window lists, takes regular focus, and floats or tiles by his
+// own window rules. There is no scrim, no fullscreen surface, no mask and
+// no focus grab; the window simply exists while SettingsService.open holds.
+// (To float + centre it, his Hyprland config needs a window rule matching
+// this window - title "Settings", class/app_id is Quickshell's own.)
+//
+// Single instance for the whole shell (see shell.qml): one application
+// window, not one per screen. SettingsService.screen survives only as the
+// initial placement hint - the screen the opener targeted.
+FloatingWindow {
     id: root
 
-    required property var modelData
-
-    readonly property ShellScreen targetScreen: modelData.screen
-    readonly property bool open: SettingsService.open && SettingsService.screen === root.targetScreen
-
-    screen: root.targetScreen
-
-    visible: true
-
-    WlrLayershell.layer: WlrLayer.Overlay
-    WlrLayershell.namespace: "quickshell-settings"
-    WlrLayershell.exclusionMode: ExclusionMode.Ignore
-
-    anchors {
-        top: true
-        bottom: true
-        left: true
-        right: true
-    }
-
+    title: "Settings"
     color: "transparent"
-    focusable: root.open
 
-    mask: Region { item: root.open ? content : null }
+    screen: SettingsService.screen
 
-    onOpenChanged: if (root.open) settingsView.forceActiveFocus()
+    visible: SettingsService.open
 
-    Shortcut {
-        sequences: ["Escape"]
-        enabled: root.open
-        onActivated: SettingsService.hide()
-    }
+    // Starting size and floor, carried over from the old centred card: the
+    // Display page needs the room. implicit* applies only while the window
+    // is hidden (FloatingWindow semantics), so it sets the opening size
+    // without ever fighting a resize the user made through Hyprland.
+    implicitWidth: 880
+    implicitHeight: 560
+    minimumSize: Qt.size(460, 380)
 
-    HyprlandFocusGrab {
-        windows: [root]
-        active: root.open
-
-        onCleared: {
-            if (!root.open)
-                return
+    onVisibleChanged: {
+        if (root.visible) {
+            settingsView.forceActiveFocus()
+        } else if (SettingsService.open) {
+            // Closed from the window-manager side (kill keybind, decoration
+            // button): keep the service truthful, or the next toggle would
+            // "hide" an already-gone window instead of opening it.
             SettingsService.hide()
         }
     }
 
-    Item {
-        id: content
+    Shortcut {
+        sequences: ["Escape"]
+        onActivated: SettingsService.hide()
+    }
+
+    SettingsView {
+        id: settingsView
 
         anchors.fill: parent
-        opacity: root.open ? 1 : 0
-        visible: opacity > 0
-
-        Behavior on opacity {
-            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
-        }
-
-        Rectangle {
-            anchors.fill: parent
-            color: Qt.rgba(0, 0, 0, 0.55)
-
-            MouseArea {
-                anchors.fill: parent
-                onClicked: SettingsService.hide()
-            }
-        }
-
-        Rectangle {
-            id: card
-
-            anchors.centerIn: parent
-            width: settingsView.implicitWidth
-            height: settingsView.implicitHeight
-            radius: 18
-            color: Theme.background
-            border.width: 1
-            border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
-
-            layer.enabled: true
-            layer.effect: DropShadow {
-                transparentBorder: true
-                horizontalOffset: 0
-                verticalOffset: 4
-                radius: 16
-                samples: 25
-                color: Qt.rgba(0, 0, 0, 0.45)
-            }
-
-            MouseArea {
-                anchors.fill: parent
-            }
-
-            SettingsView {
-                id: settingsView
-
-                anchors.fill: parent
-                onCloseRequested: SettingsService.hide()
-            }
-        }
+        onCloseRequested: SettingsService.hide()
     }
 }

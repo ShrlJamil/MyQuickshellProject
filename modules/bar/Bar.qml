@@ -24,8 +24,7 @@ PanelWindow {
     // Static bar: always on, from the moment quickshell starts. No IPC gate.
     visible: true
 
-    property bool centerOpen: barState.mode === "center" && barState.screen === root.screen
-    property bool surfaceActive: (barState.screen === root.screen && (barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact"))
+    property bool surfaceActive: (barState.screen === root.screen && (barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact"))
     property double _mediaPopoverClosedAt: 0
 
     // ---- single-window concave (tiled hug) --------------------------------
@@ -71,7 +70,7 @@ PanelWindow {
     // corners so the same path draws today's plain rectangle. The y guard
     // keeps the scoop attached to the bar (a gapped window means no hug).
     // Window-state only: DynamicCenter must not kill the concave. DC paints
-    // below the bar (y>=40) while these Shapes live at y=40..60 beside it.
+    // below the bar (y>=36) while these Shapes live at y=36..56 beside it.
     readonly property bool _scoopOn: root._haveSolo && root._geoValid && !root._winFloat
         && root._winY <= 44 && root._scoopW > 40
     readonly property real _scoopL0: Math.max(0, Math.min(barContent.width, root._winX))
@@ -279,7 +278,7 @@ PanelWindow {
 
     color: "transparent"
 
-    exclusiveZone: 40
+    exclusiveZone: 36
     focusable: root.surfaceActive
 
     mask: root.surfaceActive ? activeMask : idleMask
@@ -320,16 +319,16 @@ PanelWindow {
         x: 0
         y: 0
         width: parent.width
-        height: 40
+        height: 36
         clip: true
         z: 999
 
         color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.barSurfaceOpacity)
 
-        // Material prototype: directional top light + bottom edge key.
-        // The top light is a short soft falloff (not a hard hairline) so it
-        // reads as light response rather than an edge artifact; peak uses the
-        // same highlight token. All content stays above both painters.
+        // Material prototype: directional top light - a short soft falloff
+        // (not a hard hairline) so it reads as light response rather than an
+        // edge artifact; peak uses the highlight token. All content stays
+        // above it. (There is deliberately no bottom edge line.)
         Rectangle {
             x: 0
             y: 0
@@ -343,320 +342,6 @@ PanelWindow {
                 GradientStop {
                     position: 1
                     color: "transparent"
-                }
-            }
-        }
-        // Bottom edge: full line while closed; split side segments while a
-        // surface is open, so the shared span merges into the panel and only
-        // the outer edge stays bright. The two states are exact complements
-        // (no frame shows both or neither); widths track allocatedWidth live.
-        Rectangle {
-            x: 0
-            y: parent.height - 1
-            width: parent.width
-            height: 1
-            color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
-            visible: dynamicCenter.activeSurface === "idle" && dynamicCenter.allocatedHeight <= 0
-        }
-        Rectangle {
-            x: 0
-            y: parent.height - 1
-            width: (parent.width - dynamicCenter.allocatedWidth) / 2
-            height: 1
-            color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
-            visible: dynamicCenter.activeSurface !== "idle" || dynamicCenter.allocatedHeight > 0
-        }
-        Rectangle {
-            x: (parent.width + dynamicCenter.allocatedWidth) / 2
-            y: parent.height - 1
-            width: (parent.width - dynamicCenter.allocatedWidth) / 2
-            height: 1
-            color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
-            visible: dynamicCenter.activeSurface !== "idle" || dynamicCenter.allocatedHeight > 0
-        }
-
-        // Arch Linux logo, pinned to the very left edge. Click toggles a
-        // fastfetch-style system summary popover (see archPop below).
-        Item {
-            id: archSlot
-
-            anchors {
-                left: parent.left
-                verticalCenter: parent.verticalCenter
-            }
-
-            // Bar left outer padding (mirrors dateTime's right padding).
-            anchors.leftMargin: 8
-
-            width: 32
-            height: 32
-
-            Rectangle {
-                anchors.fill: parent
-                radius: 10
-                color: archTap.pressed || archHover.hovered || archPop.open ? Theme.surfaceHover : "transparent"
-            }
-
-            Image {
-                id: archImg
-
-                anchors.centerIn: parent
-                width: 20
-                height: 20
-                sourceSize.width: 40
-                sourceSize.height: 40
-                fillMode: Image.PreserveAspectFit
-                asynchronous: true
-                smooth: true
-                mipmap: true
-                visible: false
-
-                source: "file://" + Quickshell.shellPath("assets/arch.svg")
-            }
-
-            ColorOverlay {
-                anchors.fill: archImg
-                source: archImg
-                layer.enabled: true
-                layer.effect: DropShadow {
-                    transparentBorder: true
-                    horizontalOffset: 0
-                    verticalOffset: 1
-                    radius: 2
-                    samples: 9
-                    color: Theme.textShadow
-                }
-                color: Theme.icon
-            }
-
-            HoverHandler {
-                id: archHover
-
-                cursorShape: Qt.PointingHandCursor
-            }
-
-            TapHandler {
-                id: archTap
-
-                onTapped: {
-                    if (archPop.open) {
-                        archPop.open = false
-                    } else {
-                        UptimeService.refresh()
-                        archPop.open = true
-                    }
-                }
-            }
-
-            // Fastfetch-style system summary. Same PanelWindow + focus-grab
-            // pattern as BatteryWidget's popover: floats just below the bar,
-            // dismisses on click-away or Esc, never steals the bar's surface.
-            PanelWindow {
-                id: archPop
-
-                screen: root.screen
-
-                property bool open: false
-                property bool closing: false
-
-                visible: archPop.open || archPop.closing
-
-                WlrLayershell.layer: WlrLayer.Overlay
-                WlrLayershell.exclusionMode: ExclusionMode.Ignore
-                WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
-
-                anchors {
-                    top: true
-                    left: true
-                }
-
-                // Sit directly beneath the Arch icon: 40px bar + 4px gap, and
-                // the icon's own left inset.
-                margins {
-                    top: 44
-                    left: 10
-                }
-
-                implicitWidth: card.implicitWidth + 16
-                implicitHeight: card.implicitHeight + 16
-
-                color: "transparent"
-
-                onOpenChanged: {
-                    if (archPop.open) {
-                        archPop.closing = false
-                        hideTimer.stop()
-                        card.forceActiveFocus()
-                    } else if (archPop.visible) {
-                        archPop.closing = true
-                        hideTimer.restart()
-                    }
-                }
-
-                Timer {
-                    id: hideTimer
-                    interval: 200
-                    onTriggered: archPop.closing = false
-                }
-
-                HyprlandFocusGrab {
-                    windows: [archPop]
-                    active: archPop.open
-                    onCleared: archPop.open = false
-                }
-
-                Rectangle {
-                    id: card
-
-                    anchors.fill: parent
-                    anchors.margins: 8
-                    radius: Theme.cornerRadius
-                    color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
-                    border.width: 1
-                    border.color: Theme.surfaceHover
-
-                    // Fixed width keeps the key column at x=70 and lets each
-                    // value Text elide instead of stretching the card.
-                    implicitWidth: 240
-                    implicitHeight: infoCol.implicitHeight + 28
-
-                    // Snappy scale-fade from directly under the Arch icon.
-                    transformOrigin: Item.Top
-                    opacity: archPop.open ? 1 : 0
-                    scale: archPop.open ? 1 : 0.85
-                    Behavior on opacity {
-                        NumberAnimation { duration: 100; easing.type: Easing.OutQuad }
-                    }
-                    Behavior on scale {
-                        NumberAnimation { duration: 120; easing.type: Easing.OutBack }
-                    }
-
-                    Keys.onPressed: (event) => {
-                        if (event.key === Qt.Key_Escape) {
-                            archPop.open = false
-                            event.accepted = true
-                        }
-                    }
-
-                    // Shared glass highlight (see ControlTile): full-bleed
-                    // rect with the card's own corner radius; falloff shaped
-                    // by stops. Below the info content.
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: Theme.cornerRadius
-                        gradient: Gradient {
-                            GradientStop {
-                                position: 0
-                                color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
-                            }
-                            GradientStop {
-                                position: 0.4
-                                color: "transparent"
-                            }
-                            GradientStop {
-                                position: 1
-                                color: "transparent"
-                            }
-                        }
-                    }
-
-                    // Structured column: header + divider + key/value rows.
-                    // Keys are a fixed-width Theme.accent (Bold) gutter; values
-                    // are Theme.text (Medium 12px) and elide on overflow.
-                    Column {
-                        id: infoCol
-
-                        x: 14
-                        y: 14
-                        width: parent.width - 28
-                        spacing: 8
-
-                        Row {
-                            width: parent.width
-                            spacing: 8
-
-                            Item {
-                                width: 16
-                                height: 16
-                                anchors.verticalCenter: parent.verticalCenter
-
-                                Image {
-                                    id: hdrArchImg
-
-                                    anchors.fill: parent
-                                    source: "file://" + Quickshell.shellPath("assets/arch.svg")
-                                    sourceSize.width: 32
-                                    sourceSize.height: 32
-                                    fillMode: Image.PreserveAspectFit
-                                    smooth: true
-                                    mipmap: true
-                                    visible: false
-                                }
-
-                                ColorOverlay {
-                                    anchors.fill: hdrArchImg
-                                    source: hdrArchImg
-                                    color: Theme.text
-                                }
-                            }
-
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "System Overview"
-                                color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.weight: Font.Bold
-                                font.pixelSize: 14
-                            }
-                        }
-
-                        Rectangle {
-                            width: parent.width
-                            height: 1
-                            color: Theme.surfaceHover
-                        }
-
-                        Repeater {
-                            model: ["OS", "Kernel", "Uptime", "WM", "Shell", "Memory"]
-
-                            delegate: Row {
-                                id: infoRow
-
-                                required property string modelData
-
-                                width: infoCol.width
-
-                                Text {
-                                    width: 70
-                                    text: infoRow.modelData
-                                    color: Theme.accent
-                                    font.family: Theme.fontFamily
-                                    font.weight: Font.Bold
-                                    font.pixelSize: 12
-                                }
-
-                                Text {
-                                    width: parent.width - 70
-                                    elide: Text.ElideRight
-                                    text: {
-                                        switch (infoRow.modelData) {
-                                        case "OS": return UptimeService.os
-                                        case "Kernel": return UptimeService.kernel
-                                        case "Uptime": return UptimeService.pretty
-                                        case "WM": return "Hyprland"
-                                        case "Shell": return "Quickshell"
-                                        case "Memory": return UptimeService.memory
-                                        }
-                                        return ""
-                                    }
-                                    color: Theme.text
-                                    font.family: Theme.fontFamily
-                                    font.weight: Font.Medium
-                                    font.pixelSize: 12
-                                }
-                            }
-                        }
-                    }
                 }
             }
         }
@@ -762,11 +447,14 @@ PanelWindow {
             }
 
             anchors {
-                left: archSlot.right
+                horizontalCenter: parent.horizontalCenter
                 verticalCenter: parent.verticalCenter
             }
 
-            anchors.leftMargin: 10
+            // Experiment: the window title lives in the centre of the bar.
+            // It yields the centre while a DynamicCenter surface owns it -
+            // holdLabel is visible exactly during those modes.
+            visible: !holdLabel.visible
 
             spacing: activeWindowIcon.visible ? 6 : 0
 
@@ -774,8 +462,8 @@ PanelWindow {
                 id: activeWindowIcon
 
                 visible: activeWindowRow.rawAppId.length > 0
-                width: visible ? 16 : 0
-                height: 16
+                width: visible ? 20 : 0
+                height: 20
                 anchors.verticalCenter: parent.verticalCenter
 
                 source: activeWindowRow.resolveWindowIcon(activeWindowRow.rawAppId)
@@ -806,7 +494,7 @@ PanelWindow {
                 styleColor: Theme.textShadow
                 font.family: Theme.fontFamily
                 font.weight: Font.Black
-                font.pixelSize: 14
+                font.pixelSize: 16
             }
         }
 
@@ -848,9 +536,8 @@ PanelWindow {
             id: holdLabel
 
             anchors.centerIn: parent
-            visible: (barState.screen === root.screen && (barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact"))
-            text: barState.mode === "display" ? "Display"
-                : barState.mode === "wallpapers" ? "Wallpapers"
+            visible: (barState.screen === root.screen && (barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact"))
+            text: barState.mode === "wallpapers" ? "Wallpapers"
                 : (barState.mode === "mediaPreview" || barState.mode === "mediaCompact") ? "Media"
                 : ""
             color: Theme.icon
@@ -861,82 +548,17 @@ PanelWindow {
             font.weight: Font.Bold
         }
 
-        Item {
-            id: rightSlot
-
-            // Sits just left of the clock, which is pinned to the bar's far edge.
-            anchors {
-                right: dateTime.left
-                verticalCenter: parent.verticalCenter
-            }
-
-            anchors.rightMargin: 8
-
-            width: 36
-            height: 36
-
-            Rectangle {
-                id: centerButton
-
-                anchors.fill: parent
-
-                radius: 10
-                color: root.centerOpen || centerTap.pressed ? Theme.surfaceHover : (centerHover.hovered ? Theme.surfaceHover : "transparent")
-
-                HoverHandler {
-                    id: centerHover
-
-                    cursorShape: Qt.PointingHandCursor
-                }
-
-                TapHandler {
-                    id: centerTap
-
-                    onTapped: {
-                        if (root.centerOpen) {
-                            barState.screen = null
-                            barState.mode = ""
-                        } else {
-                            barState.screen = root.screen
-                            barState.mode = "center"
-                        }
-                    }
-                }
-
-                IconImage {
-                    id: centerIcon
-
-                    anchors.centerIn: parent
-
-                    width: 20
-                    height: 20
-
-                    source: "file://" + Quickshell.shellPath("assets/controls-symbolic.svg")
-                    asynchronous: true
-                    layer.enabled: true
-                    layer.effect: DropShadow {
-                        transparentBorder: true
-                        horizontalOffset: 0
-                        verticalOffset: 1
-                        radius: 2
-                        samples: 9
-                        color: Theme.textShadow
-                    }
-                }
-            }
-        }
-
         DateTimeWidget {
             id: dateTime
 
             screen: root.screen
 
-            // Far-right edge of the bar.
+            // Far-left edge of the bar (experiment: clock on the left).
             anchors {
                 verticalCenter: parent.verticalCenter
-                right: parent.right
+                left: parent.left
             }
-            anchors.rightMargin: 8
+            anchors.leftMargin: 8
         }
 
         BatteryWidget {
@@ -946,7 +568,7 @@ PanelWindow {
 
             anchors {
                 verticalCenter: parent.verticalCenter
-                right: rightSlot.left
+                right: statusCluster.left
             }
             anchors.rightMargin: 4
         }
@@ -965,13 +587,13 @@ PanelWindow {
             anchors.rightMargin: CaffeineService.enabled ? 4 : 0
 
             visible: CaffeineService.enabled
-            width: CaffeineService.enabled ? 28 : 0
+            width: CaffeineService.enabled ? 38 : 0
             implicitWidth: width
-            height: 28
+            height: 34
 
             Rectangle {
                 anchors.fill: parent
-                radius: 8
+                radius: 17
                 color: caffeineTap.pressed || caffeineHover.hovered ? Theme.surfaceHover : "transparent"
             }
 
@@ -979,10 +601,10 @@ PanelWindow {
                 id: caffeineIndicatorImg
 
                 anchors.centerIn: parent
-                width: 20
-                height: 20
-                sourceSize.width: 40
-                sourceSize.height: 40
+                width: 24
+                height: 24
+                sourceSize.width: 48
+                sourceSize.height: 48
                 fillMode: Image.PreserveAspectFit
                 asynchronous: true
                 smooth: true
@@ -1021,16 +643,16 @@ PanelWindow {
         }
 
         // System tray (StatusNotifierItem hosts - Tailscale, OBS, ...). Sits
-        // left of the status indicators; empty (zero-width) when nothing is
-        // registered.
+        // on the left cluster, right of the clock; empty (zero-width) when
+        // nothing is registered.
         Row {
             id: systemTrayRow
 
             anchors {
                 verticalCenter: parent.verticalCenter
-                right: caffeineIndicator.left
+                left: dateTime.right
             }
-            anchors.rightMargin: 4
+            anchors.leftMargin: 4
 
             spacing: 4
 
@@ -1042,19 +664,19 @@ PanelWindow {
 
                     required property var modelData
 
-                    width: 28
-                    height: 28
+                    width: 38
+                    height: 34
 
                     Rectangle {
                         anchors.fill: parent
-                        radius: 8
+                        radius: 17
                         color: trayMouse.containsMouse ? Theme.surfaceHover : "transparent"
                     }
 
                     IconImage {
                         anchors.centerIn: parent
-                        width: 22
-                        height: 22
+                        width: 26
+                        height: 26
                         smooth: true
                         asynchronous: true
 
@@ -1100,9 +722,9 @@ PanelWindow {
 
             anchors {
                 verticalCenter: parent.verticalCenter
-                right: systemTrayRow.left
+                left: systemTrayRow.right
             }
-            anchors.rightMargin: 4
+            anchors.leftMargin: 4
 
             mediaService: root.mediaService
 
@@ -1130,23 +752,23 @@ PanelWindow {
             }
         }
 
-        // Microphone mute - sits just left of the Wi-Fi indicator. Click
+        // Microphone mute - sits just left of the battery. Click
         // toggles the default PipeWire source mute; glyph swaps on/off.
         Item {
             id: micIndicator
 
             anchors {
                 verticalCenter: parent.verticalCenter
-                right: wifiIndicator.left
+                right: battery.left
             }
             anchors.rightMargin: 4
 
-            width: 28
-            height: 28
+            width: 38
+            height: 34
 
             Rectangle {
                 anchors.fill: parent
-                radius: 8
+                radius: 17
                 color: micTap.pressed || micHover.hovered ? Theme.surfaceHover : "transparent"
             }
 
@@ -1154,8 +776,8 @@ PanelWindow {
                 id: micIndicatorImg
 
                 anchors.centerIn: parent
-                width: 16
-                height: 16
+                width: 20
+                height: 20
                 sourceSize.width: 40
                 sourceSize.height: 40
                 fillMode: Image.PreserveAspectFit
@@ -1196,331 +818,22 @@ PanelWindow {
             }
         }
 
-        // Wi-Fi status - sits just left of the battery. Click opens a small
-        // details card (SSID / IP / signal / interface).
-        Item {
-            id: wifiIndicator
+        // Status cluster (Wi-Fi / Bluetooth / volume) - one pill replacing
+        // the standalone Wi-Fi indicator and its details popover; a click
+        // anywhere on it toggles Control Center (see StatusCluster.qml).
+        StatusCluster {
+            id: statusCluster
 
+            barState: root.barState
+            screen: root.screen
+
+            // Far-right edge of the bar (experiment: cluster last, right of
+            // the battery).
             anchors {
                 verticalCenter: parent.verticalCenter
-                right: battery.left
+                right: parent.right
             }
-            anchors.rightMargin: 4
-
-            width: 28
-            height: 28
-
-            readonly property bool wifiOn: NetworkService.wifiEnabled
-            readonly property bool online: NetworkService.connected
-
-            readonly property string glyph: {
-                if (!wifiIndicator.wifiOn)
-                    return "network-wireless-disabled-symbolic"
-                if (!wifiIndicator.online)
-                    return "network-wireless-offline-symbolic"
-                switch (NetworkService.signalLevel) {
-                case 4: return "network-wireless-signal-excellent-symbolic"
-                case 3: return "network-wireless-signal-good-symbolic"
-                case 2: return "network-wireless-signal-ok-symbolic"
-                case 1: return "network-wireless-signal-weak-symbolic"
-                default: return "network-wireless-signal-none-symbolic"
-                }
-            }
-
-            Rectangle {
-                anchors.fill: parent
-                radius: 8
-                color: wifiBarTap.pressed || wifiBarHover.hovered || wifiPop.open
-                    ? Theme.surfaceHover : "transparent"
-            }
-
-            IconImage {
-                id: wifiBarIcon
-
-                anchors.centerIn: parent
-                width: 22
-                height: 22
-
-                source: Quickshell.iconPath(wifiIndicator.glyph, "network-wireless")
-                asynchronous: true
-            }
-
-            // Idle / connected -> solid white; Wi-Fi radio disabled -> muted.
-            // Accent is reserved for active-state highlights elsewhere.
-            ColorOverlay {
-                anchors.fill: wifiBarIcon
-                source: wifiBarIcon
-                layer.enabled: true
-                layer.effect: DropShadow {
-                    transparentBorder: true
-                    horizontalOffset: 0
-                    verticalOffset: 1
-                    radius: 2
-                    samples: 9
-                    color: Theme.textShadow
-                }
-                color: wifiIndicator.wifiOn ? Theme.icon : Theme.textMuted
-            }
-
-            HoverHandler {
-                id: wifiBarHover
-
-                cursorShape: Qt.PointingHandCursor
-            }
-
-            TapHandler {
-                id: wifiBarTap
-
-                onTapped: wifiPop.open = !wifiPop.open
-            }
-
-            // Details card. Same PanelWindow + focus-grab pattern as archPop /
-            // BatteryWidget's popover; centred under the icon, dismisses on
-            // click-away or Esc.
-            PanelWindow {
-                id: wifiPop
-
-                screen: root.screen
-
-                property bool open: false
-                property bool closing: false
-
-                visible: wifiPop.open || wifiPop.closing
-
-                WlrLayershell.layer: WlrLayer.Overlay
-                WlrLayershell.exclusionMode: ExclusionMode.Ignore
-                WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
-
-                anchors {
-                    top: true
-                    right: true
-                }
-
-                readonly property real widgetFromRight: wifiIndicator.parent
-                    ? Math.max(0, wifiIndicator.parent.width - (wifiIndicator.x + wifiIndicator.width))
-                    : 12
-                readonly property real centeredRight:
-                    wifiPop.widgetFromRight + wifiIndicator.width / 2 - wifiPop.implicitWidth / 2
-
-                margins {
-                    top: 44
-                    right: Math.max(8, Math.round(wifiPop.centeredRight))
-                }
-
-                implicitWidth: wifiCard.implicitWidth + 16
-                implicitHeight: wifiCard.implicitHeight + 16
-
-                color: "transparent"
-
-                onOpenChanged: {
-                    if (wifiPop.open) {
-                        wifiPop.closing = false
-                        wifiHideTimer.stop()
-                        wifiCard.forceActiveFocus()
-                    } else if (wifiPop.visible) {
-                        wifiPop.closing = true
-                        wifiHideTimer.restart()
-                    }
-                }
-
-                Timer {
-                    id: wifiHideTimer
-                    interval: 200
-                    onTriggered: wifiPop.closing = false
-                }
-
-                HyprlandFocusGrab {
-                    windows: [wifiPop]
-                    active: wifiPop.open
-                    onCleared: wifiPop.open = false
-                }
-
-                Rectangle {
-                    id: wifiCard
-
-                    anchors.fill: parent
-                    anchors.margins: 8
-                    radius: Theme.cornerRadius
-                    color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
-                    border.width: 1
-                    border.color: Theme.surfaceHover
-
-                    implicitWidth: 250
-                    implicitHeight: wifiInfoCol.implicitHeight + 28
-
-                    // Snappy scale-fade from directly under the Wi-Fi icon.
-                    transformOrigin: Item.Top
-                    opacity: wifiPop.open ? 1 : 0
-                    scale: wifiPop.open ? 1 : 0.85
-                    Behavior on opacity {
-                        NumberAnimation { duration: 100; easing.type: Easing.OutQuad }
-                    }
-                    Behavior on scale {
-                        NumberAnimation { duration: 120; easing.type: Easing.OutBack }
-                    }
-
-                    Keys.onPressed: (event) => {
-                        if (event.key === Qt.Key_Escape) {
-                            wifiPop.open = false
-                            event.accepted = true
-                        }
-                    }
-
-                    // Shared glass highlight (see ControlTile): full-bleed
-                    // rect with the card's own corner radius; falloff shaped
-                    // by stops. Below the info content.
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: Theme.cornerRadius
-                        gradient: Gradient {
-                            GradientStop {
-                                position: 0
-                                color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
-                            }
-                            GradientStop {
-                                position: 0.4
-                                color: "transparent"
-                            }
-                            GradientStop {
-                                position: 1
-                                color: "transparent"
-                            }
-                        }
-                    }
-
-                    Column {
-                        id: wifiInfoCol
-
-                        x: 14
-                        y: 14
-                        width: parent.width - 28
-                        spacing: 8
-
-                        // Header: connection dot + SSID (left), Wi-Fi on/off
-                        // switch (right).
-                        Item {
-                            width: parent.width
-                            height: 22
-
-                            Rectangle {
-                                id: wifiHdrDot
-
-                                width: 9
-                                height: 9
-                                radius: 4.5
-                                anchors.left: parent.left
-                                anchors.verticalCenter: parent.verticalCenter
-                                color: NetworkService.connected ? Theme.accent : Theme.textMuted
-                            }
-
-                            Text {
-                                anchors.left: wifiHdrDot.right
-                                anchors.leftMargin: 8
-                                anchors.right: wifiToggle.left
-                                anchors.rightMargin: 10
-                                anchors.verticalCenter: parent.verticalCenter
-                                elide: Text.ElideRight
-
-                                text: "Wi-Fi Network"
-                                color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.weight: Font.Bold
-                                font.pixelSize: 13
-                            }
-
-                            Rectangle {
-                                id: wifiToggle
-
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 40
-                                height: 22
-                                radius: height / 2
-                                color: NetworkService.wifiEnabled ? Theme.accent : Theme.surfaceHover
-                                Behavior on color {
-                                    ColorAnimation { duration: 120; easing.type: Easing.OutCubic }
-                                }
-
-                                Rectangle {
-                                    width: 16
-                                    height: 16
-                                    radius: 8
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    x: NetworkService.wifiEnabled ? parent.width - width - 3 : 3
-                                    color: Theme.text
-                                    Behavior on x {
-                                        NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
-                                    }
-                                }
-
-                                HoverHandler {
-                                    cursorShape: Qt.PointingHandCursor
-                                }
-
-                                TapHandler {
-                                    onTapped: NetworkService.toggleWifi()
-                                }
-                            }
-                        }
-
-                        Rectangle {
-                            width: parent.width
-                            height: 1
-                            color: Theme.surfaceHover
-                        }
-
-                        Repeater {
-                            model: ["SSID", "Status", "IP Address", "Signal", "Interface", "Frequency"]
-
-                            delegate: Row {
-                                id: wifiRow
-
-                                required property string modelData
-
-                                width: wifiInfoCol.width
-
-                                Text {
-                                    width: 84
-                                    text: wifiRow.modelData
-                                    color: Theme.accent
-                                    font.family: Theme.fontFamily
-                                    font.weight: Font.Bold
-                                    font.pixelSize: 12
-                                }
-
-                                Text {
-                                    width: parent.width - 84
-                                    elide: Text.ElideRight
-                                    text: {
-                                        switch (wifiRow.modelData) {
-                                        case "SSID":
-                                            return (NetworkService.connected && NetworkService.ssid)
-                                                ? NetworkService.ssid : "—"
-                                        case "Status":
-                                            return !NetworkService.wifiEnabled ? "Disabled"
-                                                : NetworkService.connected ? "Connected" : "Disconnected"
-                                        case "IP Address":
-                                            return NetworkService.ipAddress || "—"
-                                        case "Signal":
-                                            return NetworkService.connected
-                                                ? NetworkService.signalStrength + "%" : "—"
-                                        case "Interface":
-                                            return NetworkService.interfaceName || "—"
-                                        case "Frequency":
-                                            return NetworkService.frequency || "—"
-                                        }
-                                        return ""
-                                    }
-                                    color: Theme.text
-                                    font.family: Theme.fontFamily
-                                    font.weight: Font.Medium
-                                    font.pixelSize: 12
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+            anchors.rightMargin: 8
         }
     }
 
@@ -1529,7 +842,7 @@ PanelWindow {
         // Remove after test; do NOT restyle into a final design.
         Shape {
             x: root._scoopL0
-            y: 40
+            y: 36
             width: 40
             height: 20
             z: 1000
@@ -1547,7 +860,7 @@ PanelWindow {
         }
         Shape {
             x: root._scoopR0 - 40
-            y: 40
+            y: 36
             width: 40
             height: 20
             z: 1000
@@ -1567,9 +880,8 @@ PanelWindow {
     DynamicCenter {
         id: dynamicCenter
 
-        screen: root.screen
         anchors.horizontalCenter: parent.horizontalCenter
-        activeSurface: barState.screen === root.screen && (barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact")
+        activeSurface: barState.screen === root.screen && (barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact")
             ? barState.mode
             : "idle"
     }

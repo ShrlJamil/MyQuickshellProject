@@ -9,15 +9,14 @@ import "../../components"
 Item {
     id: root
 
-    // Natural size DynamicCenter fits its frame to (the monitor-arrangement
-    // canvas genuinely needs the full standard width). Constant -> no loop.
+    // Natural size from the DynamicCenter era (the monitor-arrangement canvas
+    // genuinely needs the full standard width), kept as a hint only: the host
+    // (the Settings window's Display page) sizes this item explicitly.
     implicitWidth: 680
-    width: parent ? parent.width : 460
     implicitHeight: 500
-    height: root.implicitHeight
     clip: true
 
-    // Raised by Cancel so the host (DynamicCenter -> Bar) tears the surface down.
+    // Raised by Cancel so the host (the Settings window) tears the page down.
     signal closeRequested()
 
     readonly property var selectedInfo: DisplayService.layout[DisplayService.selectedMonitor]
@@ -30,6 +29,28 @@ Item {
         DisplayService.suspendSync = false
         DisplayService.syncFromHyprland()
         root.closeRequested()
+    }
+
+    // Label for the primary-display dropdown: the human name of whichever
+    // monitor currently holds the primary preference - or the saved
+    // external's label while that display is disconnected (the internal
+    // panel holds the origin meanwhile; see DisplayService).
+    function primaryDisplayLabel() {
+        const names = DisplayService.monitorNames()
+        if (DisplayService.primaryKind === "external") {
+            if (DisplayService.preferredExternalPresent()) {
+                for (let i = 0; i < names.length; i++)
+                    if (DisplayService.isPreferredExternal(names[i]))
+                        return DisplayService.humanName(names[i])
+            }
+            return DisplayService.savedExternalLabel()
+        }
+        for (let i = 0; i < names.length; i++) {
+            const info = DisplayService.layout[names[i]]
+            if (info && info.internal)
+                return DisplayService.humanName(names[i])
+        }
+        return ""
     }
 
     // ---- Logical geometry (Hyprland coordinate space) -----------------------
@@ -215,695 +236,874 @@ Item {
         onActivated: root.cancelEdits()
     }
 
-    Shape {
-        id: background
-
-        anchors.fill: parent
-        antialiasing: true
-        asynchronous: false
-        vendorExtensionsEnabled: true
-        preferredRendererType: Shape.CurveRenderer
-
-        readonly property real notchSize: 18
-        readonly property real bottomRadius: Theme.cornerRadius
-
-        ShapePath {
-            // Transparent: the DynamicCenter frame is the sole panel background.
-            fillColor: "transparent"
-            strokeColor: "transparent"
-            strokeWidth: 0
-
-            startX: 0
-            startY: 0
-
-            PathCubic {
-                control1X: background.notchSize * 0.5
-                control1Y: 0
-                control2X: background.notchSize
-                control2Y: background.notchSize * 0.5
-                x: background.notchSize
-                y: background.notchSize
-            }
-
-            PathLine {
-                x: background.notchSize
-                y: background.height - background.bottomRadius
-            }
-
-            PathQuad {
-                controlX: background.notchSize
-                controlY: background.height
-                x: background.notchSize + background.bottomRadius
-                y: background.height
-            }
-
-            PathLine {
-                x: background.width - background.notchSize - background.bottomRadius
-                y: background.height
-            }
-
-            PathQuad {
-                controlX: background.width - background.notchSize
-                controlY: background.height
-                x: background.width - background.notchSize
-                y: background.height - background.bottomRadius
-            }
-
-            PathLine {
-                x: background.width - background.notchSize
-                y: background.notchSize
-            }
-
-            PathCubic {
-                control1X: background.width - background.notchSize
-                control1Y: background.notchSize * 0.5
-                control2X: background.width - background.notchSize * 0.5
-                control2Y: 0
-                x: background.width
-                y: 0
-            }
-
-            PathLine {
-                x: 0
-                y: 0
-            }
-        }
-    }
-
-    Column {
-        id: contentColumn
+    // ---- Page layout --------------------------------------------------------
+    // App-style settings page: a centred, width-capped column that scrolls
+    // when the window is short, with the action footer pinned below it.
+    // Sections: page header, arrangement card, preset segmented control,
+    // selected-monitor card with labelled rows. All state and actions still
+    // go through DisplayService exactly as before - this is presentation only.
+    Flickable {
+        id: flick
 
         anchors {
             top: parent.top
-            horizontalCenter: parent.horizontalCenter
-            topMargin: 16
+            left: parent.left
+            right: parent.right
+            bottom: actionFooter.top
         }
 
-        width: parent.width - 96
-        spacing: 16
+        contentWidth: width
+        contentHeight: contentColumn.y + contentColumn.height + 16
+        clip: true
 
-        Rectangle {
-            id: canvasArea
+        ScrollBar.vertical: ScrollBar {
+            policy: ScrollBar.AsNeeded
+        }
 
-            width: parent.width
-            height: 190
-            radius: Theme.cornerRadius
-            color: Theme.surface
-            clip: true
+        Column {
+            id: contentColumn
 
-            Text {
-                anchors.centerIn: parent
-                visible: DisplayService.monitorNames().length === 0
-                text: "No monitors detected"
-                color: Theme.textMuted
-                font.pixelSize: 12
-                font.family: Theme.fontFamily
+            anchors {
+                top: parent.top
+                horizontalCenter: parent.horizontalCenter
+                topMargin: 16
             }
 
-            // Subtle grid + origin, drawn in logical coordinate space.
-            Canvas {
-                id: gridCanvas
+            width: Math.max(280, Math.min(flick.width - 96, 980))
+            spacing: 14
 
-                anchors.fill: parent
+            // Page header.
+            Column {
+                spacing: 2
 
-                property real vScale: root.viewScale
-                property real vOffX: root.viewOffX
-                property real vOffY: root.viewOffY
-                readonly property real step: 256   // logical units between grid lines
+                Text {
+                    text: "Display"
+                    color: Theme.text
+                    font.pixelSize: 20
+                    font.family: Theme.fontFamily
+                    font.weight: Font.DemiBold
+                }
 
-                onVScaleChanged: requestPaint()
-                onVOffXChanged: requestPaint()
-                onVOffYChanged: requestPaint()
-                onWidthChanged: requestPaint()
-                onHeightChanged: requestPaint()
-
-                onPaint: {
-                    const ctx = getContext("2d")
-                    ctx.reset()
-
-                    const b = root.bounds
-                    ctx.lineWidth = 1
-                    ctx.strokeStyle = String(Theme.text)
-                    ctx.globalAlpha = 0.06
-
-                    const x0 = Math.floor(b.minX / step) * step
-                    for (let gx = x0; gx <= b.maxX + step; gx += step) {
-                        const cx = Math.round(root.logicalToCanvasX(gx)) + 0.5
-                        ctx.beginPath()
-                        ctx.moveTo(cx, 0)
-                        ctx.lineTo(cx, height)
-                        ctx.stroke()
-                    }
-                    const y0 = Math.floor(b.minY / step) * step
-                    for (let gy = y0; gy <= b.maxY + step; gy += step) {
-                        const cy = Math.round(root.logicalToCanvasY(gy)) + 0.5
-                        ctx.beginPath()
-                        ctx.moveTo(0, cy)
-                        ctx.lineTo(width, cy)
-                        ctx.stroke()
-                    }
-
-                    // Origin (0,0) crosshair.
-                    const ox = root.logicalToCanvasX(0)
-                    const oy = root.logicalToCanvasY(0)
-                    ctx.globalAlpha = 0.5
-                    ctx.strokeStyle = String(Theme.accent)
-                    ctx.beginPath()
-                    ctx.moveTo(ox - 6, oy)
-                    ctx.lineTo(ox + 6, oy)
-                    ctx.moveTo(ox, oy - 6)
-                    ctx.lineTo(ox, oy + 6)
-                    ctx.stroke()
+                Text {
+                    text: "Arrange your monitors and adjust resolution, scale and rotation."
+                    color: Theme.textMuted
+                    font.pixelSize: 11
+                    font.family: Theme.fontFamily
                 }
             }
 
-            Repeater {
-                model: DisplayService.monitorNames()
+            // Arrangement card: title + the drag canvas. The canvas is kept
+            // deliberately plain - no grid, no origin crosshair - so the
+            // monitor blocks are the only thing drawn.
+            Rectangle {
+                id: arrangementCard
 
-                delegate: Rectangle {
-                    id: monBlock
+                width: parent.width
+                height: 238
+                radius: 14
+                color: Theme.surface
+                border.width: 1
+                border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
 
-                    required property string modelData
-                    readonly property var info: DisplayService.layout[monBlock.modelData]
-                    readonly property bool selected: DisplayService.selectedMonitor === monBlock.modelData
+                Text {
+                    anchors {
+                        top: parent.top
+                        left: parent.left
+                        topMargin: 12
+                        leftMargin: 16
+                    }
+                    text: "Arrangement"
+                    color: Theme.text
+                    font.pixelSize: 12
+                    font.family: Theme.fontFamily
+                    font.weight: Font.DemiBold
+                }
 
-                    x: monBlock.info ? root.logicalToCanvasX(monBlock.info.x) : 0
-                    y: monBlock.info ? root.logicalToCanvasY(monBlock.info.y) : 0
-                    width: monBlock.info ? Math.max(22, root.logicalW(monBlock.info) * root.viewScale) : 22
-                    height: monBlock.info ? Math.max(22, root.logicalH(monBlock.info) * root.viewScale) : 22
+                Item {
+                    id: canvasArea
 
-                    radius: 8
-                    opacity: monBlock.info && monBlock.info.disabled ? 0.35 : 1
-                    color: monBlock.selected ? Qt.lighter(Theme.background, 1.4) : Theme.background
-                    border.width: monBlock.selected ? 2 : 1
-                    border.color: monBlock.selected ? Theme.accent : Theme.surfaceHover
+                    anchors {
+                        left: parent.left
+                        right: parent.right
+                        top: parent.top
+                        bottom: parent.bottom
+                        leftMargin: 10
+                        rightMargin: 10
+                        topMargin: 38
+                        bottomMargin: 10
+                    }
+                    clip: true
 
-                    // Animate re-layout, but never while this canvas is being
-                    // dragged - there the block must track the pointer exactly.
-                    Behavior on x { enabled: !root.dragging; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
-                    Behavior on y { enabled: !root.dragging; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
-
-                    Column {
+                    Text {
                         anchors.centerIn: parent
-                        spacing: 2
+                        visible: DisplayService.monitorNames().length === 0
+                        text: "No monitors detected"
+                        color: Theme.textMuted
+                        font.pixelSize: 12
+                        font.family: Theme.fontFamily
+                    }
+
+                    Repeater {
+                        model: DisplayService.monitorNames()
+
+                        delegate: Rectangle {
+                            id: monBlock
+
+                            required property string modelData
+                            readonly property var info: DisplayService.layout[monBlock.modelData]
+                            readonly property bool selected: DisplayService.selectedMonitor === monBlock.modelData
+
+                            x: monBlock.info ? root.logicalToCanvasX(monBlock.info.x) : 0
+                            y: monBlock.info ? root.logicalToCanvasY(monBlock.info.y) : 0
+                            width: monBlock.info ? Math.max(22, root.logicalW(monBlock.info) * root.viewScale) : 22
+                            height: monBlock.info ? Math.max(22, root.logicalH(monBlock.info) * root.viewScale) : 22
+
+                            radius: 8
+                            opacity: monBlock.info && monBlock.info.disabled ? 0.35 : 1
+                            color: monBlock.selected ? Qt.lighter(Theme.background, 1.4) : Theme.background
+                            border.width: monBlock.selected ? 2 : 1
+                            border.color: monBlock.selected ? Theme.accent : Theme.surfaceHover
+
+                            // Animate re-layout, but never while this canvas is being
+                            // dragged - there the block must track the pointer exactly.
+                            Behavior on x { enabled: !root.dragging; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+                            Behavior on y { enabled: !root.dragging; NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+
+                            Column {
+                                anchors.centerIn: parent
+                                spacing: 2
+
+                                Text {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    text: monBlock.modelData
+                                    color: monBlock.selected ? Theme.accent : Theme.text
+                                    font.pixelSize: 12
+                                    font.family: Theme.fontFamily
+                                    font.weight: Font.DemiBold
+                                }
+
+                                Text {
+                                    anchors.horizontalCenter: parent.horizontalCenter
+                                    visible: monBlock.info !== undefined
+                                    text: monBlock.info
+                                        ? (root.logicalW(monBlock.info) + "×" + root.logicalH(monBlock.info) + (monBlock.info.mirrorOf ? " (mirror)" : ""))
+                                        : ""
+                                    color: Theme.textMuted
+                                    font.pixelSize: 10
+                                    font.family: Theme.fontFamily
+                                }
+                            }
+
+                            MouseArea {
+                                id: dragArea
+
+                                anchors.fill: parent
+
+                                property real pressX: 0
+                                property real pressY: 0
+                                property real origX: 0
+                                property real origY: 0
+
+                                onPressed: (mouse) => {
+                                    DisplayService.selectedMonitor = monBlock.modelData
+                                    DisplayService.suspendSync = true
+                                    root._frozenScale = root.canvasScale
+                                    root._frozenOffX = root.canvasOffsetX
+                                    root._frozenOffY = root.canvasOffsetY
+                                    root._snapEngagedX = NaN
+                                    root._snapEngagedY = NaN
+                                    root.dragging = true
+                                    dragArea.pressX = mouse.x
+                                    dragArea.pressY = mouse.y
+                                    dragArea.origX = monBlock.info.x
+                                    dragArea.origY = monBlock.info.y
+                                }
+
+                                onPositionChanged: (mouse) => {
+                                    const s = root.viewScale
+                                    const dx = (mouse.x - dragArea.pressX) / s
+                                    const dy = (mouse.y - dragArea.pressY) / s
+                                    root.applyDragSnap(monBlock.modelData, dragArea.origX + dx, dragArea.origY + dy)
+                                }
+
+                                onReleased: {
+                                    root.dragging = false
+                                    root.snapGuideX = NaN
+                                    root.snapGuideY = NaN
+                                    root._snapEngagedX = NaN
+                                    root._snapEngagedY = NaN
+                                    // Integer normalize + mirror-on-full-overlap only -
+                                    // does not yank arbitrary positions onto an edge.
+                                    DisplayService.finalizeDrag(monBlock.modelData)
+                                    DisplayService.suspendSync = false
+                                }
+                            }
+                        }
+                    }
+
+                    // Snap guide overlay - only visible mid-drag while a snap is engaged.
+                    Rectangle {
+                        visible: root.dragging && !isNaN(root.snapGuideX)
+                        width: 1
+                        height: canvasArea.height
+                        x: root.logicalToCanvasX(root.snapGuideX)
+                        y: 0
+                        color: Theme.accent
+                        opacity: 0.9
+                    }
+
+                    Rectangle {
+                        visible: root.dragging && !isNaN(root.snapGuideY)
+                        width: canvasArea.width
+                        height: 1
+                        x: 0
+                        y: root.logicalToCanvasY(root.snapGuideY)
+                        color: Theme.accent
+                        opacity: 0.9
+                    }
+
+                    Text {
+                        visible: root.dragging && root.selectedInfo !== undefined
+                        anchors { left: parent.left; bottom: parent.bottom; margins: 6 }
+                        text: root.selectedInfo
+                            ? (root.selectedInfo.x + " × " + root.selectedInfo.y)
+                            : ""
+                        color: Theme.accent
+                        font.pixelSize: 10
+                        font.family: Theme.fontFamily
+                        font.weight: Font.DemiBold
+                    }
+                }
+            }
+
+            // Layout presets as one segmented control, left-aligned with the
+            // cards. The segments are momentary commands (DisplayService has
+            // no persistent "current preset" state to highlight), so only
+            // hover feedback is shown.
+            Rectangle {
+                id: presetBar
+
+                width: presetRow.implicitWidth + 4
+                height: 36
+                radius: height / 2
+                color: Theme.background
+                border.width: 1
+                border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+
+                Row {
+                    id: presetRow
+
+                    anchors.centerIn: parent
+                    spacing: 2
+
+                    Repeater {
+                        model: [
+                            { label: "Extend", preset: "extend" },
+                            { label: "Mirror", preset: "mirror" },
+                            { label: "Internal Only", preset: "internalOnly" },
+                            { label: "External Only", preset: "externalOnly" }
+                        ]
+
+                        delegate: Rectangle {
+                            id: presetSegment
+
+                            required property var modelData
+
+                            width: segmentLabel.implicitWidth + 22
+                            height: 30
+                            radius: height / 2
+                            color: segmentHover.hovered ? Qt.lighter(Theme.background, 1.35) : "transparent"
+
+                            HoverHandler {
+                                id: segmentHover
+                                cursorShape: Qt.PointingHandCursor
+                            }
+
+                            TapHandler {
+                                onTapped: DisplayService.applyPreset(presetSegment.modelData.preset)
+                            }
+
+                            Text {
+                                id: segmentLabel
+                                anchors.centerIn: parent
+                                text: presetSegment.modelData.label
+                                color: Theme.text
+                                font.pixelSize: 11
+                                font.family: Theme.fontFamily
+                                font.weight: Font.DemiBold
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Selected-monitor card: labelled rows, label on the left and the
+            // control right-aligned, hairline dividers between rows.
+            Rectangle {
+                id: monitorCard
+
+                width: parent.width
+                height: monitorColumn.implicitHeight + 28
+                radius: 14
+                color: Theme.surface
+                border.width: 1
+                border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+                visible: root.selectedInfo !== undefined
+
+                Column {
+                    id: monitorColumn
+
+                    anchors {
+                        top: parent.top
+                        left: parent.left
+                        right: parent.right
+                        topMargin: 14
+                        leftMargin: 16
+                        rightMargin: 16
+                    }
+                    spacing: 0
+
+                    Item {
+                        width: parent.width
+                        height: 30
 
                         Text {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            text: monBlock.modelData
-                            color: monBlock.selected ? Theme.accent : Theme.text
-                            font.pixelSize: 12
+                            anchors {
+                                left: parent.left
+                                verticalCenter: parent.verticalCenter
+                            }
+                            text: "Selected Monitor: " + DisplayService.selectedMonitor
+                            color: Theme.text
+                            font.pixelSize: 13
                             font.family: Theme.fontFamily
                             font.weight: Font.DemiBold
                         }
+                    }
+
+                    // Primary display preference. Hyprland has no native
+                    // primary-output property, so this selects which display
+                    // should sit at logical (0,0); it is stored in
+                    // DisplayService (statePath) and enforced in Extend mode
+                    // only. A disconnected saved external stays selectable
+                    // state shown as an unavailable entry, and the internal
+                    // panel keeps the origin meanwhile.
+                    Item {
+                        width: parent.width
+                        height: 42
 
                         Text {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            visible: monBlock.info !== undefined
-                            text: monBlock.info
-                                ? (root.logicalW(monBlock.info) + "×" + root.logicalH(monBlock.info) + (monBlock.info.mirrorOf ? " (mirror)" : ""))
+                            anchors {
+                                left: parent.left
+                                verticalCenter: parent.verticalCenter
+                            }
+                            text: "Primary display"
+                            color: Theme.textMuted
+                            font.pixelSize: 12
+                            font.family: Theme.fontFamily
+                        }
+
+                        Rectangle {
+                            id: primaryBox
+
+                            anchors {
+                                right: parent.right
+                                verticalCenter: parent.verticalCenter
+                            }
+                            width: 250
+                            height: 32
+                            radius: 8
+                            color: Theme.background
+                            border.width: primaryMouse.containsMouse ? 1 : 0
+                            border.color: Theme.accent
+
+                            Text {
+                                anchors {
+                                    left: parent.left
+                                    verticalCenter: parent.verticalCenter
+                                    leftMargin: 12
+                                }
+                                text: root.primaryDisplayLabel()
+                                color: Theme.text
+                                font.pixelSize: 12
+                                font.family: Theme.fontFamily
+                            }
+
+                            IconImage {
+                                anchors {
+                                    right: parent.right
+                                    verticalCenter: parent.verticalCenter
+                                    rightMargin: 10
+                                }
+                                width: 14
+                                height: 14
+                                source: Quickshell.iconPath("pan-down-symbolic", "go-down-symbolic")
+                                asynchronous: true
+                            }
+
+                            MouseArea {
+                                id: primaryMouse
+
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+
+                                onClicked: primaryPopup.open()
+                            }
+
+                            Popup {
+                                id: primaryPopup
+
+                                y: primaryBox.height + 4
+                                width: primaryBox.width
+                                padding: 4
+
+                                implicitHeight: Math.min(200, primaryList.contentHeight + primaryList.footerItem.height + 8)
+
+                                background: Rectangle {
+                                    radius: 8
+                                    color: Qt.lighter(Theme.background, 1.5)
+                                    border.width: 1
+                                    border.color: Qt.lighter(Theme.background, 1.6)
+                                }
+
+                                contentItem: ListView {
+                                    id: primaryList
+
+                                    clip: true
+                                    implicitHeight: contentHeight
+                                    model: DisplayService.monitorNames()
+
+                                    delegate: ItemDelegate {
+                                        id: primaryDelegate
+
+                                        required property string modelData
+                                        readonly property var info: DisplayService.layout[primaryDelegate.modelData]
+                                        readonly property bool active: primaryDelegate.info
+                                            ? (primaryDelegate.info.internal
+                                                ? DisplayService.primaryKind === "internal"
+                                                : DisplayService.isPreferredExternal(primaryDelegate.modelData))
+                                            : false
+
+                                        width: primaryList.width
+                                        height: 30
+
+                                        contentItem: Text {
+                                            leftPadding: 8
+                                            text: DisplayService.humanName(primaryDelegate.modelData)
+                                            color: primaryDelegate.active ? Theme.accent : Theme.text
+                                            font.pixelSize: 11
+                                            font.family: Theme.fontFamily
+                                            font.weight: primaryDelegate.active ? Font.DemiBold : Font.Normal
+                                            verticalAlignment: Text.AlignVCenter
+                                        }
+
+                                        background: Rectangle {
+                                            radius: 6
+                                            color: primaryDelegate.hovered ? Qt.lighter(Theme.background, 1.7) : "transparent"
+                                        }
+
+                                        onClicked: {
+                                            if (primaryDelegate.info && primaryDelegate.info.internal)
+                                                DisplayService.setPrimaryInternal()
+                                            else
+                                                DisplayService.setPrimaryExternal(primaryDelegate.modelData)
+                                            primaryPopup.close()
+                                        }
+                                    }
+
+                                    footer: ItemDelegate {
+                                        id: savedPrimaryDelegate
+
+                                        visible: DisplayService.primaryKind === "external" && !DisplayService.preferredExternalPresent()
+                                        enabled: false
+
+                                        width: primaryList.width
+                                        height: savedPrimaryDelegate.visible ? 30 : 0
+
+                                        contentItem: Text {
+                                            leftPadding: 8
+                                            text: DisplayService.savedExternalLabel() + " (unavailable)"
+                                            color: Theme.accent
+                                            font.pixelSize: 11
+                                            font.family: Theme.fontFamily
+                                            verticalAlignment: Text.AlignVCenter
+                                        }
+
+                                        background: Rectangle {
+                                            color: "transparent"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: 1
+                        color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+                    }
+
+                    Item {
+                        width: parent.width
+                        height: 42
+
+                        Text {
+                            anchors {
+                                left: parent.left
+                                verticalCenter: parent.verticalCenter
+                            }
+                            text: "Resolution"
+                            color: Theme.textMuted
+                            font.pixelSize: 12
+                            font.family: Theme.fontFamily
+                        }
+
+                        Rectangle {
+                            id: resolutionBox
+
+                            readonly property string labelText: root.selectedInfo
+                                ? (root.selectedInfo.width + "x" + root.selectedInfo.height + "@" + root.selectedInfo.refresh + "Hz")
+                                : ""
+
+                            anchors {
+                                right: parent.right
+                                verticalCenter: parent.verticalCenter
+                            }
+                            width: 250
+                            height: 32
+                            radius: 8
+                            color: Theme.background
+                            border.width: resolutionMouse.containsMouse ? 1 : 0
+                            border.color: Theme.accent
+
+                            Text {
+                                anchors {
+                                    left: parent.left
+                                    verticalCenter: parent.verticalCenter
+                                    leftMargin: 12
+                                }
+                                text: resolutionBox.labelText
+                                color: Theme.text
+                                font.pixelSize: 12
+                                font.family: Theme.fontFamily
+                            }
+
+                            IconImage {
+                                anchors {
+                                    right: parent.right
+                                    verticalCenter: parent.verticalCenter
+                                    rightMargin: 10
+                                }
+                                width: 14
+                                height: 14
+                                source: Quickshell.iconPath("pan-down-symbolic", "go-down-symbolic")
+                                asynchronous: true
+                            }
+
+                            MouseArea {
+                                id: resolutionMouse
+
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+
+                                onClicked: resolutionPopup.open()
+                            }
+
+                            Popup {
+                                id: resolutionPopup
+
+                                y: resolutionBox.height + 4
+                                width: resolutionBox.width
+                                padding: 4
+
+                                implicitHeight: Math.min(200, modeList.contentHeight + 8)
+
+                                background: Rectangle {
+                                    radius: 8
+                                    color: Qt.lighter(Theme.background, 1.5)
+                                    border.width: 1
+                                    border.color: Qt.lighter(Theme.background, 1.6)
+                                }
+
+                                contentItem: ListView {
+                                    id: modeList
+
+                                    clip: true
+                                    implicitHeight: contentHeight
+                                    model: root.selectedInfo ? root.selectedInfo.availableModes : []
+
+                                    delegate: ItemDelegate {
+                                        id: modeDelegate
+
+                                        required property string modelData
+
+                                        width: modeList.width
+                                        height: 30
+
+                                        contentItem: Text {
+                                            leftPadding: 8
+                                            text: modeDelegate.modelData
+                                            color: Theme.text
+                                            font.pixelSize: 11
+                                            font.family: Theme.fontFamily
+                                            verticalAlignment: Text.AlignVCenter
+                                        }
+
+                                        background: Rectangle {
+                                            radius: 6
+                                            color: modeDelegate.hovered ? Qt.lighter(Theme.background, 1.7) : "transparent"
+                                        }
+
+                                        onClicked: {
+                                            const parts = modeDelegate.modelData.split("@")
+                                            const dims = parts[0].split("x")
+                                            const refresh = parseFloat(parts[1])
+                                            DisplayService.setResolution(DisplayService.selectedMonitor, parseInt(dims[0]), parseInt(dims[1]), refresh)
+                                            resolutionPopup.close()
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: 1
+                        color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+                    }
+
+                    Item {
+                        width: parent.width
+                        height: 42
+
+                        Text {
+                            anchors {
+                                left: parent.left
+                                verticalCenter: parent.verticalCenter
+                            }
+                            text: "Scale"
+                            color: Theme.textMuted
+                            font.pixelSize: 12
+                            font.family: Theme.fontFamily
+                        }
+
+                        Row {
+                            anchors {
+                                right: parent.right
+                                verticalCenter: parent.verticalCenter
+                            }
+                            spacing: 6
+
+                            Repeater {
+                                model: [1.0, 1.25, 1.5, 2.0]
+
+                                delegate: Rectangle {
+                                    id: scalePill
+
+                                    required property real modelData
+                                    readonly property bool active: root.selectedInfo ? root.selectedInfo.scale === scalePill.modelData : false
+
+                                    width: 44
+                                    height: 28
+                                    radius: 10
+                                    color: scalePill.active ? Theme.accent : Theme.background
+
+                                    TapHandler {
+                                        onTapped: DisplayService.setScale(DisplayService.selectedMonitor, scalePill.modelData)
+                                    }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: scalePill.modelData.toFixed(2).replace(/0+$/, "").replace(/\.$/, "")
+                                        color: scalePill.active ? Theme.background : Theme.text
+                                        font.pixelSize: 11
+                                        font.family: Theme.fontFamily
+                                        font.weight: Font.DemiBold
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        width: parent.width
+                        height: 1
+                        color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+                    }
+
+                    Item {
+                        width: parent.width
+                        height: 42
+
+                        Text {
+                            anchors {
+                                left: parent.left
+                                verticalCenter: parent.verticalCenter
+                            }
+                            text: "Rotation"
+                            color: Theme.textMuted
+                            font.pixelSize: 12
+                            font.family: Theme.fontFamily
+                        }
+
+                        Row {
+                            anchors {
+                                right: parent.right
+                                verticalCenter: parent.verticalCenter
+                            }
+                            spacing: 6
+
+                            Repeater {
+                                model: [0, 1, 2, 3]
+
+                                delegate: Rectangle {
+                                    id: transformPill
+
+                                    required property int modelData
+                                    readonly property bool active: root.selectedInfo ? root.selectedInfo.transform === transformPill.modelData : false
+
+                                    width: 44
+                                    height: 28
+                                    radius: 10
+                                    color: transformPill.active ? Theme.accent : Theme.background
+
+                                    TapHandler {
+                                        onTapped: DisplayService.setTransform(DisplayService.selectedMonitor, transformPill.modelData)
+                                    }
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: (transformPill.modelData * 90) + "°"
+                                        color: transformPill.active ? Theme.background : Theme.text
+                                        font.pixelSize: 11
+                                        font.family: Theme.fontFamily
+                                        font.weight: Font.DemiBold
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Item {
+                        width: parent.width
+                        height: 26
+
+                        Text {
+                            anchors {
+                                left: parent.left
+                                verticalCenter: parent.verticalCenter
+                            }
+                            text: root.selectedInfo
+                                ? ("Logical " + root.logicalW(root.selectedInfo) + "×" + root.logicalH(root.selectedInfo)
+                                   + "   •   Position " + root.selectedInfo.x + "×" + root.selectedInfo.y)
                                 : ""
                             color: Theme.textMuted
                             font.pixelSize: 10
                             font.family: Theme.fontFamily
                         }
                     }
-
-                    MouseArea {
-                        id: dragArea
-
-                        anchors.fill: parent
-
-                        property real pressX: 0
-                        property real pressY: 0
-                        property real origX: 0
-                        property real origY: 0
-
-                        onPressed: (mouse) => {
-                            DisplayService.selectedMonitor = monBlock.modelData
-                            DisplayService.suspendSync = true
-                            root._frozenScale = root.canvasScale
-                            root._frozenOffX = root.canvasOffsetX
-                            root._frozenOffY = root.canvasOffsetY
-                            root._snapEngagedX = NaN
-                            root._snapEngagedY = NaN
-                            root.dragging = true
-                            dragArea.pressX = mouse.x
-                            dragArea.pressY = mouse.y
-                            dragArea.origX = monBlock.info.x
-                            dragArea.origY = monBlock.info.y
-                        }
-
-                        onPositionChanged: (mouse) => {
-                            const s = root.viewScale
-                            const dx = (mouse.x - dragArea.pressX) / s
-                            const dy = (mouse.y - dragArea.pressY) / s
-                            root.applyDragSnap(monBlock.modelData, dragArea.origX + dx, dragArea.origY + dy)
-                        }
-
-                        onReleased: {
-                            root.dragging = false
-                            root.snapGuideX = NaN
-                            root.snapGuideY = NaN
-                            root._snapEngagedX = NaN
-                            root._snapEngagedY = NaN
-                            // Integer normalize + mirror-on-full-overlap only -
-                            // does not yank arbitrary positions onto an edge.
-                            DisplayService.finalizeDrag(monBlock.modelData)
-                            DisplayService.suspendSync = false
-                        }
-                    }
-                }
-            }
-
-            // Snap guide overlay - only visible mid-drag while a snap is engaged.
-            Rectangle {
-                visible: root.dragging && !isNaN(root.snapGuideX)
-                width: 1
-                height: canvasArea.height
-                x: root.logicalToCanvasX(root.snapGuideX)
-                y: 0
-                color: Theme.accent
-                opacity: 0.9
-            }
-
-            Rectangle {
-                visible: root.dragging && !isNaN(root.snapGuideY)
-                width: canvasArea.width
-                height: 1
-                x: 0
-                y: root.logicalToCanvasY(root.snapGuideY)
-                color: Theme.accent
-                opacity: 0.9
-            }
-
-            Text {
-                visible: root.dragging && root.selectedInfo !== undefined
-                anchors { left: parent.left; bottom: parent.bottom; margins: 6 }
-                text: root.selectedInfo
-                    ? (root.selectedInfo.x + " × " + root.selectedInfo.y)
-                    : ""
-                color: Theme.accent
-                font.pixelSize: 10
-                font.family: Theme.fontFamily
-                font.weight: Font.DemiBold
-            }
-        }
-
-        Row {
-            spacing: 8
-
-            Repeater {
-                model: [
-                    { label: "Extend", preset: "extend" },
-                    { label: "Mirror", preset: "mirror" },
-                    { label: "Internal Only", preset: "internalOnly" },
-                    { label: "External Only", preset: "externalOnly" }
-                ]
-
-                delegate: Rectangle {
-                    id: presetPill
-
-                    required property var modelData
-
-                    width: presetLabel.implicitWidth + 24
-                    height: 32
-                    radius: height / 2
-                    color: presetHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
-
-                    HoverHandler {
-                        id: presetHover
-                        cursorShape: Qt.PointingHandCursor
-                    }
-
-                    TapHandler {
-                        onTapped: DisplayService.applyPreset(presetPill.modelData.preset)
-                    }
-
-                    Text {
-                        id: presetLabel
-                        anchors.centerIn: parent
-                        text: presetPill.modelData.label
-                        color: Theme.text
-                        font.pixelSize: 11
-                        font.family: Theme.fontFamily
-                        font.weight: Font.DemiBold
-                    }
                 }
             }
         }
-
-        // Primary display preference. Hyprland has no native primary-output
-        // property, so this selects which display should sit at logical (0,0);
-        // it is stored in DisplayService (statePath) and enforced in Extend mode
-        // only. A disconnected saved external stays selected but is shown
-        // unavailable, and the internal panel keeps the origin meanwhile.
-        Row {
-            spacing: 8
-
-            Text {
-                height: 28
-                verticalAlignment: Text.AlignVCenter
-                text: "Primary"
-                color: Theme.textMuted
-                font.pixelSize: 11
-                font.family: Theme.fontFamily
-                font.weight: Font.DemiBold
-            }
-
-            Repeater {
-                model: DisplayService.monitorNames()
-
-                delegate: Rectangle {
-                    id: primaryPill
-
-                    required property string modelData
-                    readonly property var info: DisplayService.layout[primaryPill.modelData]
-                    readonly property bool active: primaryPill.info
-                        ? (primaryPill.info.internal
-                            ? DisplayService.primaryKind === "internal"
-                            : DisplayService.isPreferredExternal(primaryPill.modelData))
-                        : false
-
-                    width: primaryLabel.implicitWidth + 24
-                    height: 28
-                    radius: height / 2
-                    color: primaryPill.active
-                        ? Theme.accent
-                        : (primaryHover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background)
-
-                    HoverHandler {
-                        id: primaryHover
-                        cursorShape: Qt.PointingHandCursor
-                    }
-
-                    TapHandler {
-                        onTapped: {
-                            if (primaryPill.info && primaryPill.info.internal)
-                                DisplayService.setPrimaryInternal()
-                            else
-                                DisplayService.setPrimaryExternal(primaryPill.modelData)
-                        }
-                    }
-
-                    Text {
-                        id: primaryLabel
-                        anchors.centerIn: parent
-                        text: DisplayService.humanName(primaryPill.modelData)
-                        color: primaryPill.active ? Theme.background : Theme.text
-                        font.pixelSize: 11
-                        font.family: Theme.fontFamily
-                        font.weight: Font.DemiBold
-                    }
-                }
-            }
-
-            Rectangle {
-                visible: DisplayService.primaryKind === "external" && !DisplayService.preferredExternalPresent()
-                width: savedPrimaryLabel.implicitWidth + 24
-                height: 28
-                radius: height / 2
-                color: Theme.background
-                border.width: 1
-                border.color: Theme.accent
-                opacity: 0.7
-
-                Text {
-                    id: savedPrimaryLabel
-                    anchors.centerIn: parent
-                    text: DisplayService.savedExternalLabel()
-                    color: Theme.accent
-                    font.pixelSize: 11
-                    font.family: Theme.fontFamily
-                    font.weight: Font.DemiBold
-                }
-            }
-        }
-
-        Column {
-            width: parent.width
-            spacing: 8
-            visible: root.selectedInfo !== undefined
-
-            Text {
-                text: DisplayService.selectedMonitor
-                color: Theme.text
-                font.pixelSize: 13
-                font.family: Theme.fontFamily
-                font.weight: Font.DemiBold
-            }
-
-            Text {
-                width: parent.width
-                wrapMode: Text.WordWrap
-                color: Theme.textMuted
-                font.pixelSize: 10
-                font.family: Theme.fontFamily
-                text: root.selectedInfo
-                    ? (root.selectedInfo.width + "×" + root.selectedInfo.height
-                       + " @ " + root.selectedInfo.refresh + "Hz   •   Scale " + root.selectedInfo.scale
-                       + "\nLogical " + root.logicalW(root.selectedInfo) + "×" + root.logicalH(root.selectedInfo)
-                       + "   •   Position " + root.selectedInfo.x + "×" + root.selectedInfo.y)
-                    : ""
-            }
-
-            Rectangle {
-                id: resolutionBox
-
-                readonly property string labelText: root.selectedInfo
-                    ? (root.selectedInfo.width + "x" + root.selectedInfo.height + "@" + root.selectedInfo.refresh + "Hz")
-                    : ""
-
-                width: parent.width
-                height: 34
-                radius: 8
-                color: Theme.background
-                border.width: resolutionMouse.containsMouse ? 1 : 0
-                border.color: Theme.accent
-
-                Text {
-                    anchors {
-                        left: parent.left
-                        verticalCenter: parent.verticalCenter
-                        leftMargin: 12
-                    }
-                    text: resolutionBox.labelText
-                    color: Theme.text
-                    font.pixelSize: 12
-                    font.family: Theme.fontFamily
-                }
-
-                IconImage {
-                    anchors {
-                        right: parent.right
-                        verticalCenter: parent.verticalCenter
-                        rightMargin: 10
-                    }
-                    width: 14
-                    height: 14
-                    source: Quickshell.iconPath("pan-down-symbolic", "go-down-symbolic")
-                    asynchronous: true
-                }
-
-                MouseArea {
-                    id: resolutionMouse
-
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-
-                    onClicked: resolutionPopup.open()
-                }
-
-                Popup {
-                    id: resolutionPopup
-
-                    y: resolutionBox.height + 4
-                    width: resolutionBox.width
-                    padding: 4
-
-                    implicitHeight: Math.min(200, modeList.contentHeight + 8)
-
-                    background: Rectangle {
-                        radius: 8
-                        color: Qt.lighter(Theme.background, 1.5)
-                        border.width: 1
-                        border.color: Qt.lighter(Theme.background, 1.6)
-                    }
-
-                    contentItem: ListView {
-                        id: modeList
-
-                        clip: true
-                        implicitHeight: contentHeight
-                        model: root.selectedInfo ? root.selectedInfo.availableModes : []
-
-                        delegate: ItemDelegate {
-                            id: modeDelegate
-
-                            required property string modelData
-
-                            width: modeList.width
-                            height: 30
-
-                            contentItem: Text {
-                                leftPadding: 8
-                                text: modeDelegate.modelData
-                                color: Theme.text
-                                font.pixelSize: 11
-                                font.family: Theme.fontFamily
-                                verticalAlignment: Text.AlignVCenter
-                            }
-
-                            background: Rectangle {
-                                radius: 6
-                                color: modeDelegate.hovered ? Qt.lighter(Theme.background, 1.7) : "transparent"
-                            }
-
-                            onClicked: {
-                                const parts = modeDelegate.modelData.split("@")
-                                const dims = parts[0].split("x")
-                                const refresh = parseFloat(parts[1])
-                                DisplayService.setResolution(DisplayService.selectedMonitor, parseInt(dims[0]), parseInt(dims[1]), refresh)
-                                resolutionPopup.close()
-                            }
-                        }
-                    }
-                }
-            }
-
-            Row {
-                spacing: 6
-
-                Repeater {
-                    model: [1.0, 1.25, 1.5, 2.0]
-
-                    delegate: Rectangle {
-                        id: scalePill
-
-                        required property real modelData
-                        readonly property bool active: root.selectedInfo ? root.selectedInfo.scale === scalePill.modelData : false
-
-                        width: 44
-                        height: 28
-                        radius: 8
-                        color: scalePill.active ? Theme.accent : Theme.background
-
-                        TapHandler {
-                            onTapped: DisplayService.setScale(DisplayService.selectedMonitor, scalePill.modelData)
-                        }
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: scalePill.modelData.toFixed(2).replace(/0+$/, "").replace(/\.$/, "")
-                            color: scalePill.active ? Theme.background : Theme.text
-                            font.pixelSize: 11
-                            font.family: Theme.fontFamily
-                            font.weight: Font.DemiBold
-                        }
-                    }
-                }
-
-                Repeater {
-                    model: [0, 1, 2, 3]
-
-                    delegate: Rectangle {
-                        id: transformPill
-
-                        required property int modelData
-                        readonly property bool active: root.selectedInfo ? root.selectedInfo.transform === transformPill.modelData : false
-
-                        width: 44
-                        height: 28
-                        radius: 8
-                        color: transformPill.active ? Theme.accent : Theme.background
-
-                        TapHandler {
-                            onTapped: DisplayService.setTransform(DisplayService.selectedMonitor, transformPill.modelData)
-                        }
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: (transformPill.modelData * 90) + "°"
-                            color: transformPill.active ? Theme.background : Theme.text
-                            font.pixelSize: 11
-                            font.family: Theme.fontFamily
-                            font.weight: Font.DemiBold
-                        }
-                    }
-                }
-            }
-        }
-
     }
 
-    // Action bar, left-aligned with the content column. Apply (apply live +
-    // persist to monitors.lua) and Cancel (discard un-applied edits + close).
-    Row {
+    // Action footer, pinned below the scroll area and aligned with the
+    // content column: status message on the left, Cancel (discard un-applied
+    // edits + close) and Apply (apply live + persist to monitors.lua) on the
+    // right.
+    Item {
         id: actionFooter
 
         anchors {
-            bottom: parent.bottom
             left: parent.left
-            leftMargin: 48
-            bottomMargin: 16
+            right: parent.right
+            bottom: parent.bottom
+            leftMargin: (root.width - contentColumn.width) / 2
+            rightMargin: (root.width - contentColumn.width) / 2
+            bottomMargin: 14
         }
-
-        spacing: 8
+        height: 46
 
         Rectangle {
-            id: applyButton
-
-            width: 90
-            height: 34
-            radius: 8
-            color: Theme.accent
-
-            TapHandler {
-                onTapped: DisplayService.applyLive()
+            anchors {
+                top: parent.top
+                left: parent.left
+                right: parent.right
             }
-
-            Text {
-                anchors.centerIn: parent
-                text: "Apply"
-                color: Theme.background
-                font.pixelSize: 12
-                font.family: Theme.fontFamily
-                font.weight: Font.DemiBold
-            }
-        }
-
-        Rectangle {
-            id: cancelButton
-
-            width: 90
-            height: 34
-            radius: 8
-            color: Theme.background
-            border.width: 1
-            border.color: Theme.accent
-
-            TapHandler {
-                onTapped: root.cancelEdits()
-            }
-
-            Text {
-                anchors.centerIn: parent
-                text: "Cancel"
-                color: Theme.accent
-                font.pixelSize: 12
-                font.family: Theme.fontFamily
-                font.weight: Font.DemiBold
-            }
+            height: 1
+            color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
         }
 
         Text {
             id: statusText
 
-            anchors.verticalCenter: parent.verticalCenter
+            anchors {
+                left: parent.left
+                bottom: parent.bottom
+            }
+            height: 34
+            verticalAlignment: Text.AlignVCenter
             text: DisplayService.statusMessage
             color: DisplayService.statusIsError ? Theme.accent : Theme.textMuted
             font.pixelSize: 11
             font.family: Theme.fontFamily
+        }
+
+        Row {
+            anchors {
+                right: parent.right
+                bottom: parent.bottom
+            }
+            spacing: 8
+
+            Rectangle {
+                id: cancelButton
+
+                width: 90
+                height: 34
+                radius: 8
+                color: Theme.background
+                border.width: 1
+                border.color: Theme.accent
+
+                TapHandler {
+                    onTapped: root.cancelEdits()
+                }
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "Cancel"
+                    color: Theme.accent
+                    font.pixelSize: 12
+                    font.family: Theme.fontFamily
+                    font.weight: Font.DemiBold
+                }
+            }
+
+            Rectangle {
+                id: applyButton
+
+                width: 90
+                height: 34
+                radius: 8
+                color: Theme.accent
+
+                TapHandler {
+                    onTapped: DisplayService.applyLive()
+                }
+
+                Text {
+                    anchors.centerIn: parent
+                    text: "Apply"
+                    color: Theme.background
+                    font.pixelSize: 12
+                    font.family: Theme.fontFamily
+                    font.weight: Font.DemiBold
+                }
+            }
         }
     }
 }

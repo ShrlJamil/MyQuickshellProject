@@ -11,7 +11,7 @@ Item {
 
     readonly property bool centerOpen: NotificationService.centerScreen === root.screen
 
-    implicitWidth: layout.implicitWidth + 20
+    implicitWidth: layout.implicitWidth + 24
     implicitHeight: 40
 
     SystemClock {
@@ -21,10 +21,11 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        anchors.topMargin: 4
-        anchors.bottomMargin: 4
-        radius: 8
-        color: (root.centerOpen || tap.pressed || hover.hovered) ? Theme.surfaceHover : "transparent"
+        anchors.topMargin: 1
+        anchors.bottomMargin: 1
+        radius: 17
+        color: root.centerOpen ? Theme.surface
+            : ((tap.pressed || hover.hovered) ? Theme.surfaceHover : "transparent")
     }
 
     Row {
@@ -42,7 +43,7 @@ Item {
             styleColor: Theme.textShadow
             font.family: Theme.fontFamily
             font.weight: Font.Black
-            font.pixelSize: 14
+            font.pixelSize: 16
         }
     }
 

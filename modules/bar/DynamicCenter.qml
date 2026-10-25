@@ -1,11 +1,8 @@
 import QtQuick
 import QtQuick.Shapes
 import Quickshell
-import Quickshell.Hyprland
-import Quickshell.Widgets
 import "../../components"
 import "../capture"
-import "../display"
 import "../wallpapers"
 
 Item {
@@ -14,30 +11,27 @@ Item {
     property string activeSurface: "idle"
     signal closeRequested()
 
-    property var screen: null
-
     anchors.horizontalCenter: parent.horizontalCenter
-    y: 40
+    y: 36
     width: parent.width
     clip: true
 
-    property bool surfaceVisible: activeSurface !== "idle"
     property string _lastSurface: "wallpapers"
 
     // The surface being switched AWAY from during a direct surface->surface
-    // morph. Kept non-empty for the duration of the 280ms height morph so the
+    // morph. Kept non-empty for the duration of the 180ms height morph so the
     // outgoing surface stays mounted + painted underneath (no see-through gap on
     // a shrink) and cross-fades out. Empty on open / close.
     property string _prevSurface: ""
 
     // ---- Universal content-driven sizing --------------------------------
     // The frame just fits whatever the active surface reports as its own
-    // natural size. Each surface (DisplayManager, WallpaperPicker)
-    // owns its implicitWidth / implicitHeight - no per-mode magic numbers
-    // live here anymore.
+    // natural size. The surface (WallpaperPicker) owns its implicitWidth /
+    // implicitHeight - no per-mode magic numbers live here anymore. (The
+    // display manager used to be a second surface here; it lives in the
+    // Settings window now.)
     readonly property Item _activeItem: {
         switch (root.activeSurface) {
-        case "display": return displayLoader.item
         case "wallpapers": return wallpaperLoader.item
         default: return null
         }
@@ -46,7 +40,6 @@ Item {
     // Never exceed 85% of the monitor / 680px - the outer cap that keeps the
     // panel sane on any screen and the fallback when a surface reports nothing.
     readonly property real maxWidth: Math.min(680, parent.width * 0.85)
-    readonly property real surfaceWidth: root.maxWidth   // kept for callers
 
     readonly property real targetWidth: (root._activeItem && root._activeItem.implicitWidth > 0)
         ? Math.min(root._activeItem.implicitWidth, root.maxWidth)
@@ -57,7 +50,6 @@ Item {
     property real allocatedWidth: root.maxWidth
     property int allocatedHeight: 0
 
-    readonly property int gap: 0
     implicitHeight: allocatedHeight
     height: implicitHeight
 
@@ -65,17 +57,17 @@ Item {
     // direct surface->surface switch morphs between heights. The top edge
     // never moves (surfaceWrapper.y is permanently 0); the wrapper clip
     // reveals the static-size content as the frame grows. Durations mirror the
-    // old slide: 220 OutCubic open / 160 InCubic close (display 300 / 220),
-    // 180 InOutCubic switch. Conditions are stable mid-flight: _prevSurface is
-    // set only during a live switch, activeSurface only flips on open/close.
+    // old slide: 220 OutCubic open / 160 InCubic close, 180 InOutCubic switch.
+    // Conditions are stable mid-flight: _prevSurface is set only during a live
+    // switch, activeSurface only flips on open/close.
     Behavior on allocatedHeight {
         NumberAnimation {
             duration: {
                 if (root._prevSurface !== "")
                     return 180
                 if (root.activeSurface === "idle")
-                    return root._lastSurface === "display" ? 220 : 160
-                return root.activeSurface === "display" ? 300 : 220
+                    return 160
+                return 220
             }
             easing.type: {
                 if (root._prevSurface !== "")
@@ -120,10 +112,10 @@ Item {
     onTargetHeightChanged: {
         if (targetHeight > 0) {
             hideTimer.stop()
-            allocatedHeight = targetHeight + gap
+            allocatedHeight = targetHeight
         } else if (allocatedHeight > 0) {
-            // Shrink visibly to 0 through the Behavior above (160ms, 220 for
-            // display) - hideTimer below only resets width + re-zeroes safely.
+            // Shrink visibly to 0 through the Behavior above (160ms) -
+            // hideTimer below only resets width + re-zeroes safely.
             allocatedHeight = 0
             hideTimer.restart()
         }
@@ -131,8 +123,8 @@ Item {
 
     Timer {
         id: hideTimer
-        // Past the longest close shrink (220ms display) so the timer never
-        // cuts the visible animation with a snap.
+        // Past the close shrink (160ms) so the timer never cuts the visible
+        // animation with a snap.
         interval: 250
         onTriggered: {
             root.allocatedHeight = 0
@@ -183,10 +175,6 @@ Item {
 
             readonly property real notchSize: 18
             readonly property real bottomRadius: Theme.cornerRadius
-            // Notch interpolation factor: 0 at zero height (flat top) -> 1 once
-            // the frame is tall enough to contain the full 18px notch. Purely
-            // derived from the animated height, so open/close stay symmetric
-            // with no threshold snap, timer, or extra animation.
             // Notch reveal progress, purely derived from the animated height.
             // Open/active: flat below 32px, full notch at/above 56px. Close
             // (idle): full notch down to 48px, flat at/below 24px. No timer,
@@ -259,8 +247,9 @@ Item {
         // Shared per-surface show/fade rules:
         //   visible  = active | prev (switch linger) | closing linger
         //   opacity  = 1 while active or closing-linger, else 0
-        //   Behavior = only runs while _prevSurface is set (a live switch), so
-        //              open / close never fade - they're the pure y slide.
+        //   opacity Behavior duration comes from _contentFadeDuration():
+        //   150ms crossfade on a live switch, 140ms fade-in on open,
+        //   90ms fade-out at close.
         //
         // Each surface lives behind a latched Loader: nothing is instantiated
         // at startup; the first open creates it synchronously (no async pop,
@@ -268,27 +257,6 @@ Item {
         // Loader.active honors the existing visibility conditions plus a
         // one-way load latch (see below) - the mode remains solely
         // `activeSurface` (+ the transient `_prevSurface`/`_lastSurface`).
-        Loader {
-            id: displayLoader
-            width: parent.width
-            active: root._displayLatched || root.activeSurface === "display" || root._prevSurface === "display"
-                || (root.allocatedHeight > 0 && root._lastSurface === "display")
-            sourceComponent: DisplayManager {
-                width: parent.width
-                visible: root.activeSurface === "display" || root._prevSurface === "display"
-                    || (root.allocatedHeight > 0 && root._lastSurface === "display")
-                opacity: root.activeSurface === "display" ? 1 : 0
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: root._contentFadeDuration()
-                        easing.type: Easing.OutCubic
-                    }
-                }
-                onCloseRequested: root.closeRequested()
-            }
-            onLoaded: if (root.activeSurface === "display") root._focusSurface("display")
-        }
-
         Loader {
             id: wallpaperLoader
             width: parent.width
@@ -309,29 +277,15 @@ Item {
             }
             onLoaded: if (root.activeSurface === "wallpapers") root._focusSurface("wallpapers")
         }
-
-        Item {
-            id: mediaPreviewSurface
-            width: parent.width
-            visible: root.activeSurface === "mediaPreview"
-        }
-
-        Item {
-            id: mediaCompactSurface
-            width: parent.width
-            visible: root.activeSurface === "mediaCompact"
-        }
     }
 
     // One-way load latches: set when a surface first becomes active, never
     // cleared. These are load-lifecycle flags, not mode state - the mode
     // remains solely `activeSurface` (+ `_prevSurface`/`_lastSurface`).
-    property bool _displayLatched: false
     property bool _wallpapersLatched: false
 
     function _surfaceItem(name) {
         switch (name) {
-        case "display": return displayLoader.item
         case "wallpapers": return wallpaperLoader.item
         default: return null
         }
@@ -373,11 +327,6 @@ Item {
         if (root.activeSurface === "wallpapers") {
             root._wallpapersLatched = true
             root._focusSurface("wallpapers")
-        } else if (root.activeSurface === "display") {
-            root._displayLatched = true
-            // Arms the bar's HyprlandFocusGrab so Esc + click-outside dismiss
-            // work (DisplayManager has no PanelWindow / grab of its own).
-            root._focusSurface("display")
         }
     }
 }
