@@ -36,7 +36,8 @@ Item {
         radius: root.cornerRadius
         border.width: 0
         border.color: "transparent"
-        // Active  -> light muted (Theme.activeTile) surface, Theme.accent contents.
+        // Active  -> light muted (Theme.activeTile) surface; the glyph stays
+        // Theme.icon (the seed-tinted white) in BOTH states, by design.
         // Inactive -> standard dark surface (Theme.background).
         color: {
             // Active tiles are solid state surfaces: no surfaceOpacity alpha.
@@ -120,7 +121,7 @@ Item {
                 anchors.fill: svgIcon
                 source: svgIcon
                 visible: root._localIcon && svgIcon.status === Image.Ready
-                color: root.active ? Theme.accent : Theme.icon
+                color: Theme.icon
             }
         }
     }

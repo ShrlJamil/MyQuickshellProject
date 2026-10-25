@@ -122,11 +122,11 @@ Item {
     property real moduleSurfaceOpacity: 1
     property real barSurfaceOpacity: 0
 
-    // Icon colour: NOT a neutral white - the seed (accent) mixed 82%
-    // toward white, so icons carry a faint tint of the wallpaper's own
-    // colour family instead of a milky generic white (Material You's
-    // on-surface idea). Still light enough to read as "white" anywhere.
-    property color icon: root.tint(root._palAccent, 0.82)
+    // Icon colour: NOT a neutral white - the seed (accent) mixed 65%
+    // toward white, so icons are a white that clearly carries the
+    // wallpaper's own colour family instead of a milky generic white
+    // (Material You's on-surface idea). Still reads as "white" anywhere.
+    property color icon: root.tint(root._palAccent, 0.65)
 
     // Material prototype (static bar only): ultra-subtle directional top
     // highlight + bottom edge key over the blurred backdrop. Neutral white at

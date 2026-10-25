@@ -473,12 +473,12 @@ PanelWindow {
                             }
 
                             // network-wireless-symbolic is a monochrome glyph;
-                            // overlay it so it reads as accent on the light ON
-                            // circle and as Theme.text when OFF.
+                            // overlay it: the glyph stays Theme.icon (the
+                            // seed-tinted white) whether Wi-Fi is on or off.
                             ColorOverlay {
                                 anchors.fill: wifiIcon
                                 source: wifiIcon
-                                color: wifiTile.wifiOn ? Theme.accent : Theme.icon
+                                color: Theme.icon
                             }
 
                             MouseArea {
@@ -639,7 +639,7 @@ PanelWindow {
                             ColorOverlay {
                                 anchors.fill: btHeroIcon
                                 source: btHeroIcon
-                                color: bluetoothTile.btOn ? Theme.accent : Theme.icon
+                                color: Theme.icon
                             }
 
                             MouseArea {
