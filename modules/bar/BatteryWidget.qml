@@ -24,7 +24,8 @@ Item {
         anchors.topMargin: 4
         anchors.bottomMargin: 4
         radius: 8
-        color: (root.popoverOpen || tap.pressed || hover.hovered) ? Theme.surfaceHover : "transparent"
+        color: root.popoverOpen ? Theme.surface
+            : ((tap.pressed || hover.hovered) ? Theme.surfaceHover : "transparent")
     }
 
     Row {

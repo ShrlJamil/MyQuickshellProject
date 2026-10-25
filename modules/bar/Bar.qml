@@ -393,7 +393,8 @@ PanelWindow {
             Rectangle {
                 anchors.fill: parent
                 radius: 10
-                color: archTap.pressed || archHover.hovered || archPop.open ? Theme.surfaceHover : "transparent"
+                color: archPop.open ? Theme.surface
+                    : (archTap.pressed || archHover.hovered ? Theme.surfaceHover : "transparent")
             }
 
             Image {

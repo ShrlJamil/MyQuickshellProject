@@ -51,8 +51,8 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: 8
-        color: root.centerOpen || clusterTap.pressed ? Theme.surfaceHover
-            : (clusterHover.hovered ? Theme.surfaceHover : "transparent")
+        color: root.centerOpen ? Theme.surface
+            : (clusterTap.pressed || clusterHover.hovered ? Theme.surfaceHover : "transparent")
     }
 
     Row {
