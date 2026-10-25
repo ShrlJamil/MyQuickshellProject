@@ -394,7 +394,7 @@ PanelWindow {
                     // inner wifiActiveCircle reflects the on/off state.
                     radius: height / 2
                     color: {
-                        const c = wifiHover.hovered ? Qt.lighter(Theme.backgroundInset, 1.35) : Theme.backgroundInset
+                        const c = wifiHover.hovered ? Theme.backgroundSunken : Theme.backgroundInset
                         return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
                     }
 
@@ -563,7 +563,7 @@ PanelWindow {
                     height: 68
                     radius: height / 2
                     color: {
-                        const c = btHover.hovered ? Qt.lighter(Theme.backgroundInset, 1.35) : Theme.backgroundInset
+                        const c = btHover.hovered ? Theme.backgroundSunken : Theme.backgroundInset
                         return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
                     }
 
@@ -892,7 +892,7 @@ PanelWindow {
             // Full pill.
             radius: height / 2
             color: {
-                const c = displayHover.hovered ? Qt.lighter(Theme.backgroundInset, 1.35) : Theme.backgroundInset
+                const c = displayHover.hovered ? Theme.backgroundSunken : Theme.backgroundInset
                 return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
             }
 
@@ -973,7 +973,7 @@ PanelWindow {
             // Full pill.
             radius: height / 2
             color: {
-                const c = soundHover.hovered ? Qt.lighter(Theme.backgroundInset, 1.35) : Theme.backgroundInset
+                const c = soundHover.hovered ? Theme.backgroundSunken : Theme.backgroundInset
                 return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
             }
 
@@ -1206,7 +1206,7 @@ PanelWindow {
                         anchors.fill: parent
 
                         radius: 16
-                        color: backHover.hovered ? Qt.lighter(Theme.background, 1.35) : "transparent"
+                        color: backHover.hovered ? Theme.surface : "transparent"
                     }
 
                     HoverHandler {
@@ -1253,7 +1253,7 @@ PanelWindow {
                         anchors.fill: parent
 
                         radius: 16
-                        color: rescanHover.hovered ? Qt.lighter(Theme.background, 1.35) : "transparent"
+                        color: rescanHover.hovered ? Theme.surface : "transparent"
                     }
 
                     HoverHandler {
@@ -1357,7 +1357,7 @@ PanelWindow {
                         width: parent.width
                         height: 52
                         radius: 14
-                        color: rowHover.hovered ? Qt.lighter(Theme.background, 1.35) : "transparent"
+                        color: rowHover.hovered ? Theme.surface : "transparent"
 
                         HoverHandler {
                             id: rowHover
@@ -1467,7 +1467,7 @@ PanelWindow {
                                 anchors.fill: parent
 
                                 radius: 14
-                                color: moreHover.hovered ? Qt.lighter(Theme.background, 1.5) : "transparent"
+                                color: moreHover.hovered ? Theme.surface : "transparent"
                             }
 
                             HoverHandler {
@@ -1524,7 +1524,7 @@ PanelWindow {
                                 height: 34
 
                                 radius: 8
-                                color: Qt.lighter(Theme.background, 1.3)
+                                color: Theme.surface
                                 border.width: passwordField.activeFocus ? 1 : 0
                                 border.color: Theme.accent
 
@@ -1661,7 +1661,7 @@ PanelWindow {
                 height: 36
                 radius: 12
                 visible: wifiService.enabled
-                color: addRowHover.hovered ? Qt.lighter(Theme.background, 1.35) : "transparent"
+                color: addRowHover.hovered ? Theme.surface : "transparent"
 
                 HoverHandler {
                     id: addRowHover
@@ -1756,7 +1756,7 @@ PanelWindow {
                     width: parent.width
                     height: 34
                     radius: 6
-                    color: popupDisconnectHover.hovered ? Qt.lighter(Theme.background, 1.5) : "transparent"
+                    color: popupDisconnectHover.hovered ? Theme.surface : "transparent"
                     Behavior on color { ColorAnimation { duration: 100 } }
 
                     HoverHandler {
@@ -1794,7 +1794,7 @@ PanelWindow {
                     height: 34
                     radius: 6
                     visible: wifiPanel.menuNet && wifiPanel.menuNet.known
-                    color: popupForgetHover.hovered ? Qt.lighter(Theme.background, 1.5) : "transparent"
+                    color: popupForgetHover.hovered ? Theme.surface : "transparent"
                     Behavior on color { ColorAnimation { duration: 100 } }
 
                     HoverHandler {
@@ -1895,7 +1895,7 @@ PanelWindow {
                     height: 34
 
                     radius: 8
-                    color: Qt.lighter(Theme.background, 1.5)
+                    color: Theme.surface
                     border.width: ssidInput.activeFocus ? 1 : 0
                     border.color: Theme.accent
 
@@ -1964,7 +1964,7 @@ PanelWindow {
 
                     background: Rectangle {
                         radius: 8
-                        color: Qt.lighter(Theme.background, 1.5)
+                        color: Theme.surface
                         border.width: securityCombo.activeFocus || securityCombo.popup.visible ? 1 : 0
                         border.color: Theme.accent
                     }
@@ -2010,7 +2010,7 @@ PanelWindow {
 
                         background: Rectangle {
                             radius: 6
-                            color: highlighted ? Qt.lighter(Theme.background, 1.7) : "transparent"
+                            color: highlighted ? Theme.surface : "transparent"
                         }
                     }
 
@@ -2044,7 +2044,7 @@ PanelWindow {
                     visible: securityCombo.currentIndex === 1
 
                     radius: 8
-                    color: Qt.lighter(Theme.background, 1.5)
+                    color: Theme.surface
                     border.width: usernameInput.activeFocus ? 1 : 0
                     border.color: Theme.accent
 
@@ -2088,7 +2088,7 @@ PanelWindow {
                     visible: securityCombo.currentIndex !== 2
 
                     radius: 8
-                    color: Qt.lighter(Theme.background, 1.5)
+                    color: Theme.surface
                     border.width: hiddenPasswordInput.activeFocus ? 1 : 0
                     border.color: Theme.accent
 
@@ -2346,7 +2346,7 @@ PanelWindow {
                         anchors.fill: parent
 
                         radius: 16
-                        color: btBackHover.hovered ? Qt.lighter(Theme.background, 1.35) : "transparent"
+                        color: btBackHover.hovered ? Theme.surface : "transparent"
                     }
 
                     HoverHandler {
@@ -2396,7 +2396,7 @@ PanelWindow {
                         anchors.fill: parent
 
                         radius: 16
-                        color: btRescanHover.hovered ? Qt.lighter(Theme.background, 1.35) : "transparent"
+                        color: btRescanHover.hovered ? Theme.surface : "transparent"
                     }
 
                     HoverHandler {
@@ -2517,7 +2517,7 @@ PanelWindow {
                     width: btList.width
                     height: 52
                     radius: 14
-                    color: btRowHover.hovered ? Qt.lighter(Theme.background, 1.35) : "transparent"
+                    color: btRowHover.hovered ? Theme.surface : "transparent"
 
                     HoverHandler {
                         id: btRowHover
@@ -2795,7 +2795,7 @@ PanelWindow {
                     width: parent.width
                     height: 34
                     radius: 6
-                    color: btTrustHover.hovered ? Qt.lighter(Theme.background, 1.5) : "transparent"
+                    color: btTrustHover.hovered ? Theme.surface : "transparent"
                     Behavior on color { ColorAnimation { duration: 100 } }
 
                     HoverHandler {
@@ -2844,7 +2844,7 @@ PanelWindow {
                     width: parent.width
                     height: 34
                     radius: 6
-                    color: btForgetHover.hovered ? Qt.lighter(Theme.background, 1.5) : "transparent"
+                    color: btForgetHover.hovered ? Theme.surface : "transparent"
                     Behavior on color { ColorAnimation { duration: 100 } }
 
                     HoverHandler {
@@ -3034,7 +3034,7 @@ PanelWindow {
                         anchors.fill: parent
 
                         radius: 16
-                        color: hsBackHover.hovered ? Qt.lighter(Theme.background, 1.35) : "transparent"
+                        color: hsBackHover.hovered ? Theme.surface : "transparent"
                     }
 
                     HoverHandler {
@@ -3236,7 +3236,7 @@ PanelWindow {
 
                             background: Rectangle {
                                 radius: 6
-                                color: highlighted ? Qt.lighter(Theme.surface, 1.3) : "transparent"
+                                color: highlighted ? Theme.surfaceRaised : "transparent"
                             }
                         }
 
@@ -3508,7 +3508,7 @@ PanelWindow {
                         anchors.fill: parent
 
                         radius: 16
-                        color: aoBackHover.hovered ? Qt.lighter(Theme.background, 1.35) : "transparent"
+                        color: aoBackHover.hovered ? Theme.surface : "transparent"
                     }
 
                     HoverHandler {
@@ -3579,7 +3579,7 @@ PanelWindow {
                     height: 52
                     radius: 14
                     color: aoRowHover.hovered || (aoRow.sink && aoRow.sink.isDefault)
-                        ? Qt.lighter(Theme.background, 1.35)
+                        ? Theme.surface
                         : "transparent"
 
                     HoverHandler {

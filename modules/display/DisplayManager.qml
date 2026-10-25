@@ -360,7 +360,7 @@ Item {
 
                             radius: 8
                             opacity: monBlock.info && monBlock.info.disabled ? 0.35 : 1
-                            color: monBlock.selected ? Qt.lighter(Theme.background, 1.4) : Theme.background
+                            color: monBlock.selected ? Theme.surfaceOverlay : Theme.surface
                             border.width: monBlock.selected ? 2 : 1
                             border.color: monBlock.selected ? Theme.accent : Theme.surfaceHover
 
@@ -512,7 +512,7 @@ Item {
                             width: segmentLabel.implicitWidth + 22
                             height: 30
                             radius: height / 2
-                            color: segmentHover.hovered ? Qt.lighter(Theme.background, 1.35) : "transparent"
+                            color: segmentHover.hovered ? Theme.surfaceRaised : "transparent"
 
                             HoverHandler {
                                 id: segmentHover
@@ -661,9 +661,9 @@ Item {
 
                                 background: Rectangle {
                                     radius: 8
-                                    color: Qt.lighter(Theme.background, 1.5)
+                                    color: Theme.surfaceRaised
                                     border.width: 1
-                                    border.color: Qt.lighter(Theme.background, 1.6)
+                                    border.color: Theme.surfaceOverlay
                                 }
 
                                 contentItem: ListView {
@@ -699,7 +699,7 @@ Item {
 
                                         background: Rectangle {
                                             radius: 6
-                                            color: primaryDelegate.hovered ? Qt.lighter(Theme.background, 1.7) : "transparent"
+                                            color: primaryDelegate.hovered ? Theme.surfaceRaised : "transparent"
                                         }
 
                                         onClicked: {
@@ -822,9 +822,9 @@ Item {
 
                                 background: Rectangle {
                                     radius: 8
-                                    color: Qt.lighter(Theme.background, 1.5)
+                                    color: Theme.surfaceRaised
                                     border.width: 1
-                                    border.color: Qt.lighter(Theme.background, 1.6)
+                                    border.color: Theme.surfaceOverlay
                                 }
 
                                 contentItem: ListView {
@@ -853,7 +853,7 @@ Item {
 
                                         background: Rectangle {
                                             radius: 6
-                                            color: modeDelegate.hovered ? Qt.lighter(Theme.background, 1.7) : "transparent"
+                                            color: modeDelegate.hovered ? Theme.surfaceRaised : "transparent"
                                         }
 
                                         onClicked: {

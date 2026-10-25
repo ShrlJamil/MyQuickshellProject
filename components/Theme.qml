@@ -3,41 +3,90 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 
+// ============================================================================
+// MATERIAL-YOU TONAL EXPERIMENT (2026-10-25, on top of baseline-2026-10-25-v2)
+//
+// The semantic surface colours are no longer taken verbatim from the
+// palette. Instead the palette supplies two ANCHORS - `background` (the
+// wallpaper's dark tone) and `accent` (the wallpaper's key colour, the
+// "seed") - and every surface is a tonal step derived from them, the way
+// Material You builds its scheme from a source colour:
+//
+//   * One neutral hue family for everything: the seed's hue, at a heavily
+//     compressed saturation (chroma cap below). Surfaces stop clashing
+//     because they are the same colour at different tones.
+//   * Tone steps are absolute lightness offsets from the (clamped) palette
+//     background, so the ladder's ORDER can never invert per wallpaper.
+//   * The overall register is deliberately DARK and MUTED: the base tone
+//     is clamped low and every saturation is capped - nothing gets dense
+//     or vivid, even from a saturated wallpaper.
+//   * `activeTile` is the seed's "container" tone (muted seed fill at
+//     tone ~0.30) instead of a near-white grey.
+//
+// Tuning lives in the recipe block right below the anchors - all factors
+// in one place. The palette contract is unchanged: palette.json keys land
+// on the `_pal*` anchors (and the direct tokens), never on the derived
+// tokens. If the experiment is rejected, the pre-experiment Theme is the
+// one in baseline-2026-10-25-v2.
+// ============================================================================
+
 Item {
     id: root
 
     visible: false
 
-    property color background: "#000000"
-    property color surface: "#313244"
+    // ---- Palette anchors (written ONLY by applyPalette) -------------------
+    property color _palBackground: "#000000"
+    property color _palSurface: "#313244"
+    property color _palAccent: "#89b4fa"
+    // Parsed for compatibility; the tonal recipe currently derives
+    // activeTile from the seed instead of using the palette's value.
+    property color _palActiveTile: "#c4c9d1"
 
-    // Elevation ladder above `surface`, DERIVED from it by default (tint
-    // toward white, fixed factors - the ordering can never invert, whatever
-    // the palette). The wallust template also emits both tiers (from the
-    // same color0 base as `surface`); when palette.json provides them,
-    // applyPalette() replaces the derivation with the generated values.
-    property color surfaceRaised: root.tint(root.surface, 0.07)
-    property color surfaceOverlay: root.tint(root.surface, 0.14)
+    // ---- Tonal recipe (THE tuning knobs) ----------------------------------
+    // Seed hue: the accent's hue; fall back to the background's, then to a
+    // calm blue. Achromatic colours report hue -1 and are skipped.
+    readonly property real _seedHue: root._palAccent.hslHue >= 0 ? root._palAccent.hslHue
+        : (root._palBackground.hslHue >= 0 ? root._palBackground.hslHue : 0.62)
+    readonly property real _seedSat: root._palAccent.hslSaturation
+    // Neutral chroma: an echo of the seed, heavily compressed and capped.
+    readonly property real _neutralSat: Math.max(0.02, Math.min(0.13, root._seedSat * 0.30))
+    // Base tone: the palette background's lightness, clamped into the dark
+    // register so a bright-ish palette cannot lift the whole shell.
+    readonly property real _baseL: Math.max(0.035, Math.min(0.08, root._palBackground.hslLightness))
+    // Container (ON-state) chroma: half the seed's, capped muted.
+    readonly property real _containerSat: Math.max(0.08, Math.min(0.30, root._seedSat * 0.50))
 
-    // Bar widgets' ACTIVE (open-state) fill: `surface` with its saturation
-    // pulled down, so an opened bar widget reads calmer than the raw
-    // palette surface. Pure QML derivation (no palette key). Hover fills
-    // are deliberately NOT routed through this - surfaceHover stays as-is.
-    property color surfaceDesaturated: root.desaturate(root.surface, 0.4)
+    function _tone(lightness) {
+        return Qt.hsla(root._seedHue, root._neutralSat, lightness, 1)
+    }
 
-    // Downward shades of `background` for recessed layering (tiles that sit
-    // darker than their panel): backgroundSunken is one step down (panel
-    // backdrops), backgroundInset one step further, derived FROM
-    // backgroundSunken so the ordering can never invert.
-    property color backgroundSunken: root.darken(root.background, 0.15)
-    property color backgroundInset: root.darken(root.backgroundSunken, 0.18)
+    // ---- Semantic surface tokens (derived) --------------------------------
+    property color background: root._tone(root._baseL)
+    property color surface: root._tone(root._baseL + 0.042)
+    property color surfaceRaised: root._tone(root._baseL + 0.082)
+    property color surfaceOverlay: root._tone(root._baseL + 0.122)
+    property color backgroundSunken: root._tone(root._baseL * 0.70)
+    property color backgroundInset: root._tone(root._baseL * 0.48)
+
+    // Bar widgets' ACTIVE (open-state) fill = the neutral container tone,
+    // same as `surface`: one family everywhere. (Pre-experiment this was a
+    // desaturated raw surface; the tonal ladder makes that a no-op.)
+    property color surfaceDesaturated: root.surface
+
+    // ON-state tile fill: the seed's muted container tone.
+    property color activeTile: Qt.hsla(root._seedHue, root._containerSat, 0.30, 1)
+    // Its hover: the same container one tone step up.
+    property color activeTileHover: Qt.hsla(root._seedHue, root._containerSat, 0.34, 1)
+
+    // Accent passes through from the palette (his template already tunes
+    // it); text colours likewise stay palette-direct below.
+    property color accent: root._palAccent
 
     property color surfaceHover: Qt.rgba(1, 1, 1, 0.05)
     property color text: "#ffffff"
     property color textDim: "#a6adc8"
     property color textMuted: "#888888"
-    property color accent: "#89b4fa"
-    property color activeTile: "#c4c9d1"
 
     // Raw wallust palette, mirrored 1:1 and UNFILTERED (color0-15 +
     // cursor). Reserved for future use: nothing consumes these yet; they
@@ -93,8 +142,6 @@ Item {
     readonly property real cornerRadius: 22
 
     // Mix a colour toward white by factor f (0 = unchanged, 1 = white).
-    // Used for the derived elevation tiers; mixing toward white keeps the
-    // hue family while guaranteeing a lightness step on any base colour.
     function tint(c, f) {
         return Qt.rgba(c.r + (1 - c.r) * f, c.g + (1 - c.g) * f, c.b + (1 - c.b) * f, c.a)
     }
@@ -158,15 +205,15 @@ Item {
     }
 
     function applyPalette() {
-        if (paletteAdapter.background) root.background = paletteAdapter.background
-        if (paletteAdapter.surface) root.surface = paletteAdapter.surface
-        if (paletteAdapter.surfaceRaised) root.surfaceRaised = paletteAdapter.surfaceRaised
-        if (paletteAdapter.surfaceOverlay) root.surfaceOverlay = paletteAdapter.surfaceOverlay
+        if (paletteAdapter.background) root._palBackground = paletteAdapter.background
+        if (paletteAdapter.surface) root._palSurface = paletteAdapter.surface
+        // surfaceRaised / surfaceOverlay palette keys are still parsed but
+        // the tonal recipe derives both tiers; they land nowhere for now.
         if (paletteAdapter.text) root.text = paletteAdapter.text
         if (paletteAdapter.textDim) root.textDim = paletteAdapter.textDim
         if (paletteAdapter.textMuted) root.textMuted = paletteAdapter.textMuted
-        if (paletteAdapter.accent) root.accent = paletteAdapter.accent
-        if (paletteAdapter.activeTile) root.activeTile = paletteAdapter.activeTile
+        if (paletteAdapter.accent) root._palAccent = paletteAdapter.accent
+        if (paletteAdapter.activeTile) root._palActiveTile = paletteAdapter.activeTile
         if (paletteAdapter.icon) root.icon = paletteAdapter.icon
         if (paletteAdapter.color0) root.color0 = paletteAdapter.color0
         if (paletteAdapter.color1) root.color1 = paletteAdapter.color1

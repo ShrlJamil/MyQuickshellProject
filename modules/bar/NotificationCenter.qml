@@ -576,7 +576,7 @@ PanelWindow {
                 height: cardCol.implicitHeight + 20
                 radius: 12
                 color: {
-                    const c = cardHover.hovered ? Qt.lighter(Theme.surface, 1.15) : Theme.surface
+                    const c = cardHover.hovered ? Theme.surfaceRaised : Theme.surface
                     return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
                 }
 

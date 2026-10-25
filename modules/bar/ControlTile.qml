@@ -42,8 +42,8 @@ Item {
             // Active tiles are solid state surfaces: no surfaceOpacity alpha.
             // Inactive tiles stay translucent material.
             if (root.active)
-                return hover.hovered ? Qt.darker(Theme.activeTile, 1.06) : Theme.activeTile
-            const c = hover.hovered ? Qt.lighter(Theme.backgroundInset, 1.35) : Theme.backgroundInset
+                return hover.hovered ? Theme.activeTileHover : Theme.activeTile
+            const c = hover.hovered ? Theme.backgroundSunken : Theme.backgroundInset
             return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
         }
 

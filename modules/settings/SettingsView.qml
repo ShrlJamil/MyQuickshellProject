@@ -191,7 +191,7 @@ FocusScope {
 
             width: root.sidebarWidth
             radius: 14
-            color: Qt.rgba(Theme.surface.r, Theme.surface.g, Theme.surface.b, 0.65)
+            color: Theme.surface
             border.width: 1
             border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity * 0.7)
 
@@ -301,7 +301,7 @@ FocusScope {
             }
 
             radius: 14
-            color: Qt.rgba(Theme.surface.r, Theme.surface.g, Theme.surface.b, 0.28)
+            color: Theme.background
             border.width: 1
             border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
 

@@ -5,20 +5,18 @@ import Quickshell
 import Quickshell.Io
 import "../../components"
 
-// Eco Mode: reduces Hyprland GPU/compositor load (blur + shadow off) and makes
-// QML surfaces opaque. Snapshot-apply-restore over runtime `hyprctl eval`
-// only: no config file edits, no `hyprctl reload`, no persistence across shell
-// restarts (OFF by default).
+// Eco Mode: reduces Hyprland GPU/compositor load (blur + shadow off).
+// Snapshot-apply-restore over runtime `hyprctl eval` only: no config file
+// edits, no `hyprctl reload`, no persistence across shell restarts (OFF by
+// default).
 //
 // Transport: the compositor runs the Lua config parser, which rejects
 // `hyprctl keyword` ("non-legacy parsers. Use eval."). Blur + shadow go out as
 // ONE combined `hyprctl eval 'hl.config(...)'` through a tracked Process with
 // bounded retries (no parallel blur/shadow processes, no polling).
-// QML surface opacity (Theme.surfaceOpacity) is snapshotted imperatively
-// before apply and forced to 1.0 while eco is on, then restored (no binding,
-// no cycle: EcoService -> Theme one-way).
-// Caveat: Wallust applyPalette rewrites surfaceOpacity on palette change, so
-// a wallpaper switch mid-eco restores translucency until the next toggle.
+// (A QML-opacity arm lived here until the surfaceOpacity token was removed:
+// module surfaces are always opaque in this design, so there is nothing
+// left for it to force.)
 Item {
     id: root
 
@@ -30,7 +28,6 @@ Item {
     property bool _haveSnap: false
     property int _readIdx: -1
     property int _readPass: 0
-    property real _surfSnap: -1
 
     property int _triesLeft: 0
     property bool _writePending: false
@@ -46,7 +43,6 @@ Item {
             }
         } else {
             root.ecoMode = true
-            root._surfSnap = Theme.surfaceOpacity
             if (root._haveSnap) {
                 root._applyEco()
             } else if (!readProc.running) {
@@ -68,13 +64,10 @@ Item {
     }
 
     function _applyEco() {
-        Theme.surfaceOpacity = 1.0
         root._requestWrite()
     }
 
     function _restore() {
-        if (root._surfSnap >= 0)
-            Theme.surfaceOpacity = root._surfSnap
         root._requestWrite()
     }
 

@@ -53,13 +53,11 @@ Rectangle {
     }
 
     color: {
-        // Selected keeps its surface RGB identity; fill alpha is
-        // Theme.surfaceOpacity scaled down (same approach as the panel
-        // fill). Hover and normal states are untouched.
-        if (root.selected) {
-            const c = Theme.surface
-            return Qt.rgba(c.r, c.g, c.b, Theme.surfaceOpacity * 0.65)
-        }
+        // Selected = one tonal step above the panel (surfaceRaised,
+        // fully opaque - this design has no translucent module fills).
+        // Hover and normal states are untouched.
+        if (root.selected)
+            return Theme.surfaceRaised
         return hover.hovered ? Theme.surfaceHover : "transparent"
     }
     Behavior on color {

@@ -86,7 +86,7 @@ Column {
         implicitWidth: replyLabel.implicitWidth + 20
         implicitHeight: 28
         radius: 8
-        color: replyAffHover.hovered ? Qt.lighter(Theme.surface, 1.2) : Theme.surface
+        color: replyAffHover.hovered ? Theme.surfaceRaised : Theme.surface
 
         Text {
             id: replyLabel
@@ -167,7 +167,7 @@ Column {
             implicitWidth: cancelLabel.implicitWidth + 20
             implicitHeight: 28
             radius: 8
-            color: cancelHover.hovered ? Qt.lighter(Theme.surface, 1.2) : Theme.surface
+            color: cancelHover.hovered ? Theme.surfaceRaised : Theme.surface
 
             Text {
                 id: cancelLabel
