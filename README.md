@@ -20,7 +20,7 @@ A hand-rolled [Quickshell](https://github.com/Quickshell/Quickshell) desktop she
 Prototype, not a stable release. Expect rough edges and breaking changes. What exists today:
 
 - **Launcher** (solid): full-screen keyboard app launcher with fuzzy scoring, usage history, and prefix search modes.
-- **Top bar** (working): static 40px bar per monitor with a pop-down **Dynamic Center** (wallpaper picker, expanded media player), a **Control Center** overlay, system tray, and status indicators. The display manager lives in the **Settings** window (Display page).
+- **Top bar** (working): static 40px bar per monitor with a pop-down **Dynamic Center** (expanded media player), a **Control Center** overlay, system tray, and status indicators. The display manager and the wallpaper picker live in the **Settings** window (Display and Wallpaper pages).
 - **Media**: MPRIS-backed now-playing preview in the bar centre (click-to-expand, never auto-expands) plus an expanded player surface.
 - **Notifications**: freedesktop notification history (Notification Center) + popup toasts, with inline reply support.
 - **OSD**: standalone bottom-centre overlay for volume / brightness / caps-lock, plus a workspace OSD.
@@ -146,14 +146,14 @@ A static **40px** top bar, one instance per monitor (`Variants(Quickshell.screen
 | Dynamic center | `modules/bar/DynamicCenter.qml` | Plain `Item` at `y: 40`, attached under the bar; raises one surface at a time, each behind a latched `Loader` with crossfade |
 | Power menu | `modules/bar/PowerMenuWindow.qml` (host) + `PowerMenu.qml` + `PowerActionItem.qml` | Standalone centred modal over a dimmed background, own focus grab; 6 actions — Lock, Hibernate, Logout, Shutdown, Suspend, Reboot — with hold-to-confirm |
 | Display | `modules/display/DisplayManager.qml` | Monitor-arrangement page in the Settings window (backed by `DisplayService`) |
-| Wallpapers | `modules/wallpapers/WallpaperPicker.qml` | Thumbnail strip, keyboard nav, applies via `walset-backend`-style flow (wallpaper + wallust + matugen) |
+| Wallpapers | `modules/wallpapers/WallpaperService.qml` + `WallpaperPage.qml` | Settings page: single collection grid + import, backed by the shared service (stepwise awww + wallust + matugen apply, persistent history) |
 | Control Center | `modules/bar/ControlCenter.qml` + `ControlSlider.qml` / `ControlTile.qml` | Separate top-right overlay window: audio, brightness, network, bluetooth, hotspot and quick toggles (audio over native PipeWire, no `wpctl`) |
 | Clock/date | `modules/bar/DateTimeWidget.qml` | Clock + calendar popover |
 | Battery | `modules/bar/BatteryWidget.qml` + `BatteryService.qml` | UPower-backed indicator + popover |
 
 ### The dynamic center
 
-The bar's centre can raise a surface that looks like it grows straight out of the bar — no gap, square top corners. Implemented surfaces: `wallpapers`, `media` (expanded player). `mediaPreview` / `mediaCompact` IPC modes also exist. (The capture picker and the power menu are no longer surfaces here — they are standalone floating windows, see Capture below. The display manager is no longer a surface either: it is the Display page of the Settings window, and the `display` IPC target opens it there.)
+The bar's centre can raise a surface that looks like it grows straight out of the bar — no gap, square top corners. Implemented surfaces: `media` (expanded player). `mediaPreview` / `mediaCompact` IPC modes also exist. (The capture picker and the power menu are no longer surfaces here — they are standalone floating windows, see Capture below. The display manager is no longer a surface either: it is the Display page of the Settings window, and the `display` IPC target opens it there. The wallpaper picker followed it: it is the Wallpaper page of the Settings window, and the `wallpapers` IPC target opens it there.)
 
 - The bar's `PanelWindow` height stays constant at runtime; surfaces fade/crossfade inside the allocated space. (Resizing a layer-shell surface every open flickers badly on fractional-scale outputs.)
 - When idle, the transparent area below the 40px strip is click-through (input mask); when a surface is open the window grabs input via `HyprlandFocusGrab`.
@@ -199,8 +199,8 @@ One `MediaService` (`modules/services/MediaService.qml`) wraps the native `Quick
 | Target | Functions |
 | --- | --- |
 | `launcher` | `show`, `hide`, `toggle` |
-| `power`, `wallpapers`, `center`, `mediaPreview`, `mediaCompact` | `show`, `hide`, `toggle` (set `barState.mode` + `screen`) |
-| `display` | `show`, `hide`, `toggle` (opens the Settings window on its Display page) |
+| `power`, `center`, `mediaPreview`, `mediaCompact` | `show`, `hide`, `toggle` (set `barState.mode` + `screen`) |
+| `display`, `wallpapers` | `show`, `hide`, `toggle` (opens the Settings window on its Display / Wallpaper page) |
 | `volume` | `up`, `down` (±5 via native PipeWire) |
 | `brightness` | `up`, `down` (step + OSD) |
 | `capture` | `open`, `bar`, `region`, `window`, `screen`, `fullscreen` |
