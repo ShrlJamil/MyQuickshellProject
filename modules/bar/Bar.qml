@@ -345,292 +345,6 @@ PanelWindow {
                 }
             }
         }
-        // Arch Linux logo, pinned to the very left edge. Click toggles a
-        // fastfetch-style system summary popover (see archPop below).
-        Item {
-            id: archSlot
-
-            anchors {
-                left: parent.left
-                verticalCenter: parent.verticalCenter
-            }
-
-            // Bar left outer padding (mirrors dateTime's right padding).
-            anchors.leftMargin: 8
-
-            width: 36
-            height: 36
-
-            Rectangle {
-                anchors.fill: parent
-                radius: 10
-                color: archPop.open ? Theme.surface
-                    : (archTap.pressed || archHover.hovered ? Theme.surfaceHover : "transparent")
-            }
-
-            Image {
-                id: archImg
-
-                anchors.centerIn: parent
-                width: 24
-                height: 24
-                sourceSize.width: 48
-                sourceSize.height: 48
-                fillMode: Image.PreserveAspectFit
-                asynchronous: true
-                smooth: true
-                mipmap: true
-                visible: false
-
-                source: "file://" + Quickshell.shellPath("assets/arch.svg")
-            }
-
-            ColorOverlay {
-                anchors.fill: archImg
-                source: archImg
-                layer.enabled: true
-                layer.effect: DropShadow {
-                    transparentBorder: true
-                    horizontalOffset: 0
-                    verticalOffset: 1
-                    radius: 2
-                    samples: 9
-                    color: Theme.textShadow
-                }
-                color: Theme.icon
-            }
-
-            HoverHandler {
-                id: archHover
-
-                cursorShape: Qt.PointingHandCursor
-            }
-
-            TapHandler {
-                id: archTap
-
-                onTapped: {
-                    if (archPop.open) {
-                        archPop.open = false
-                    } else {
-                        UptimeService.refresh()
-                        archPop.open = true
-                    }
-                }
-            }
-
-            // Fastfetch-style system summary. Same PanelWindow + focus-grab
-            // pattern as BatteryWidget's popover: floats just below the bar,
-            // dismisses on click-away or Esc, never steals the bar's surface.
-            PanelWindow {
-                id: archPop
-
-                screen: root.screen
-
-                property bool open: false
-                property bool closing: false
-
-                visible: archPop.open || archPop.closing
-
-                WlrLayershell.layer: WlrLayer.Overlay
-                WlrLayershell.exclusionMode: ExclusionMode.Ignore
-                WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
-
-                anchors {
-                    top: true
-                    left: true
-                }
-
-                // Sit directly beneath the Arch icon: 40px bar + 4px gap, and
-                // the icon's own left inset.
-                margins {
-                    top: 44
-                    left: 10
-                }
-
-                implicitWidth: card.implicitWidth + 16
-                implicitHeight: card.implicitHeight + 16
-
-                color: "transparent"
-
-                onOpenChanged: {
-                    if (archPop.open) {
-                        archPop.closing = false
-                        hideTimer.stop()
-                        card.forceActiveFocus()
-                    } else if (archPop.visible) {
-                        archPop.closing = true
-                        hideTimer.restart()
-                    }
-                }
-
-                Timer {
-                    id: hideTimer
-                    interval: 200
-                    onTriggered: archPop.closing = false
-                }
-
-                HyprlandFocusGrab {
-                    windows: [archPop]
-                    active: archPop.open
-                    onCleared: archPop.open = false
-                }
-
-                Rectangle {
-                    id: card
-
-                    anchors.fill: parent
-                    anchors.margins: 8
-                    radius: Theme.cornerRadius
-                    color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
-                    border.width: 1
-                    border.color: Theme.surfaceHover
-
-                    // Fixed width keeps the key column at x=70 and lets each
-                    // value Text elide instead of stretching the card.
-                    implicitWidth: 240
-                    implicitHeight: infoCol.implicitHeight + 28
-
-                    // Snappy scale-fade from directly under the Arch icon.
-                    transformOrigin: Item.Top
-                    opacity: archPop.open ? 1 : 0
-                    scale: archPop.open ? 1 : 0.85
-                    Behavior on opacity {
-                        NumberAnimation { duration: 100; easing.type: Easing.OutQuad }
-                    }
-                    Behavior on scale {
-                        NumberAnimation { duration: 120; easing.type: Easing.OutBack }
-                    }
-
-                    Keys.onPressed: (event) => {
-                        if (event.key === Qt.Key_Escape) {
-                            archPop.open = false
-                            event.accepted = true
-                        }
-                    }
-
-                    // Shared glass highlight (see ControlTile): full-bleed
-                    // rect with the card's own corner radius; falloff shaped
-                    // by stops. Below the info content.
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: Theme.cornerRadius
-                        gradient: Gradient {
-                            GradientStop {
-                                position: 0
-                                color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
-                            }
-                            GradientStop {
-                                position: 0.4
-                                color: "transparent"
-                            }
-                            GradientStop {
-                                position: 1
-                                color: "transparent"
-                            }
-                        }
-                    }
-
-                    // Structured column: header + divider + key/value rows.
-                    // Keys are a fixed-width Theme.accent (Bold) gutter; values
-                    // are Theme.text (Medium 12px) and elide on overflow.
-                    Column {
-                        id: infoCol
-
-                        x: 14
-                        y: 14
-                        width: parent.width - 28
-                        spacing: 8
-
-                        Row {
-                            width: parent.width
-                            spacing: 8
-
-                            Item {
-                                width: 16
-                                height: 16
-                                anchors.verticalCenter: parent.verticalCenter
-
-                                Image {
-                                    id: hdrArchImg
-
-                                    anchors.fill: parent
-                                    source: "file://" + Quickshell.shellPath("assets/arch.svg")
-                                    sourceSize.width: 32
-                                    sourceSize.height: 32
-                                    fillMode: Image.PreserveAspectFit
-                                    smooth: true
-                                    mipmap: true
-                                    visible: false
-                                }
-
-                                ColorOverlay {
-                                    anchors.fill: hdrArchImg
-                                    source: hdrArchImg
-                                    color: Theme.text
-                                }
-                            }
-
-                            Text {
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: "System Overview"
-                                color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.weight: Font.Bold
-                                font.pixelSize: 14
-                            }
-                        }
-
-                        Rectangle {
-                            width: parent.width
-                            height: 1
-                            color: Theme.surfaceHover
-                        }
-
-                        Repeater {
-                            model: ["OS", "Kernel", "Uptime", "WM", "Shell", "Memory"]
-
-                            delegate: Row {
-                                id: infoRow
-
-                                required property string modelData
-
-                                width: infoCol.width
-
-                                Text {
-                                    width: 70
-                                    text: infoRow.modelData
-                                    color: Theme.accent
-                                    font.family: Theme.fontFamily
-                                    font.weight: Font.Bold
-                                    font.pixelSize: 12
-                                }
-
-                                Text {
-                                    width: parent.width - 70
-                                    elide: Text.ElideRight
-                                    text: {
-                                        switch (infoRow.modelData) {
-                                        case "OS": return UptimeService.os
-                                        case "Kernel": return UptimeService.kernel
-                                        case "Uptime": return UptimeService.pretty
-                                        case "WM": return "Hyprland"
-                                        case "Shell": return "Quickshell"
-                                        case "Memory": return UptimeService.memory
-                                        }
-                                        return ""
-                                    }
-                                    color: Theme.text
-                                    font.family: Theme.fontFamily
-                                    font.weight: Font.Medium
-                                    font.pixelSize: 12
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
 
         Row {
             id: activeWindowRow
@@ -733,11 +447,14 @@ PanelWindow {
             }
 
             anchors {
-                left: archSlot.right
+                horizontalCenter: parent.horizontalCenter
                 verticalCenter: parent.verticalCenter
             }
 
-            anchors.leftMargin: 10
+            // Experiment: the window title lives in the centre of the bar.
+            // It yields the centre while a DynamicCenter surface owns it -
+            // holdLabel is visible exactly during those modes.
+            visible: !holdLabel.visible
 
             spacing: activeWindowIcon.visible ? 6 : 0
 
@@ -836,12 +553,12 @@ PanelWindow {
 
             screen: root.screen
 
-            // Far-right edge of the bar.
+            // Far-left edge of the bar (experiment: clock on the left).
             anchors {
                 verticalCenter: parent.verticalCenter
-                right: parent.right
+                left: parent.left
             }
-            anchors.rightMargin: 8
+            anchors.leftMargin: 8
         }
 
         BatteryWidget {
@@ -849,11 +566,12 @@ PanelWindow {
 
             screen: root.screen
 
+            // Far-right edge of the bar (the clock used to sit here).
             anchors {
                 verticalCenter: parent.verticalCenter
-                right: dateTime.left
+                right: parent.right
             }
-            anchors.rightMargin: 4
+            anchors.rightMargin: 8
         }
 
         // Caffeine indicator - only present while CaffeineService.enabled.
@@ -926,16 +644,16 @@ PanelWindow {
         }
 
         // System tray (StatusNotifierItem hosts - Tailscale, OBS, ...). Sits
-        // left of the status indicators; empty (zero-width) when nothing is
-        // registered.
+        // on the left cluster, right of the clock; empty (zero-width) when
+        // nothing is registered.
         Row {
             id: systemTrayRow
 
             anchors {
                 verticalCenter: parent.verticalCenter
-                right: caffeineIndicator.left
+                left: dateTime.right
             }
-            anchors.rightMargin: 4
+            anchors.leftMargin: 4
 
             spacing: 4
 
@@ -1005,9 +723,9 @@ PanelWindow {
 
             anchors {
                 verticalCenter: parent.verticalCenter
-                right: systemTrayRow.left
+                left: systemTrayRow.right
             }
-            anchors.rightMargin: 4
+            anchors.leftMargin: 4
 
             mediaService: root.mediaService
 
