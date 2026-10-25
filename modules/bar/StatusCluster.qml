@@ -24,9 +24,9 @@ Item {
         && root.barState.mode === "center" && root.barState.screen === root.screen
 
     implicitWidth: clusterRow.implicitWidth + 16
-    implicitHeight: 34
+    implicitHeight: 30
     width: implicitWidth
-    height: 34
+    height: 30
 
     // Own service instances, the ControlCenter pattern: both track their
     // backends (PipeWire / BlueZ) reactively, so state converges with the
@@ -50,7 +50,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        radius: 17
+        radius: 15
         color: root.centerOpen ? Theme.surface
             : (clusterTap.pressed || clusterHover.hovered ? Theme.surfaceHover : "transparent")
     }
@@ -68,7 +68,7 @@ Item {
             id: wifiSlot
 
             width: 30
-            height: 34
+            height: 30
 
             readonly property bool wifiOn: NetworkService.wifiEnabled
             readonly property bool online: NetworkService.connected
@@ -91,8 +91,8 @@ Item {
                 id: wifiIcon
 
                 anchors.centerIn: parent
-                width: 26
-                height: 26
+                width: 23
+                height: 23
 
                 source: Quickshell.iconPath(wifiSlot.glyph, "network-wireless")
                 asynchronous: true
@@ -120,7 +120,7 @@ Item {
             id: btSlot
 
             width: 30
-            height: 34
+            height: 30
 
             // State glyphs (assets/dynamic bluetooth/*): off while the radio
             // is off, connect while a device is connected, signal while
@@ -140,8 +140,8 @@ Item {
                 id: btIcon
 
                 anchors.centerIn: parent
-                width: 22
-                height: 22
+                width: 19
+                height: 19
                 sourceSize.width: 44
                 sourceSize.height: 44
                 fillMode: Image.PreserveAspectFit
@@ -176,7 +176,7 @@ Item {
             id: volSlot
 
             width: 30
-            height: 34
+            height: 30
 
             readonly property bool silent: audioSvc.muted || audioSvc.volume <= 0
 
@@ -194,8 +194,8 @@ Item {
                 id: volIcon
 
                 anchors.centerIn: parent
-                width: 24
-                height: 24
+                width: 21
+                height: 21
                 sourceSize.width: 48
                 sourceSize.height: 48
                 fillMode: Image.PreserveAspectFit

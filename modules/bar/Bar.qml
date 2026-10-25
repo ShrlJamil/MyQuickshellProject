@@ -588,11 +588,11 @@ PanelWindow {
             visible: CaffeineService.enabled
             width: CaffeineService.enabled ? 38 : 0
             implicitWidth: width
-            height: 34
+            height: 30
 
             Rectangle {
                 anchors.fill: parent
-                radius: 17
+                radius: 15
                 color: caffeineTap.pressed || caffeineHover.hovered ? Theme.surfaceHover : "transparent"
             }
 
@@ -600,8 +600,8 @@ PanelWindow {
                 id: caffeineIndicatorImg
 
                 anchors.centerIn: parent
-                width: 24
-                height: 24
+                width: 21
+                height: 21
                 sourceSize.width: 48
                 sourceSize.height: 48
                 fillMode: Image.PreserveAspectFit
@@ -664,18 +664,18 @@ PanelWindow {
                     required property var modelData
 
                     width: 38
-                    height: 34
+                    height: 30
 
                     Rectangle {
                         anchors.fill: parent
-                        radius: 17
+                        radius: 15
                         color: trayMouse.containsMouse ? Theme.surfaceHover : "transparent"
                     }
 
                     IconImage {
                         anchors.centerIn: parent
-                        width: 26
-                        height: 26
+                        width: 23
+                        height: 23
                         smooth: true
                         asynchronous: true
 
@@ -763,11 +763,11 @@ PanelWindow {
             anchors.rightMargin: 4
 
             width: 38
-            height: 34
+            height: 30
 
             Rectangle {
                 anchors.fill: parent
-                radius: 17
+                radius: 15
                 color: micTap.pressed || micHover.hovered ? Theme.surfaceHover : "transparent"
             }
 
@@ -775,8 +775,8 @@ PanelWindow {
                 id: micIndicatorImg
 
                 anchors.centerIn: parent
-                width: 20
-                height: 20
+                width: 18
+                height: 18
                 sourceSize.width: 40
                 sourceSize.height: 40
                 fillMode: Image.PreserveAspectFit
