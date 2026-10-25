@@ -58,14 +58,15 @@ PanelWindow {
 
     color: "transparent"
 
-    readonly property real colWidth: 210
+    readonly property real colWidth: 226
     readonly property real colGap: 12
     readonly property real rowGap: 12
     readonly property real panelPadding: 14
     readonly property real heroHeight: 68
-    readonly property real gridTileSize: 92
-    readonly property real sliderHeight: 100
-    readonly property real tilesHeight: root.heroHeight + 12 + root.gridTileSize * 2 + 12
+    readonly property real gridTileSize: 100
+    readonly property real gridTileHeight: 64
+    readonly property real sliderHeight: 68
+    readonly property real tilesHeight: root.heroHeight + 12 + root.gridTileHeight * 2 + 12
     readonly property real contentHeight: root.tilesHeight + root.rowGap + root.sliderHeight + root.rowGap + root.sliderHeight + root.panelPadding * 2
 
     implicitWidth: root.colWidth * 2 + root.colGap
@@ -386,7 +387,7 @@ PanelWindow {
 
                     readonly property bool wifiOn: wifiService.enabled
 
-                    width: 196
+                    width: 212
                     height: 68
 
                     // Full pill. The outer capsule ALWAYS stays dark - only the
@@ -494,7 +495,7 @@ PanelWindow {
                         Column {
                             anchors.verticalCenter: parent.verticalCenter
 
-                            width: 110
+                            width: 126
 
                             spacing: 2
 
@@ -558,7 +559,7 @@ PanelWindow {
                         return "On"
                     }
 
-                    width: 196
+                    width: 212
                     height: 68
                     radius: height / 2
                     color: {
@@ -655,7 +656,7 @@ PanelWindow {
                         Column {
                             anchors.verticalCenter: parent.verticalCenter
 
-                            width: 110
+                            width: 126
 
                             spacing: 2
 
@@ -710,8 +711,8 @@ PanelWindow {
                 ControlTile {
                     id: hotspotTile
 
-                    width: 92
-                    height: 92
+                    width: 100
+                    height: 64
 
                     round: true
                     active: hotspotService.enabled
@@ -730,8 +731,8 @@ PanelWindow {
                 ControlTile {
                     id: focusTile
 
-                    width: 92
-                    height: 92
+                    width: 100
+                    height: 64
 
                     round: true
                     active: NotificationService.doNotDisturb
@@ -750,8 +751,8 @@ PanelWindow {
                 ControlTile {
                     id: caffeineTile
 
-                    width: 92
-                    height: 92
+                    width: 100
+                    height: 64
 
                     round: true
                     active: CaffeineService.enabled
@@ -770,8 +771,8 @@ PanelWindow {
                 ControlTile {
                     id: mirrorTile
 
-                    width: 92
-                    height: 92
+                    width: 100
+                    height: 64
 
                     round: true
                     active: DisplayService.mirrorActive
@@ -792,8 +793,8 @@ PanelWindow {
                 ControlTile {
                     id: ecoTile
 
-                    width: 92
-                    height: 92
+                    width: 100
+                    height: 64
 
                     round: true
                     active: EcoService.ecoMode
@@ -812,8 +813,8 @@ PanelWindow {
                 ControlTile {
                     id: nightLightTile
 
-                    width: 92
-                    height: 92
+                    width: 100
+                    height: 64
 
                     round: true
                     active: nightLightService.active
@@ -832,8 +833,8 @@ PanelWindow {
                 ControlTile {
                     id: colorPickerTile
 
-                    width: 92
-                    height: 92
+                    width: 100
+                    height: 64
 
                     round: true
                     label: "Color Picker"
@@ -854,8 +855,8 @@ PanelWindow {
                 ControlTile {
                     id: audioOutputTile
 
-                    width: 92
-                    height: 92
+                    width: 100
+                    height: 64
 
                     round: true
                     active: root.audioOutputPanelOpen
@@ -922,31 +923,12 @@ PanelWindow {
                 }
             }
 
-            Text {
-                id: displayLabel
-
-                anchors {
-                    left: parent.left
-                    top: parent.top
-                }
-
-                // Larger than the slider's 28px edgeInset below: this label sits
-                // near the top of the pill where the radius-50 arc cuts in.
-                anchors.leftMargin: 36
-                anchors.topMargin: 16
-
-                text: "Brightness"
-                color: Theme.text
-                font.family: Theme.fontFamily
-                font.pixelSize: 14
-                font.weight: Font.DemiBold
-            }
 
             ControlSlider {
                 anchors {
                     left: parent.left
                     right: parent.right
-                    top: displayLabel.bottom
+                    top: parent.top
                     bottom: parent.bottom
                 }
 
@@ -954,8 +936,8 @@ PanelWindow {
                 // so track / icon / value all align with the title above.
                 anchors.leftMargin: 0
                 anchors.rightMargin: 0
-                anchors.topMargin: 8
-                anchors.bottomMargin: 12
+                anchors.topMargin: 14
+                anchors.bottomMargin: 14
 
                 iconSource: {
                     if (brightnessService.brightness < 34)
@@ -1022,31 +1004,12 @@ PanelWindow {
                 }
             }
 
-            Text {
-                id: soundLabel
-
-                anchors {
-                    left: parent.left
-                    top: parent.top
-                }
-
-                // Larger than the slider's 28px edgeInset below: this label sits
-                // near the top of the pill where the radius-50 arc cuts in.
-                anchors.leftMargin: 36
-                anchors.topMargin: 16
-
-                text: "Volume"
-                color: Theme.text
-                font.family: Theme.fontFamily
-                font.pixelSize: 14
-                font.weight: Font.DemiBold
-            }
 
             ControlSlider {
                 anchors {
                     left: parent.left
                     right: parent.right
-                    top: soundLabel.bottom
+                    top: parent.top
                     bottom: parent.bottom
                 }
 
@@ -1054,8 +1017,8 @@ PanelWindow {
                 // so track / icon / value all align with the title above.
                 anchors.leftMargin: 0
                 anchors.rightMargin: 0
-                anchors.topMargin: 8
-                anchors.bottomMargin: 12
+                anchors.topMargin: 14
+                anchors.bottomMargin: 14
 
                 iconSource: {
                     if (audioService.muted || audioService.volume === 0)

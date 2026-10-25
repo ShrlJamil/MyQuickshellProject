@@ -102,7 +102,7 @@ Item {
     // Scale a colour's HSL saturation down by factor f (0 = unchanged,
     // 1 = fully grey), keeping hue and lightness.
     function desaturate(c, f) {
-        return Qt.hsla(c.hslHue, c.hslSaturation * (1 - f), c.hslLightness, c.alpha)
+        return Qt.hsla(c.hslHue, c.hslSaturation * (1 - f), c.hslLightness, c.a)
     }
 
     // Mix a colour toward black by factor f (0 = unchanged, 1 = black).
