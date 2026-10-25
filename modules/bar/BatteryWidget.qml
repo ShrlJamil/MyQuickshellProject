@@ -46,9 +46,9 @@ Item {
             id: iconBox
 
             anchors.verticalCenter: parent.verticalCenter
-            width: 46
-            implicitWidth: 46
-            height: 34
+            width: 44
+            implicitWidth: 44
+            height: 32
 
             // Charging and critically-low both read as "attention" -> accent.
             readonly property bool attention: BatteryService.charging || BatteryService.low
