@@ -163,7 +163,7 @@ PanelWindow {
                 easing.type: Easing.OutCubic
             }
         }
-        radius: 16
+        radius: height / 2
         color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
         border.width: 1
         border.color: Theme.surfaceHover
@@ -174,7 +174,7 @@ PanelWindow {
         Rectangle {
             anchors.fill: parent
             anchors.margins: 1
-            radius: 15
+            radius: parent.radius - 1
             gradient: Gradient {
                 GradientStop {
                     position: 0
