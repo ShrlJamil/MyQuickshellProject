@@ -34,15 +34,14 @@ Item {
         anchors.centerIn: parent
         spacing: 5
 
-        // Custom SVG battery glyph (assets/ultra-dynamic-battery-icon/*).
+        // Custom SVG battery glyph (assets/Microsoft-battery-icon/*).
         // Deliberately NOT Quickshell.iconPath / UPower.iconName - the Qt icon
-        // theme (Kora) renders those poorly. The set is ultra-dynamic: one
-        // twotone glyph per 5% step (0..100) in regular and charging variants,
-        // 42 files, each rendered through the same Image + ColorOverlay - the
-        // glyphs' fill-opacity keeps the two-tone look under the overlay, and
-        // the charging state is baked into its own glyphs, so there is no
-        // separate flash overlay. Enlarged (38x28) to read as prominently as
-        // the Control Center bar button; still comfortably inside the 40px bar.
+        // theme (Kora) renders those poorly. The set is Microsoft's Fluent
+        // battery family: a 10-step fill ladder (battery-0 .. battery-9),
+        // battery-full at 100%, and a dedicated battery-charge glyph for the
+        // charging state - all rendered through the same Image + ColorOverlay.
+        // Enlarged (38x28) to read as prominently as the Control Center bar
+        // button; still comfortably inside the 40px bar.
         Item {
             id: iconBox
 
@@ -54,18 +53,20 @@ Item {
             // Charging and critically-low both read as "attention" -> accent.
             readonly property bool attention: BatteryService.charging || BatteryService.low
 
-            // Nearest 5% step, clamped: every one of the 21 levels is
-            // reachable (0-2 -> 0, 3-7 -> 5, ..., 98-100 -> 100), so all 42
-            // files in the set are used. Filename stems are irregular in the
-            // source set and reproduced exactly: regular 0 is "0" but
-            // charging 0 is "0px", steps 5..95 are zero-padded, 100 is "100".
+            // Fluent ladder in 10% floor steps (0-9 -> battery-0, 10-19 ->
+            // battery-1, ..., 90-99 -> battery-9); battery-full only at
+            // exactly 100. Charging at any level shows the set's dedicated
+            // battery-charge glyph - the set has no per-level charging
+            // ladder. battery-saver / battery-warning stay unused for now:
+            // BatteryService exposes no power-saver signal, and critically
+            // low already reads through the accent tint below.
             readonly property string batteryFile: {
-                const level = Math.max(0, Math.min(100, Math.round(BatteryService.percent / 5) * 5))
-                const stem = level === 0
-                    ? (BatteryService.charging ? "0px" : "0")
-                    : (level === 100 ? "100" : String(level).padStart(2, "0"))
-                return (BatteryService.charging ? "battery-charging-twotone-" : "battery-twotone-")
-                    + stem + "-svgrepo-com.svg"
+                if (BatteryService.charging)
+                    return "battery-charge-svgrepo-com.svg"
+                const p = Math.max(0, Math.min(100, Math.floor(BatteryService.percent)))
+                if (p >= 100)
+                    return "battery-full-svgrepo-com.svg"
+                return "battery-" + Math.floor(p / 10) + "-svgrepo-com.svg"
             }
 
             Image {
@@ -82,8 +83,8 @@ Item {
 
                 // Safe fallback glyph, never the icon theme.
                 property bool failed: false
-                source: "file://" + Quickshell.shellPath("assets/ultra-dynamic-battery-icon/"
-                    + (battImg.failed ? "battery-twotone-50-svgrepo-com.svg" : iconBox.batteryFile))
+                source: "file://" + Quickshell.shellPath("assets/Microsoft-battery-icon/"
+                    + (battImg.failed ? "battery-5-svgrepo-com.svg" : iconBox.batteryFile))
                 onStatusChanged: if (status === Image.Error) battImg.failed = true
             }
 
