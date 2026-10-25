@@ -24,7 +24,7 @@ PanelWindow {
     // Static bar: always on, from the moment quickshell starts. No IPC gate.
     visible: true
 
-    property bool surfaceActive: (barState.screen === root.screen && (barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact"))
+    property bool surfaceActive: (barState.screen === root.screen && (barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact"))
     property double _mediaPopoverClosedAt: 0
 
     // ---- single-window concave (tiled hug) --------------------------------
@@ -848,9 +848,8 @@ PanelWindow {
             id: holdLabel
 
             anchors.centerIn: parent
-            visible: (barState.screen === root.screen && (barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact"))
-            text: barState.mode === "display" ? "Display"
-                : barState.mode === "wallpapers" ? "Wallpapers"
+            visible: (barState.screen === root.screen && (barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact"))
+            text: barState.mode === "wallpapers" ? "Wallpapers"
                 : (barState.mode === "mediaPreview" || barState.mode === "mediaCompact") ? "Media"
                 : ""
             color: Theme.icon
@@ -1192,7 +1191,7 @@ PanelWindow {
         id: dynamicCenter
 
         anchors.horizontalCenter: parent.horizontalCenter
-        activeSurface: barState.screen === root.screen && (barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact")
+        activeSurface: barState.screen === root.screen && (barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact")
             ? barState.mode
             : "idle"
     }

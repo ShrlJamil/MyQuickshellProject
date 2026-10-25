@@ -31,7 +31,7 @@ ShellRoot {
         return null
     }
 
-    // The Dynamic Center surfaces (display / wallpapers / media) are
+    // The Dynamic Center surfaces (wallpapers / media) are
     // rendered by the full Bar, so their IPC must target the screen hosting that
     // Bar - never the focused one, or barState.screen names a screen with no Bar
     // and nothing renders. The power menu's window is standalone now, but its
@@ -157,21 +157,25 @@ ShellRoot {
     IpcHandler {
         target: "display"
 
+        // Display is a Settings page now, not a DynamicCenter surface: this
+        // target opens the Settings window on the focused screen with the
+        // Display category preselected, after the same barState / capture
+        // housekeeping the `settings` target does. Keybinds are unchanged.
         function show(): void {
             focusState.inquire()
-            const screen = barScreen() || focusedScreen()
+            const screen = focusedScreen()
             if (!screen) return
-            if (barState.mode === "display" && barState.screen === screen) return
-            barState.screen = screen
-            barState.mode = "display"
-            CaptureService.closeBar()
-        }
-        function hide(): void {
             barState.screen = null
             barState.mode = ""
+            CaptureService.closeBar()
+            SettingsService.categoryIndex = SettingsService.displayCategory
+            SettingsService.show(screen)
+        }
+        function hide(): void {
+            SettingsService.hide()
         }
         function toggle(): void {
-            if (barState.mode === "display") hide()
+            if (SettingsService.open) hide()
             else show()
         }
     }

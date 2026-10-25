@@ -9,15 +9,14 @@ import "../../components"
 Item {
     id: root
 
-    // Natural size DynamicCenter fits its frame to (the monitor-arrangement
-    // canvas genuinely needs the full standard width). Constant -> no loop.
+    // Natural size from the DynamicCenter era (the monitor-arrangement canvas
+    // genuinely needs the full standard width), kept as a hint only: the host
+    // (the Settings window's Display page) sizes this item explicitly.
     implicitWidth: 680
-    width: parent ? parent.width : 460
     implicitHeight: 500
-    height: root.implicitHeight
     clip: true
 
-    // Raised by Cancel so the host (DynamicCenter -> Bar) tears the surface down.
+    // Raised by Cancel so the host (the Settings window) tears the page down.
     signal closeRequested()
 
     readonly property var selectedInfo: DisplayService.layout[DisplayService.selectedMonitor]

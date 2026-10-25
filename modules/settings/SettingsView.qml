@@ -2,6 +2,7 @@ import QtQuick
 import Qt5Compat.GraphicalEffects
 import Quickshell
 import "../../components"
+import "../display"
 
 FocusScope {
     id: root
@@ -44,13 +45,29 @@ FocusScope {
         }
     ]
 
-    property int categoryIndex: 0
+    // Owned by SettingsService so IPC callers can preselect a page; the
+    // sidebar writes through to the service.
+    readonly property int categoryIndex: SettingsService.categoryIndex
 
     readonly property var activeCategory: root.categories[Math.max(0, Math.min(root.categories.length - 1, root.categoryIndex))]
 
     signal closeRequested()
 
     Keys.onEscapePressed: root.closeRequested()
+
+    // Reopening the window while the Display page is selected must behave
+    // like opening the old DynamicCenter surface did: a fresh sync.
+    // DisplayManager.onVisibleChanged cannot provide this here - its
+    // `visible` is bound to the category alone, so it does not change when
+    // the window opens or closes.
+    Connections {
+        target: SettingsService
+
+        function onOpenChanged() {
+            if (SettingsService.open && root.categoryIndex === SettingsService.displayCategory)
+                DisplayService.syncFromHyprland()
+        }
+    }
 
     Rectangle {
         id: baseLayer
@@ -252,7 +269,7 @@ FocusScope {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: root.categoryIndex = sidebarItem.index
+                            onClicked: SettingsService.categoryIndex = sidebarItem.index
                         }
                     }
                 }
@@ -278,6 +295,8 @@ FocusScope {
             Text {
                 id: detailTitle
 
+                visible: root.categoryIndex !== SettingsService.displayCategory
+
                 anchors {
                     top: parent.top
                     left: parent.left
@@ -297,6 +316,8 @@ FocusScope {
 
             Text {
                 id: detailDescription
+
+                visible: root.categoryIndex !== SettingsService.displayCategory
 
                 anchors {
                     top: detailTitle.bottom
@@ -318,6 +339,8 @@ FocusScope {
             Rectangle {
                 id: divider
 
+                visible: root.categoryIndex !== SettingsService.displayCategory
+
                 anchors {
                     top: detailDescription.bottom
                     left: parent.left
@@ -333,6 +356,8 @@ FocusScope {
 
             Rectangle {
                 id: placeholder
+
+                visible: root.categoryIndex !== SettingsService.displayCategory
 
                 anchors {
                     top: divider.bottom
@@ -411,6 +436,21 @@ FocusScope {
                         wrapMode: Text.WordWrap
                     }
                 }
+            }
+
+            // The Display page hosts the real DisplayManager (moved out of
+            // DynamicCenter). The generic title / description / placeholder
+            // chrome above hides itself for this category so the manager
+            // gets the full detail pane - it needs the height, and it carries
+            // its own headings.
+            DisplayManager {
+                id: displayPage
+
+                anchors.fill: parent
+                anchors.margins: 12
+                visible: root.categoryIndex === SettingsService.displayCategory
+
+                onCloseRequested: root.closeRequested()
             }
         }
     }
