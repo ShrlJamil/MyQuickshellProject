@@ -117,8 +117,24 @@ Item {
 
         // ---- Bluetooth ----------------------------------------------------
         Item {
+            id: btSlot
+
             width: 28
             height: 28
+
+            // State glyphs (assets/dynamic bluetooth/*): off while the radio
+            // is off, connect while a device is connected, signal while
+            // scanning, on otherwise. The glyph carries the state - the tint
+            // is Theme.icon in every state, never dimmed.
+            readonly property string glyph: {
+                if (!btSvc.enabled)
+                    return "bluetooth-off-svgrepo-com.svg"
+                if (btSvc.anyConnected)
+                    return "bluetooth-connect-svgrepo-com.svg"
+                if (btSvc.scanning)
+                    return "bluetooth-signal-svgrepo-com.svg"
+                return "bluetooth-on-svgrepo-com.svg"
+            }
 
             Image {
                 id: btIcon
@@ -134,11 +150,11 @@ Item {
                 mipmap: true
                 visible: false
 
-                source: "file://" + Quickshell.shellPath("assets/bluetooth-svgrepo-com.svg")
+                // The set's folder name contains a space; percent-encode it
+                // so the file URL is well-formed wherever the repo lives.
+                source: ("file://" + Quickshell.shellPath("assets/dynamic bluetooth/" + btSlot.glyph)).replace(/ /g, "%20")
             }
 
-            // Off / no adapter -> muted; on, nothing connected -> solid;
-            // connected -> accent (active-state highlight).
             ColorOverlay {
                 anchors.fill: btIcon
                 source: btIcon
@@ -151,8 +167,7 @@ Item {
                     samples: 9
                     color: Theme.textShadow
                 }
-                color: !btSvc.enabled ? Theme.textMuted
-                    : (btSvc.anyConnected ? Theme.accent : Theme.icon)
+                color: Theme.icon
             }
         }
 
@@ -204,7 +219,9 @@ Item {
                     samples: 9
                     color: Theme.textShadow
                 }
-                color: volSlot.silent ? Theme.textMuted : Theme.icon
+                // The off glyph carries the muted state - the tint stays
+                // Theme.icon, never dimmed.
+                color: Theme.icon
             }
         }
     }
