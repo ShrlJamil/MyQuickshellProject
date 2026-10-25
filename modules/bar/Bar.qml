@@ -24,7 +24,6 @@ PanelWindow {
     // Static bar: always on, from the moment quickshell starts. No IPC gate.
     visible: true
 
-    property bool centerOpen: barState.mode === "center" && barState.screen === root.screen
     property bool surfaceActive: (barState.screen === root.screen && (barState.mode === "display" || barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact"))
     property double _mediaPopoverClosedAt: 0
 
@@ -861,71 +860,6 @@ PanelWindow {
             font.weight: Font.Bold
         }
 
-        Item {
-            id: rightSlot
-
-            // Sits just left of the clock, which is pinned to the bar's far edge.
-            anchors {
-                right: dateTime.left
-                verticalCenter: parent.verticalCenter
-            }
-
-            anchors.rightMargin: 8
-
-            width: 36
-            height: 36
-
-            Rectangle {
-                id: centerButton
-
-                anchors.fill: parent
-
-                radius: 10
-                color: root.centerOpen || centerTap.pressed ? Theme.surfaceHover : (centerHover.hovered ? Theme.surfaceHover : "transparent")
-
-                HoverHandler {
-                    id: centerHover
-
-                    cursorShape: Qt.PointingHandCursor
-                }
-
-                TapHandler {
-                    id: centerTap
-
-                    onTapped: {
-                        if (root.centerOpen) {
-                            barState.screen = null
-                            barState.mode = ""
-                        } else {
-                            barState.screen = root.screen
-                            barState.mode = "center"
-                        }
-                    }
-                }
-
-                IconImage {
-                    id: centerIcon
-
-                    anchors.centerIn: parent
-
-                    width: 20
-                    height: 20
-
-                    source: "file://" + Quickshell.shellPath("assets/controls-symbolic.svg")
-                    asynchronous: true
-                    layer.enabled: true
-                    layer.effect: DropShadow {
-                        transparentBorder: true
-                        horizontalOffset: 0
-                        verticalOffset: 1
-                        radius: 2
-                        samples: 9
-                        color: Theme.textShadow
-                    }
-                }
-            }
-        }
-
         DateTimeWidget {
             id: dateTime
 
@@ -946,7 +880,7 @@ PanelWindow {
 
             anchors {
                 verticalCenter: parent.verticalCenter
-                right: rightSlot.left
+                right: dateTime.left
             }
             anchors.rightMargin: 4
         }
@@ -1137,7 +1071,7 @@ PanelWindow {
 
             anchors {
                 verticalCenter: parent.verticalCenter
-                right: wifiIndicator.left
+                right: statusCluster.left
             }
             anchors.rightMargin: 4
 
@@ -1196,331 +1130,20 @@ PanelWindow {
             }
         }
 
-        // Wi-Fi status - sits just left of the battery. Click opens a small
-        // details card (SSID / IP / signal / interface).
-        Item {
-            id: wifiIndicator
+        // Status cluster (Wi-Fi / Bluetooth / volume) - one pill replacing
+        // the standalone Wi-Fi indicator and its details popover; a click
+        // anywhere on it toggles Control Center (see StatusCluster.qml).
+        StatusCluster {
+            id: statusCluster
+
+            barState: root.barState
+            screen: root.screen
 
             anchors {
                 verticalCenter: parent.verticalCenter
                 right: battery.left
             }
             anchors.rightMargin: 4
-
-            width: 28
-            height: 28
-
-            readonly property bool wifiOn: NetworkService.wifiEnabled
-            readonly property bool online: NetworkService.connected
-
-            readonly property string glyph: {
-                if (!wifiIndicator.wifiOn)
-                    return "network-wireless-disabled-symbolic"
-                if (!wifiIndicator.online)
-                    return "network-wireless-offline-symbolic"
-                switch (NetworkService.signalLevel) {
-                case 4: return "network-wireless-signal-excellent-symbolic"
-                case 3: return "network-wireless-signal-good-symbolic"
-                case 2: return "network-wireless-signal-ok-symbolic"
-                case 1: return "network-wireless-signal-weak-symbolic"
-                default: return "network-wireless-signal-none-symbolic"
-                }
-            }
-
-            Rectangle {
-                anchors.fill: parent
-                radius: 8
-                color: wifiBarTap.pressed || wifiBarHover.hovered || wifiPop.open
-                    ? Theme.surfaceHover : "transparent"
-            }
-
-            IconImage {
-                id: wifiBarIcon
-
-                anchors.centerIn: parent
-                width: 22
-                height: 22
-
-                source: Quickshell.iconPath(wifiIndicator.glyph, "network-wireless")
-                asynchronous: true
-            }
-
-            // Idle / connected -> solid white; Wi-Fi radio disabled -> muted.
-            // Accent is reserved for active-state highlights elsewhere.
-            ColorOverlay {
-                anchors.fill: wifiBarIcon
-                source: wifiBarIcon
-                layer.enabled: true
-                layer.effect: DropShadow {
-                    transparentBorder: true
-                    horizontalOffset: 0
-                    verticalOffset: 1
-                    radius: 2
-                    samples: 9
-                    color: Theme.textShadow
-                }
-                color: wifiIndicator.wifiOn ? Theme.icon : Theme.textMuted
-            }
-
-            HoverHandler {
-                id: wifiBarHover
-
-                cursorShape: Qt.PointingHandCursor
-            }
-
-            TapHandler {
-                id: wifiBarTap
-
-                onTapped: wifiPop.open = !wifiPop.open
-            }
-
-            // Details card. Same PanelWindow + focus-grab pattern as archPop /
-            // BatteryWidget's popover; centred under the icon, dismisses on
-            // click-away or Esc.
-            PanelWindow {
-                id: wifiPop
-
-                screen: root.screen
-
-                property bool open: false
-                property bool closing: false
-
-                visible: wifiPop.open || wifiPop.closing
-
-                WlrLayershell.layer: WlrLayer.Overlay
-                WlrLayershell.exclusionMode: ExclusionMode.Ignore
-                WlrLayershell.keyboardFocus: WlrKeyboardFocus.OnDemand
-
-                anchors {
-                    top: true
-                    right: true
-                }
-
-                readonly property real widgetFromRight: wifiIndicator.parent
-                    ? Math.max(0, wifiIndicator.parent.width - (wifiIndicator.x + wifiIndicator.width))
-                    : 12
-                readonly property real centeredRight:
-                    wifiPop.widgetFromRight + wifiIndicator.width / 2 - wifiPop.implicitWidth / 2
-
-                margins {
-                    top: 44
-                    right: Math.max(8, Math.round(wifiPop.centeredRight))
-                }
-
-                implicitWidth: wifiCard.implicitWidth + 16
-                implicitHeight: wifiCard.implicitHeight + 16
-
-                color: "transparent"
-
-                onOpenChanged: {
-                    if (wifiPop.open) {
-                        wifiPop.closing = false
-                        wifiHideTimer.stop()
-                        wifiCard.forceActiveFocus()
-                    } else if (wifiPop.visible) {
-                        wifiPop.closing = true
-                        wifiHideTimer.restart()
-                    }
-                }
-
-                Timer {
-                    id: wifiHideTimer
-                    interval: 200
-                    onTriggered: wifiPop.closing = false
-                }
-
-                HyprlandFocusGrab {
-                    windows: [wifiPop]
-                    active: wifiPop.open
-                    onCleared: wifiPop.open = false
-                }
-
-                Rectangle {
-                    id: wifiCard
-
-                    anchors.fill: parent
-                    anchors.margins: 8
-                    radius: Theme.cornerRadius
-                    color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
-                    border.width: 1
-                    border.color: Theme.surfaceHover
-
-                    implicitWidth: 250
-                    implicitHeight: wifiInfoCol.implicitHeight + 28
-
-                    // Snappy scale-fade from directly under the Wi-Fi icon.
-                    transformOrigin: Item.Top
-                    opacity: wifiPop.open ? 1 : 0
-                    scale: wifiPop.open ? 1 : 0.85
-                    Behavior on opacity {
-                        NumberAnimation { duration: 100; easing.type: Easing.OutQuad }
-                    }
-                    Behavior on scale {
-                        NumberAnimation { duration: 120; easing.type: Easing.OutBack }
-                    }
-
-                    Keys.onPressed: (event) => {
-                        if (event.key === Qt.Key_Escape) {
-                            wifiPop.open = false
-                            event.accepted = true
-                        }
-                    }
-
-                    // Shared glass highlight (see ControlTile): full-bleed
-                    // rect with the card's own corner radius; falloff shaped
-                    // by stops. Below the info content.
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: Theme.cornerRadius
-                        gradient: Gradient {
-                            GradientStop {
-                                position: 0
-                                color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
-                            }
-                            GradientStop {
-                                position: 0.4
-                                color: "transparent"
-                            }
-                            GradientStop {
-                                position: 1
-                                color: "transparent"
-                            }
-                        }
-                    }
-
-                    Column {
-                        id: wifiInfoCol
-
-                        x: 14
-                        y: 14
-                        width: parent.width - 28
-                        spacing: 8
-
-                        // Header: connection dot + SSID (left), Wi-Fi on/off
-                        // switch (right).
-                        Item {
-                            width: parent.width
-                            height: 22
-
-                            Rectangle {
-                                id: wifiHdrDot
-
-                                width: 9
-                                height: 9
-                                radius: 4.5
-                                anchors.left: parent.left
-                                anchors.verticalCenter: parent.verticalCenter
-                                color: NetworkService.connected ? Theme.accent : Theme.textMuted
-                            }
-
-                            Text {
-                                anchors.left: wifiHdrDot.right
-                                anchors.leftMargin: 8
-                                anchors.right: wifiToggle.left
-                                anchors.rightMargin: 10
-                                anchors.verticalCenter: parent.verticalCenter
-                                elide: Text.ElideRight
-
-                                text: "Wi-Fi Network"
-                                color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.weight: Font.Bold
-                                font.pixelSize: 13
-                            }
-
-                            Rectangle {
-                                id: wifiToggle
-
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 40
-                                height: 22
-                                radius: height / 2
-                                color: NetworkService.wifiEnabled ? Theme.accent : Theme.surfaceHover
-                                Behavior on color {
-                                    ColorAnimation { duration: 120; easing.type: Easing.OutCubic }
-                                }
-
-                                Rectangle {
-                                    width: 16
-                                    height: 16
-                                    radius: 8
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    x: NetworkService.wifiEnabled ? parent.width - width - 3 : 3
-                                    color: Theme.text
-                                    Behavior on x {
-                                        NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
-                                    }
-                                }
-
-                                HoverHandler {
-                                    cursorShape: Qt.PointingHandCursor
-                                }
-
-                                TapHandler {
-                                    onTapped: NetworkService.toggleWifi()
-                                }
-                            }
-                        }
-
-                        Rectangle {
-                            width: parent.width
-                            height: 1
-                            color: Theme.surfaceHover
-                        }
-
-                        Repeater {
-                            model: ["SSID", "Status", "IP Address", "Signal", "Interface", "Frequency"]
-
-                            delegate: Row {
-                                id: wifiRow
-
-                                required property string modelData
-
-                                width: wifiInfoCol.width
-
-                                Text {
-                                    width: 84
-                                    text: wifiRow.modelData
-                                    color: Theme.accent
-                                    font.family: Theme.fontFamily
-                                    font.weight: Font.Bold
-                                    font.pixelSize: 12
-                                }
-
-                                Text {
-                                    width: parent.width - 84
-                                    elide: Text.ElideRight
-                                    text: {
-                                        switch (wifiRow.modelData) {
-                                        case "SSID":
-                                            return (NetworkService.connected && NetworkService.ssid)
-                                                ? NetworkService.ssid : "—"
-                                        case "Status":
-                                            return !NetworkService.wifiEnabled ? "Disabled"
-                                                : NetworkService.connected ? "Connected" : "Disconnected"
-                                        case "IP Address":
-                                            return NetworkService.ipAddress || "—"
-                                        case "Signal":
-                                            return NetworkService.connected
-                                                ? NetworkService.signalStrength + "%" : "—"
-                                        case "Interface":
-                                            return NetworkService.interfaceName || "—"
-                                        case "Frequency":
-                                            return NetworkService.frequency || "—"
-                                        }
-                                        return ""
-                                    }
-                                    color: Theme.text
-                                    font.family: Theme.fontFamily
-                                    font.weight: Font.Medium
-                                    font.pixelSize: 12
-                                }
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 

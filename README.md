@@ -138,7 +138,7 @@ A static **40px** top bar, one instance per monitor (`Variants(Quickshell.screen
 | --- | --- |
 | Left | Arch logo (click: fastfetch-style system popover via `UptimeService`), active window icon + title, Hyprland submap pill |
 | Centre | Mode hold-label, or the `MediaPreview` now-playing pill (artwork, scrolling title/artist, cava mini-viz) |
-| Right | Control-Center button, clock (`DateTimeWidget`), battery widget + popover, caffeine indicator, system tray, mic-mute indicator, Wi-Fi indicator + details popover |
+| Right | Status cluster (`StatusCluster.qml`: Wi-Fi / Bluetooth / volume indicators in one pill, click opens Control Center), clock (`DateTimeWidget`), battery widget + popover, caffeine indicator, system tray, mic-mute indicator |
 
 | Piece | File | Role |
 | --- | --- | --- |
