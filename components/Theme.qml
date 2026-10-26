@@ -92,10 +92,10 @@ Item {
     property color surfaceRaised: root._tone(root._baseL + 0.085)
     property color surfaceOverlay: root._tone(root._baseL + 0.125)
     // Sunken is the Control Center tiles' idle tone (its only consumer):
-    // just below the panel tone (x0.86, not a deep drop) and quieter than
+    // just below the panel tone (x0.90, not a deep drop) and quieter than
     // the panel family (saturation x0.7), so idle tiles read as part of
     // the panel, slightly recessed - never as separate dark blocks.
-    property color backgroundSunken: Qt.hsla(root._panelHue, root._panelSat * 0.7, root._baseL * 0.86, 1)
+    property color backgroundSunken: Qt.hsla(root._panelHue, root._panelSat * 0.7, root._baseL * 0.90, 1)
     property color backgroundInset: root._tone(root._baseL * 0.58)
 
     // Control Center panel family: the CC surfaces get their own hue and
@@ -129,7 +129,7 @@ Item {
     // Control Center (panel, detail panels, tiles, sliders) consumes
     // these; other modules keep the global tones above.
     property color panelBackground: root._panelTone(root._baseL + 0.025)
-    property color panelSurface: root._panelTone(root._baseL + 0.065)
+    property color panelSurface: root._panelTone(root._baseL + 0.070)
     property color panelRaised: root._panelTone(root._baseL + 0.105)
     property color panelOverlay: root._panelTone(root._baseL + 0.140)
 

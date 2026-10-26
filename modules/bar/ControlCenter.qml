@@ -289,7 +289,7 @@ PanelWindow {
         Rectangle {
             anchors.fill: parent
 
-            radius: 28
+            radius: 36
             color: Theme.panelBackground
         }
 
