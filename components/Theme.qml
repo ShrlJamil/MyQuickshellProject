@@ -84,7 +84,11 @@ Item {
     property color surface: root._tone(root._baseL + 0.045)
     property color surfaceRaised: root._tone(root._baseL + 0.085)
     property color surfaceOverlay: root._tone(root._baseL + 0.125)
-    property color backgroundSunken: root._tone(root._baseL * 0.74)
+    // Sunken is the Control Center tiles' idle tone (its only consumer):
+    // just below the panel tone (x0.86, not a deep drop) and quieter than
+    // the panel family (saturation x0.7), so idle tiles read as part of
+    // the panel, slightly recessed - never as separate dark blocks.
+    property color backgroundSunken: Qt.hsla(root._seedHue, root._neutralSat * 0.7, root._baseL * 0.86, 1)
     property color backgroundInset: root._tone(root._baseL * 0.58)
 
     // Bar widgets' ACTIVE (open-state) fill = the neutral container tone,

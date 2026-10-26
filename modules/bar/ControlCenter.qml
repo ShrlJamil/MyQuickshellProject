@@ -418,7 +418,7 @@ PanelWindow {
                     // inner wifiActiveCircle reflects the on/off state.
                     radius: height / 2
                     color: {
-                        const c = wifiHover.hovered ? Theme.background : Theme.backgroundSunken
+                        const c = wifiHover.hovered ? Theme.surface : Theme.backgroundSunken
                         return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
                     }
 
@@ -587,7 +587,7 @@ PanelWindow {
                     height: 68
                     radius: height / 2
                     color: {
-                        const c = btHover.hovered ? Theme.background : Theme.backgroundSunken
+                        const c = btHover.hovered ? Theme.surface : Theme.backgroundSunken
                         return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
                     }
 
@@ -916,7 +916,7 @@ PanelWindow {
             // Full pill.
             radius: height / 2
             color: {
-                const c = displayHover.hovered ? Theme.background : Theme.backgroundSunken
+                const c = displayHover.hovered ? Theme.surface : Theme.backgroundSunken
                 return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
             }
 
@@ -997,7 +997,7 @@ PanelWindow {
             // Full pill.
             radius: height / 2
             color: {
-                const c = soundHover.hovered ? Theme.background : Theme.backgroundSunken
+                const c = soundHover.hovered ? Theme.surface : Theme.backgroundSunken
                 return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
             }
 
