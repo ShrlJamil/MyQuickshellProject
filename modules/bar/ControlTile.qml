@@ -26,7 +26,7 @@ Item {
 
     readonly property real iconSlotSize: root.round ? Math.max(26, Math.round(Math.min(root.width, root.height) * 0.4)) : 34
     readonly property real iconSize: root.round ? Math.max(22, Math.round(Math.min(root.width, root.height) * 0.34)) : 30
-    readonly property int labelPixelSize: root.round ? Math.max(9, Math.min(12, Math.round(Math.min(root.width, root.height) * 0.12))) : 12
+    readonly property int labelPixelSize: root.round ? 13 : 12
 
     Rectangle {
         id: tile
@@ -81,7 +81,11 @@ Item {
         }
 
         Item {
-            anchors.centerIn: parent
+            id: iconSlot
+
+            anchors.left: parent.left
+            anchors.leftMargin: 14
+            anchors.verticalCenter: parent.verticalCenter
 
             width: root.iconSlotSize
             height: root.iconSlotSize
@@ -123,6 +127,26 @@ Item {
                 visible: root._localIcon && svgIcon.status === Image.Ready
                 color: Theme.icon
             }
+        }
+
+        // Label right of the icon: horizontal tile layout. (The `label`
+        // property was carried unused through the icon-only pill phase;
+        // it renders here now.)
+        Text {
+            anchors.left: iconSlot.right
+            anchors.leftMargin: 10
+            anchors.right: parent.right
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+
+            text: root.label
+            color: Theme.text
+            font.family: Theme.fontFamily
+            font.pixelSize: root.labelPixelSize
+            font.weight: Font.Medium
+            elide: Text.ElideRight
+            maximumLineCount: 1
+            visible: root.label !== ""
         }
     }
 }

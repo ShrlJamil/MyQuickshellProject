@@ -87,10 +87,10 @@ PanelWindow {
     readonly property real rowGap: 12
     readonly property real panelPadding: 14
     readonly property real heroHeight: 68
-    readonly property real gridTileSize: 105
-    readonly property real gridTileHeight: 64
+    readonly property real gridTileSize: 215
+    readonly property real gridTileHeight: 56
     readonly property real sliderHeight: 68
-    readonly property real tilesHeight: root.heroHeight + 5 + root.gridTileHeight * 2 + 5
+    readonly property real tilesHeight: root.heroHeight + 5 + root.gridTileHeight * 4 + 15
     readonly property real contentHeight: root.tilesHeight + root.rowGap + root.sliderHeight + root.rowGap + root.sliderHeight + root.panelPadding * 2
 
     implicitWidth: root.colWidth * 2 + root.colGap
@@ -729,7 +729,7 @@ PanelWindow {
             Grid {
                 anchors.horizontalCenter: parent.horizontalCenter
 
-                columns: 4
+                columns: 2
                 spacing: 5
 
                 ControlTile {
