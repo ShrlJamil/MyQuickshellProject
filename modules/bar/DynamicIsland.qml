@@ -186,6 +186,10 @@ PanelWindow {
     // events). The pill grows to a fixed, content-independent size, so track
     // changes never oscillate it.
     property bool expanded: false
+
+    // Latched by the expanded-content Loader: the expanded player tree
+    // is created on first expand and kept for the rest of the session.
+    property bool _expandedLatched: false
     // Auto-hide state: the surface is always mapped (so the trigger can take
     // pointer input) but the pill is invisible until the pointer reaches the
     // top-centre trigger. `expanded` always keeps it shown.
@@ -527,354 +531,382 @@ PanelWindow {
         // (content re-flows horizontally) while the top-down clip reveals it as
         // the pill grows downward. Nothing here can collapse the pill; only the
         // chevron, Escape, and click-outside do.
-        Item {
-            id: expandedContent
+        // Lazy expanded stage (Loader latch, the Launcher pattern): the
+        // expanded player tree - artwork, controls, seekbar - does not
+        // exist until the island is first expanded, so a permanently
+        // collapsed island costs none of those objects. The Loader carries
+        // the placement expandedContent had; the Component below holds
+        // its original tree verbatim.
+        Loader {
+            id: expandedLoader
 
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
             height: root.expandedH
             visible: root.expanded
+            active: root.expanded || root._expandedLatched
+            sourceComponent: expandedComponent
 
-            // Album artwork (larger), with the same ♪ fallback.
-            Rectangle {
-                id: coverX
-                x: 24
-                y: 18
-                width: 88
-                height: 88
-                radius: width / 2
-                clip: true
-                color: Theme.surface
+            onLoaded: root._expandedLatched = true
+        }
 
-                Image {
-                    id: artX
-                    anchors.fill: parent
-                    source: root.hasMedia ? root.mediaService.artwork : ""
-                    sourceSize.width: 176
-                    sourceSize.height: 176
-                    fillMode: Image.PreserveAspectCrop
-                    asynchronous: true
-                    cache: true
-                    visible: artX.status === Image.Ready
-                    layer.enabled: artX.status === Image.Ready
-                    layer.smooth: true
-                    layer.effect: OpacityMask {
-                        maskSource: Rectangle {
-                            width: coverX.width
-                            height: coverX.height
-                            radius: coverX.radius
+        Component {
+            id: expandedComponent
+
+            Item {
+                anchors.fill: parent
+
+                Item {
+                    id: expandedContent
+
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    height: root.expandedH
+                    visible: root.expanded
+
+                    // Album artwork (larger), with the same ♪ fallback.
+                    Rectangle {
+                        id: coverX
+                        x: 24
+                        y: 18
+                        width: 88
+                        height: 88
+                        radius: width / 2
+                        clip: true
+                        color: Theme.surface
+
+                        Image {
+                            id: artX
+                            anchors.fill: parent
+                            source: root.hasMedia ? root.mediaService.artwork : ""
+                            sourceSize.width: 176
+                            sourceSize.height: 176
+                            fillMode: Image.PreserveAspectCrop
+                            asynchronous: true
+                            cache: true
+                            visible: artX.status === Image.Ready
+                            layer.enabled: artX.status === Image.Ready
+                            layer.smooth: true
+                            layer.effect: OpacityMask {
+                                maskSource: Rectangle {
+                                    width: coverX.width
+                                    height: coverX.height
+                                    radius: coverX.radius
+                                }
+                            }
+                        }
+
+                        Text {
+                            anchors.centerIn: parent
+                            visible: artX.status !== Image.Ready
+                            text: "♪"
+                            color: Theme.textMuted
+                            font.pixelSize: 26
                         }
                     }
-                }
 
-                Text {
-                    anchors.centerIn: parent
-                    visible: artX.status !== Image.Ready
-                    text: "♪"
-                    color: Theme.textMuted
-                    font.pixelSize: 26
-                }
-            }
+                    // Explicit collapse affordance, top-right, clear of the metadata.
+                    Item {
+                        id: collapseBtn
+                        width: 28
+                        height: 28
+                        anchors.right: parent.right
+                        anchors.rightMargin: 16
+                        y: 18
 
-            // Explicit collapse affordance, top-right, clear of the metadata.
-            Item {
-                id: collapseBtn
-                width: 28
-                height: 28
-                anchors.right: parent.right
-                anchors.rightMargin: 16
-                y: 18
-
-                HoverHandler { id: collapseHover; cursorShape: Qt.PointingHandCursor }
-                TapHandler { onTapped: root.expanded = false }
-
-                Rectangle {
-                    anchors.fill: parent
-                    radius: width / 2
-                    color: collapseHover.hovered ? Theme.surfaceHover : "transparent"
-                }
-                Text {
-                    anchors.centerIn: parent
-                    text: "▴"
-                    color: collapseHover.hovered ? Theme.text : Theme.textDim
-                    font.pixelSize: 16
-                }
-            }
-
-            Column {
-                id: infoCol
-
-                anchors.left: coverX.right
-                anchors.leftMargin: 22
-                anchors.right: collapseBtn.left
-                anchors.rightMargin: 14
-                y: 20
-                spacing: 5
-
-                Text {
-                    width: parent.width
-                    text: root.hasMedia ? root.mediaService.title : ""
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 15
-                    font.weight: Font.DemiBold
-                    elide: Text.ElideRight
-                    maximumLineCount: 1
-                }
-
-                Text {
-                    width: parent.width
-                    text: root.hasMedia ? root.mediaService.artist : ""
-                    color: Theme.textDim
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 12
-                    elide: Text.ElideRight
-                    maximumLineCount: 1
-                }
-
-                // Transport (left) + compact player selector chips (right).
-                Item {
-                    id: controlsRow
-                    width: parent.width
-                    height: 36
-
-                    component CtlBtn: Item {
-                        id: ctl
-                        property string glyph: ""
-                        property bool enabled: true
-                        property real glyphSize: 16
-                        signal triggered()
-
-                        width: 36
-                        height: 36
-
-                        HoverHandler {
-                            id: ctlHover
-                            enabled: ctl.enabled
-                            cursorShape: Qt.PointingHandCursor
-                        }
-                        TapHandler {
-                            enabled: ctl.enabled
-                            onTapped: ctl.triggered()
-                        }
+                        HoverHandler { id: collapseHover; cursorShape: Qt.PointingHandCursor }
+                        TapHandler { onTapped: root.expanded = false }
 
                         Rectangle {
                             anchors.fill: parent
                             radius: width / 2
-                            color: ctlHover.hovered ? Theme.surfaceHover : "transparent"
+                            color: collapseHover.hovered ? Theme.surfaceHover : "transparent"
                         }
                         Text {
                             anchors.centerIn: parent
-                            text: ctl.glyph
+                            text: "▴"
+                            color: collapseHover.hovered ? Theme.text : Theme.textDim
+                            font.pixelSize: 16
+                        }
+                    }
+
+                    Column {
+                        id: infoCol
+
+                        anchors.left: coverX.right
+                        anchors.leftMargin: 22
+                        anchors.right: collapseBtn.left
+                        anchors.rightMargin: 14
+                        y: 20
+                        spacing: 5
+
+                        Text {
+                            width: parent.width
+                            text: root.hasMedia ? root.mediaService.title : ""
                             color: Theme.text
-                            font.pixelSize: ctl.glyphSize
-                            opacity: ctl.enabled ? (ctlHover.hovered ? 1 : 0.85) : 0.3
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 15
+                            font.weight: Font.DemiBold
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
                         }
-                    }
 
-                    Row {
-                        id: ctlRow
-                        anchors.left: parent.left
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: 4
-
-                        CtlBtn {
-                            glyph: "⏮"
-                            enabled: root.hasMedia && root.mediaService.canPrevious
-                            onTriggered: root.mediaService.previous()
+                        Text {
+                            width: parent.width
+                            text: root.hasMedia ? root.mediaService.artist : ""
+                            color: Theme.textDim
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 12
+                            elide: Text.ElideRight
+                            maximumLineCount: 1
                         }
-                        CtlBtn {
-                            glyph: root.playing ? "⏸" : "▶"
-                            glyphSize: 18
-                            enabled: root.hasMedia && root.mediaService.canToggle
-                            onTriggered: root.mediaService.playPause()
-                        }
-                        CtlBtn {
-                            glyph: "⏭"
-                            enabled: root.hasMedia && root.mediaService.canNext
-                            onTriggered: root.mediaService.next()
-                        }
-                    }
 
-                    // Inline selector (only with >1 live player): one chip per
-                    // player, the active one accent-outlined. Lives entirely
-                    // inside the panel, so it needs no dropdown, no second
-                    // surface, and no input-region change.
-                    Row {
-                        id: playerChips
-                        anchors.left: ctlRow.right
-                        anchors.leftMargin: 10
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: 6
-                        clip: true
-                        visible: root.mediaService && root.mediaService.players
-                            && root.mediaService.players.length > 1
+                        // Transport (left) + compact player selector chips (right).
+                        Item {
+                            id: controlsRow
+                            width: parent.width
+                            height: 36
 
-                        Repeater {
-                            model: playerChips.visible ? root.mediaService.players : []
+                            component CtlBtn: Item {
+                                id: ctl
+                                property string glyph: ""
+                                property bool enabled: true
+                                property real glyphSize: 16
+                                signal triggered()
 
-                            delegate: Rectangle {
-                                id: chip
-                                required property var modelData
-                                readonly property bool current: root.mediaService
-                                    && chip.modelData.dbusName === root.mediaService.activeBus
+                                width: 36
+                                height: 36
 
-                                width: Math.min(chipLabel.implicitWidth + 18, 110)
-                                height: 22
-                                radius: 11
-                                color: chipHover.hovered ? Theme.surfaceHover
-                                    : (chip.current
-                                        ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.18)
-                                        : Theme.surface)
-                                border.width: 1
-                                border.color: chip.current ? Theme.accent : "transparent"
-
-                                Text {
-                                    id: chipLabel
-                                    anchors.centerIn: parent
-                                    width: parent.width - 16
-                                    text: chip.modelData.identity + (chip.modelData.isRemote ? " · r" : "")
-                                    color: chip.current ? Theme.accent : Theme.text
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 10
-                                    elide: Text.ElideRight
-                                    horizontalAlignment: Text.AlignHCenter
+                                HoverHandler {
+                                    id: ctlHover
+                                    enabled: ctl.enabled
+                                    cursorShape: Qt.PointingHandCursor
                                 }
-
-                                HoverHandler { id: chipHover; cursorShape: Qt.PointingHandCursor }
                                 TapHandler {
-                                    onTapped: if (root.mediaService)
-                                        root.mediaService.selectPlayer(chip.modelData.dbusName)
+                                    enabled: ctl.enabled
+                                    onTapped: ctl.triggered()
+                                }
+
+                                Rectangle {
+                                    anchors.fill: parent
+                                    radius: width / 2
+                                    color: ctlHover.hovered ? Theme.surfaceHover : "transparent"
+                                }
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: ctl.glyph
+                                    color: Theme.text
+                                    font.pixelSize: ctl.glyphSize
+                                    opacity: ctl.enabled ? (ctlHover.hovered ? 1 : 0.85) : 0.3
+                                }
+                            }
+
+                            Row {
+                                id: ctlRow
+                                anchors.left: parent.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 4
+
+                                CtlBtn {
+                                    glyph: "⏮"
+                                    enabled: root.hasMedia && root.mediaService.canPrevious
+                                    onTriggered: root.mediaService.previous()
+                                }
+                                CtlBtn {
+                                    glyph: root.playing ? "⏸" : "▶"
+                                    glyphSize: 18
+                                    enabled: root.hasMedia && root.mediaService.canToggle
+                                    onTriggered: root.mediaService.playPause()
+                                }
+                                CtlBtn {
+                                    glyph: "⏭"
+                                    enabled: root.hasMedia && root.mediaService.canNext
+                                    onTriggered: root.mediaService.next()
+                                }
+                            }
+
+                            // Inline selector (only with >1 live player): one chip per
+                            // player, the active one accent-outlined. Lives entirely
+                            // inside the panel, so it needs no dropdown, no second
+                            // surface, and no input-region change.
+                            Row {
+                                id: playerChips
+                                anchors.left: ctlRow.right
+                                anchors.leftMargin: 10
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                spacing: 6
+                                clip: true
+                                visible: root.mediaService && root.mediaService.players
+                                    && root.mediaService.players.length > 1
+
+                                Repeater {
+                                    model: playerChips.visible ? root.mediaService.players : []
+
+                                    delegate: Rectangle {
+                                        id: chip
+                                        required property var modelData
+                                        readonly property bool current: root.mediaService
+                                            && chip.modelData.dbusName === root.mediaService.activeBus
+
+                                        width: Math.min(chipLabel.implicitWidth + 18, 110)
+                                        height: 22
+                                        radius: 11
+                                        color: chipHover.hovered ? Theme.surfaceHover
+                                            : (chip.current
+                                                ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.18)
+                                                : Theme.surface)
+                                        border.width: 1
+                                        border.color: chip.current ? Theme.accent : "transparent"
+
+                                        Text {
+                                            id: chipLabel
+                                            anchors.centerIn: parent
+                                            width: parent.width - 16
+                                            text: chip.modelData.identity + (chip.modelData.isRemote ? " · r" : "")
+                                            color: chip.current ? Theme.accent : Theme.text
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 10
+                                            elide: Text.ElideRight
+                                            horizontalAlignment: Text.AlignHCenter
+                                        }
+
+                                        HoverHandler { id: chipHover; cursorShape: Qt.PointingHandCursor }
+                                        TapHandler {
+                                            onTapped: if (root.mediaService)
+                                                root.mediaService.selectPlayer(chip.modelData.dbusName)
+                                        }
+                                    }
                                 }
                             }
                         }
-                    }
-                }
 
-                // Seek / progress line with current + total time. Same
-                // MediaService calls and 950ms catch-up tween as MediaPlayer.
-                Item {
-                    id: seekRow
-                    width: parent.width
-                    height: 16
+                        // Seek / progress line with current + total time. Same
+                        // MediaService calls and 950ms catch-up tween as MediaPlayer.
+                        Item {
+                            id: seekRow
+                            width: parent.width
+                            height: 16
 
-                    readonly property bool ready: root.hasMedia
-                        && root.mediaService.positionSupported
-                        && root.mediaService.effectiveLength > 0
-                    readonly property bool seekable: seekRow.ready
-                        && root.mediaService.canSeek
-                    readonly property real frac: {
-                        if (!seekRow.ready)
-                            return 0
-                        const f = root.mediaService.progressFraction
-                        return isFinite(f) ? Math.max(0, Math.min(1, f)) : 0
-                    }
-
-                    // While scrubbing the fill follows the pointer directly,
-                    // bypassing the catch-up tween (zero visual lag).
-                    property bool scrubbing: false
-                    property real scrubFrac: 0
-                    readonly property real shownFrac: {
-                        const f = seekRow.scrubbing ? seekRow.scrubFrac : seekRow.frac
-                        return isFinite(f) ? Math.max(0, Math.min(1, f)) : 0
-                    }
-
-                    opacity: root.hasMedia ? (seekRow.ready ? 1 : 0.5) : 0
-
-                    Text {
-                        id: posLabel
-                        anchors.left: parent.left
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: root._fmt(root.hasMedia ? root.mediaService.safePosition : 0)
-                        color: Theme.textDim
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 10
-                    }
-                    Text {
-                        id: lenLabel
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: seekRow.ready ? root._fmt(root.mediaService.effectiveLength) : "--:--"
-                        color: Theme.textDim
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 10
-                    }
-
-                    Rectangle {
-                        id: track
-                        anchors.left: posLabel.right
-                        anchors.right: lenLabel.left
-                        anchors.leftMargin: 8
-                        anchors.rightMargin: 8
-                        anchors.verticalCenter: parent.verticalCenter
-                        height: 4
-                        radius: 2
-                        color: Theme.surface
-
-                        Rectangle {
-                            id: fill
-                            height: parent.height
-                            radius: 2
-                            color: Theme.accent
-                            visible: seekRow.ready
-                            width: parent.width * seekRow.shownFrac
-                            Behavior on width {
-                                enabled: !seekRow.scrubbing
-                                NumberAnimation { duration: 950; easing.type: Easing.Linear }
-                            }
-                        }
-
-                        Rectangle {
-                            id: thumb
-                            visible: seekRow.ready
-                            width: seekRow.scrubbing ? 8 : 6
-                            height: 14
-                            radius: 4
-                            color: Theme.icon
-                            anchors.verticalCenter: parent.verticalCenter
-                            x: Math.max(0, Math.min(parent.width - width, fill.width - width / 2))
-                            Behavior on x {
-                                enabled: !seekRow.scrubbing
-                                NumberAnimation { duration: 950; easing.type: Easing.Linear }
-                            }
-                            Behavior on width { NumberAnimation { duration: 90 } }
-                        }
-
-                        MouseArea {
-                            id: seekArea
-                            anchors.fill: parent
-                            anchors.topMargin: -8
-                            anchors.bottomMargin: -8
-                            enabled: seekRow.seekable
-                            preventStealing: true
-                            cursorShape: Qt.PointingHandCursor
-                            hoverEnabled: true
-
-                            function _apply(mx) {
-                                const w = seekArea.width
-                                if (!(w > 0))
-                                    return
-                                const f = Math.max(0, Math.min(1, mx / w))
-                                seekRow.scrubFrac = f
-                                root.mediaService.setPosition(f * root.mediaService.effectiveLength)
+                            readonly property bool ready: root.hasMedia
+                                && root.mediaService.positionSupported
+                                && root.mediaService.effectiveLength > 0
+                            readonly property bool seekable: seekRow.ready
+                                && root.mediaService.canSeek
+                            readonly property real frac: {
+                                if (!seekRow.ready)
+                                    return 0
+                                const f = root.mediaService.progressFraction
+                                return isFinite(f) ? Math.max(0, Math.min(1, f)) : 0
                             }
 
-                            onPressed: (mouse) => {
-                                seekRow.scrubbing = true
-                                seekArea._apply(mouse.x)
+                            // While scrubbing the fill follows the pointer directly,
+                            // bypassing the catch-up tween (zero visual lag).
+                            property bool scrubbing: false
+                            property real scrubFrac: 0
+                            readonly property real shownFrac: {
+                                const f = seekRow.scrubbing ? seekRow.scrubFrac : seekRow.frac
+                                return isFinite(f) ? Math.max(0, Math.min(1, f)) : 0
                             }
-                            onPositionChanged: (mouse) => {
-                                if (pressed)
-                                    seekArea._apply(mouse.x)
+
+                            opacity: root.hasMedia ? (seekRow.ready ? 1 : 0.5) : 0
+
+                            Text {
+                                id: posLabel
+                                anchors.left: parent.left
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: root._fmt(root.hasMedia ? root.mediaService.safePosition : 0)
+                                color: Theme.textDim
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 10
                             }
-                            onReleased: (mouse) => {
-                                if (seekRow.seekable && seekArea.width > 0) {
-                                    const f = Math.max(0, Math.min(1, mouse.x / seekArea.width))
-                                    root.mediaService.setPosition(f * root.mediaService.effectiveLength)
+                            Text {
+                                id: lenLabel
+                                anchors.right: parent.right
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: seekRow.ready ? root._fmt(root.mediaService.effectiveLength) : "--:--"
+                                color: Theme.textDim
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 10
+                            }
+
+                            Rectangle {
+                                id: track
+                                anchors.left: posLabel.right
+                                anchors.right: lenLabel.left
+                                anchors.leftMargin: 8
+                                anchors.rightMargin: 8
+                                anchors.verticalCenter: parent.verticalCenter
+                                height: 4
+                                radius: 2
+                                color: Theme.surface
+
+                                Rectangle {
+                                    id: fill
+                                    height: parent.height
+                                    radius: 2
+                                    color: Theme.accent
+                                    visible: seekRow.ready
+                                    width: parent.width * seekRow.shownFrac
+                                    Behavior on width {
+                                        enabled: !seekRow.scrubbing
+                                        NumberAnimation { duration: 950; easing.type: Easing.Linear }
+                                    }
                                 }
-                                seekRow.scrubbing = false
+
+                                Rectangle {
+                                    id: thumb
+                                    visible: seekRow.ready
+                                    width: seekRow.scrubbing ? 8 : 6
+                                    height: 14
+                                    radius: 4
+                                    color: Theme.icon
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    x: Math.max(0, Math.min(parent.width - width, fill.width - width / 2))
+                                    Behavior on x {
+                                        enabled: !seekRow.scrubbing
+                                        NumberAnimation { duration: 950; easing.type: Easing.Linear }
+                                    }
+                                    Behavior on width { NumberAnimation { duration: 90 } }
+                                }
+
+                                MouseArea {
+                                    id: seekArea
+                                    anchors.fill: parent
+                                    anchors.topMargin: -8
+                                    anchors.bottomMargin: -8
+                                    enabled: seekRow.seekable
+                                    preventStealing: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    hoverEnabled: true
+
+                                    function _apply(mx) {
+                                        const w = seekArea.width
+                                        if (!(w > 0))
+                                            return
+                                        const f = Math.max(0, Math.min(1, mx / w))
+                                        seekRow.scrubFrac = f
+                                        root.mediaService.setPosition(f * root.mediaService.effectiveLength)
+                                    }
+
+                                    onPressed: (mouse) => {
+                                        seekRow.scrubbing = true
+                                        seekArea._apply(mouse.x)
+                                    }
+                                    onPositionChanged: (mouse) => {
+                                        if (pressed)
+                                            seekArea._apply(mouse.x)
+                                    }
+                                    onReleased: (mouse) => {
+                                        if (seekRow.seekable && seekArea.width > 0) {
+                                            const f = Math.max(0, Math.min(1, mouse.x / seekArea.width))
+                                            root.mediaService.setPosition(f * root.mediaService.effectiveLength)
+                                        }
+                                        seekRow.scrubbing = false
+                                    }
+                                }
                             }
                         }
                     }

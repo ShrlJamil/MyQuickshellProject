@@ -1180,6 +1180,10 @@ PanelWindow {
         enabled: root.wifiPanelOpen
         visible: wifiPanel.opacity > 0
 
+        // Latched by the content Loader below: the panel content tree
+        // is created on first open and kept for the rest of the session.
+        property bool _contentLatched: false
+
         // Shared glass highlight (see ControlTile): full-bleed rect using
         // the panel's live radius (it morphs on open/close); falloff shaped
         // by stops. Below panel content; buttons/rows keep their own states.
@@ -1254,12 +1258,9 @@ PanelWindow {
         onAddOpenChanged: {
             if (wifiPanel.addOpen) {
                 wifiService.clearError()
-                ssidInput.forceActiveFocus()
+                if (wifiContentLoader.item) wifiContentLoader.item.focusAddSsid()
             } else {
-                ssidInput.text = ""
-                usernameInput.text = ""
-                hiddenPasswordInput.text = ""
-                securityCombo.currentIndex = 0
+                if (wifiContentLoader.item) wifiContentLoader.item.resetAddForm()
                 wifiPanel.addSecured = true
                 wifiPanel.addSecurityType = "personal"
                 wifiService.clearError()
@@ -1275,320 +1276,88 @@ PanelWindow {
             onTriggered: wifiService.requestScan()
         }
 
-        Item {
-            id: wifiPanelContent
+        // Lazy content stage (Loader latch, the Launcher pattern): the
+        // whole content tree under this panel - lists, menus, dialogs -
+        // does not exist until the panel is first opened, so a panel the
+        // user never opens costs no objects at shell startup.
+        Loader {
+            id: wifiContentLoader
 
-            anchors {
-                top: parent.top
-                left: parent.left
-                right: parent.right
-                bottom: parent.bottom
-            }
+            anchors.fill: parent
+            active: root.wifiPanelOpen || wifiPanel._contentLatched
+            sourceComponent: wifiContentComponent
 
-            anchors.margins: 14
+            onLoaded: wifiPanel._contentLatched = true
+        }
 
-            opacity: root.wifiPanelOpen ? 1 : 0
-            visible: wifiPanelContent.opacity > 0
-
-            Behavior on opacity {
-                NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
-            }
+        Component {
+            id: wifiContentComponent
 
             Item {
-                id: wifiHeader
+                anchors.fill: parent
 
-                anchors {
-                    top: parent.top
-                    left: parent.left
-                    right: parent.right
+                function focusAddSsid() {
+                    ssidInput.forceActiveFocus()
                 }
 
-                height: 32
-
-                MouseArea {
-                    id: backButton
-
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    width: 32
-                    height: 32
-                    cursorShape: Qt.PointingHandCursor
-
-                    onClicked: root.wifiPanelOpen = false
-
-                    Rectangle {
-                        anchors.fill: parent
-
-                        radius: 16
-                        color: backHover.hovered ? Theme.panelSurface : "transparent"
-                    }
-
-                    HoverHandler {
-                        id: backHover
-                    }
-
-                    IconImage {
-                        anchors.centerIn: parent
-
-                        width: 18
-                        height: 18
-
-                        source: Quickshell.iconPath("go-previous-symbolic", "go-previous")
-                        asynchronous: true
-                    }
+                function resetAddForm() {
+                    ssidInput.text = ""
+                    usernameInput.text = ""
+                    hiddenPasswordInput.text = ""
+                    securityCombo.currentIndex = 0
                 }
 
-                Text {
-                    anchors.left: backButton.right
-                    anchors.leftMargin: 10
-                    anchors.verticalCenter: parent.verticalCenter
+                Item {
+                    id: wifiPanelContent
 
-                    text: "Wi-Fi"
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 16
-                    font.weight: Font.DemiBold
-                }
-
-                MouseArea {
-                    id: rescanButton
-
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    width: 32
-                    height: 32
-                    enabled: wifiService.enabled && !wifiService.scanning
-                    cursorShape: Qt.PointingHandCursor
-
-                    onClicked: wifiService.requestScan()
-
-                    Rectangle {
-                        anchors.fill: parent
-
-                        radius: 16
-                        color: rescanHover.hovered ? Theme.panelSurface : "transparent"
+                    anchors {
+                        top: parent.top
+                        left: parent.left
+                        right: parent.right
+                        bottom: parent.bottom
                     }
 
-                    HoverHandler {
-                        id: rescanHover
+                    anchors.margins: 14
+
+                    opacity: root.wifiPanelOpen ? 1 : 0
+                    visible: wifiPanelContent.opacity > 0
+
+                    Behavior on opacity {
+                        NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
                     }
 
-                    IconImage {
-                        id: rescanIcon
+                    Item {
+                        id: wifiHeader
 
-                        anchors.centerIn: parent
-
-                        width: 18
-                        height: 18
-                        opacity: wifiService.scanning ? 0.4 : 1
-
-                        source: Quickshell.iconPath("view-refresh-symbolic", "view-refresh")
-                        asynchronous: true
-
-                        RotationAnimation {
-                            id: rescanSpin
-
-                            target: rescanIcon
-                            running: wifiService.scanning
-                            from: 0
-                            to: 360
-                            duration: 900
-                            loops: Animation.Infinite
-
-                            onRunningChanged: if (!rescanSpin.running) rescanIcon.rotation = 0
-                        }
-                    }
-                }
-            }
-
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.top: wifiHeader.bottom
-                anchors.topMargin: 12
-
-                text: {
-                    if (!wifiService.enabled) return "Wi-Fi is Off"
-                    if (wifiService.scanning) return "Scanning for networks…"
-                    return "No networks found"
-                }
-                color: Theme.textMuted
-                font.family: Theme.fontFamily
-                font.pixelSize: 12
-                visible: wifiService.viewNetworks.length === 0
-            }
-
-            ListView {
-                id: wifiList
-
-                anchors {
-                    top: wifiHeader.bottom
-                    left: parent.left
-                    right: parent.right
-                    bottom: addRow.top
-                }
-
-                anchors.topMargin: 8
-                anchors.bottomMargin: 8
-
-                clip: true
-                spacing: 4
-                visible: wifiService.viewNetworks.length > 0
-                model: wifiService.viewNetworks
-
-                delegate: Item {
-                    id: row
-
-                    required property var modelData
-
-                    readonly property var net: row.modelData
-                    readonly property string ssid: row.net ? row.net.name : ""
-                    readonly property bool netConnected: row.net ? row.net.connected : false
-                    readonly property bool promptOpen: row.ssid !== "" && wifiPanel.promptSsid === row.ssid
-                    readonly property bool menuOpen: row.ssid !== "" && wifiPanel.menuSsid === row.ssid
-                    readonly property bool showPrompt: row.promptOpen && !row.netConnected
-
-                    width: wifiList.width
-                    height: rowCard.height + (row.showPrompt ? promptBox.height + 6 : 0)
-
-                    onNetConnectedChanged: {
-                        if (row.netConnected && wifiPanel.promptSsid === row.ssid)
-                            wifiPanel.promptSsid = ""
-                        if (!row.netConnected && wifiPanel.menuSsid === row.ssid)
-                            wifiPanel.menuSsid = ""
-                    }
-
-                    onPromptOpenChanged: {
-                        if (row.promptOpen) {
-                            passwordField.text = ""
-                            passwordField.forceActiveFocus()
-                        }
-                    }
-
-                    Rectangle {
-                        id: rowCard
-
-                        width: parent.width
-                        height: 52
-                        radius: 14
-                        color: rowHover.hovered ? Theme.panelSurface : "transparent"
-
-                        HoverHandler {
-                            id: rowHover
-
-                            cursorShape: Qt.PointingHandCursor
+                        anchors {
+                            top: parent.top
+                            left: parent.left
+                            right: parent.right
                         }
 
-                        Row {
-                            anchors.fill: parent
-
-                            anchors.leftMargin: 12
-                            anchors.rightMargin: row.netConnected ? 44 : 12
-
-                            spacing: 10
-
-                            IconImage {
-                                anchors.verticalCenter: parent.verticalCenter
-
-                                width: 28
-                                height: 28
-
-                                source: {
-                                    switch (row.net ? row.net.level : -1) {
-                                    case 4: return Quickshell.iconPath("network-wireless-signal-excellent-symbolic", "network-wireless-signal-excellent")
-                                    case 3: return Quickshell.iconPath("network-wireless-signal-good-symbolic", "network-wireless-signal-good")
-                                    case 2: return Quickshell.iconPath("network-wireless-signal-ok-symbolic", "network-wireless-signal-ok")
-                                    case 1: return Quickshell.iconPath("network-wireless-signal-weak-symbolic", "network-wireless-signal-weak")
-                                    default: return Quickshell.iconPath("network-wireless-signal-none-symbolic", "network-wireless-signal-none")
-                                    }
-                                }
-
-                                asynchronous: true
-                            }
-
-                            Column {
-                                anchors.verticalCenter: parent.verticalCenter
-
-                                width: parent.width - 28 - 10
-
-                                spacing: 2
-
-                                Text {
-                                    width: parent.width
-                                    elide: Text.ElideRight
-
-                                    text: row.net ? row.net.name : ""
-                                    color: Theme.text
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 13
-                                    font.weight: row.net && row.net.connected ? Font.DemiBold : Font.Normal
-                                }
-
-                                Text {
-                                    width: parent.width
-                                    elide: Text.ElideRight
-
-                                    text: root.wifiStatusText(row.net)
-                                    color: Theme.textMuted
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 11
-                                }
-                            }
-
-                        }
+                        height: 32
 
                         MouseArea {
-                            anchors.fill: parent
+                            id: backButton
 
-                            acceptedButtons: Qt.LeftButton | Qt.RightButton
-                            cursorShape: Qt.PointingHandCursor
-
-                            onClicked: (mouse) => {
-                                if (row.net === null || row.net === undefined) return
-                                if (mouse.button === Qt.RightButton) {
-                                    if (row.net.known) wifiService.forgetNetwork(row.net.name)
-                                    return
-                                }
-                                if (row.netConnected) {
-                                    wifiPanel.promptSsid = ""
-                                    wifiPanel.menuSsid = row.menuOpen ? "" : row.ssid
-                                    return
-                                }
-                                if (row.net.secured && !row.net.known) {
-                                    wifiService.clearError()
-                                    wifiPanel.menuSsid = ""
-                                    wifiPanel.promptSsid = row.net.name
-                                } else {
-                                    wifiPanel.promptSsid = ""
-                                    wifiPanel.menuSsid = ""
-                                    wifiService.connectNetwork(row.net.name)
-                                }
-                            }
-                        }
-
-                        Item {
-                            id: moreButton
-
-                            anchors.right: parent.right
-                            anchors.rightMargin: 8
+                            anchors.left: parent.left
                             anchors.verticalCenter: parent.verticalCenter
 
-                            width: 28
-                            height: 28
-                            visible: row.netConnected
+                            width: 32
+                            height: 32
+                            cursorShape: Qt.PointingHandCursor
+
+                            onClicked: root.wifiPanelOpen = false
 
                             Rectangle {
                                 anchors.fill: parent
 
-                                radius: 14
-                                color: moreHover.hovered ? Theme.panelSurface : "transparent"
+                                radius: 16
+                                color: backHover.hovered ? Theme.panelSurface : "transparent"
                             }
 
                             HoverHandler {
-                                id: moreHover
-
-                                cursorShape: Qt.PointingHandCursor
+                                id: backHover
                             }
 
                             IconImage {
@@ -1597,128 +1366,271 @@ PanelWindow {
                                 width: 18
                                 height: 18
 
-                                source: Quickshell.iconPath("view-more-symbolic", "open-menu-symbolic")
+                                source: Quickshell.iconPath("go-previous-symbolic", "go-previous")
                                 asynchronous: true
                             }
+                        }
 
-                            MouseArea {
+                        Text {
+                            anchors.left: backButton.right
+                            anchors.leftMargin: 10
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            text: "Wi-Fi"
+                            color: Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 16
+                            font.weight: Font.DemiBold
+                        }
+
+                        MouseArea {
+                            id: rescanButton
+
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            width: 32
+                            height: 32
+                            enabled: wifiService.enabled && !wifiService.scanning
+                            cursorShape: Qt.PointingHandCursor
+
+                            onClicked: wifiService.requestScan()
+
+                            Rectangle {
                                 anchors.fill: parent
 
-                                cursorShape: Qt.PointingHandCursor
+                                radius: 16
+                                color: rescanHover.hovered ? Theme.panelSurface : "transparent"
+                            }
 
-                                onClicked: {
-                                    wifiPanel.promptSsid = ""
-                                    wifiPanel.menuSsid = row.menuOpen ? "" : row.ssid
+                            HoverHandler {
+                                id: rescanHover
+                            }
+
+                            IconImage {
+                                id: rescanIcon
+
+                                anchors.centerIn: parent
+
+                                width: 18
+                                height: 18
+                                opacity: wifiService.scanning ? 0.4 : 1
+
+                                source: Quickshell.iconPath("view-refresh-symbolic", "view-refresh")
+                                asynchronous: true
+
+                                RotationAnimation {
+                                    id: rescanSpin
+
+                                    target: rescanIcon
+                                    running: wifiService.scanning
+                                    from: 0
+                                    to: 360
+                                    duration: 900
+                                    loops: Animation.Infinite
+
+                                    onRunningChanged: if (!rescanSpin.running) rescanIcon.rotation = 0
                                 }
                             }
                         }
                     }
 
-                    Item {
-                        id: promptBox
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.top: wifiHeader.bottom
+                        anchors.topMargin: 12
 
-                        anchors.top: rowCard.bottom
-                        anchors.topMargin: 6
-                        anchors.left: parent.left
-                        anchors.right: parent.right
-                        anchors.leftMargin: 12
-                        anchors.rightMargin: 12
+                        text: {
+                            if (!wifiService.enabled) return "Wi-Fi is Off"
+                            if (wifiService.scanning) return "Scanning for networks…"
+                            return "No networks found"
+                        }
+                        color: Theme.textMuted
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 12
+                        visible: wifiService.viewNetworks.length === 0
+                    }
 
-                        height: 66
-                        visible: row.showPrompt
+                    ListView {
+                        id: wifiList
 
-                        Column {
-                            anchors.top: parent.top
-                            anchors.left: parent.left
-                            anchors.right: parent.right
+                        anchors {
+                            top: wifiHeader.bottom
+                            left: parent.left
+                            right: parent.right
+                            bottom: addRow.top
+                        }
 
-                            spacing: 8
+                        anchors.topMargin: 8
+                        anchors.bottomMargin: 8
 
-                            Rectangle {
-                                width: parent.width
-                                height: 34
+                        clip: true
+                        spacing: 4
+                        visible: wifiService.viewNetworks.length > 0
+                        model: wifiService.viewNetworks
 
-                                radius: 8
-                                color: Theme.panelSurface
-                                border.width: passwordField.activeFocus ? 1 : 0
-                                border.color: Theme.accent
+                        delegate: Item {
+                            id: row
 
-                                TextField {
-                                    id: passwordField
+                            required property var modelData
 
-                                    anchors.fill: parent
-                                    anchors.leftMargin: 10
-                                    anchors.rightMargin: 10
+                            readonly property var net: row.modelData
+                            readonly property string ssid: row.net ? row.net.name : ""
+                            readonly property bool netConnected: row.net ? row.net.connected : false
+                            readonly property bool promptOpen: row.ssid !== "" && wifiPanel.promptSsid === row.ssid
+                            readonly property bool menuOpen: row.ssid !== "" && wifiPanel.menuSsid === row.ssid
+                            readonly property bool showPrompt: row.promptOpen && !row.netConnected
 
-                                    verticalAlignment: TextInput.AlignVCenter
-                                    echoMode: TextInput.Password
-                                    passwordCharacter: "•"
+                            width: wifiList.width
+                            height: rowCard.height + (row.showPrompt ? promptBox.height + 6 : 0)
 
-                                    placeholderText: "Password"
-                                    placeholderTextColor: Theme.textMuted
-                                    color: Theme.text
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 12
+                            onNetConnectedChanged: {
+                                if (row.netConnected && wifiPanel.promptSsid === row.ssid)
+                                    wifiPanel.promptSsid = ""
+                                if (!row.netConnected && wifiPanel.menuSsid === row.ssid)
+                                    wifiPanel.menuSsid = ""
+                            }
 
-                                    selectByMouse: true
-
-                                    background: Rectangle {
-                                        color: "transparent"
-                                    }
-
-                                    onAccepted: {
-                                        if (passwordField.text.length > 0)
-                                            wifiService.connectNetwork(row.ssid, passwordField.text)
-                                    }
-
-                                    Keys.onPressed: (event) => {
-                                        if (event.key === Qt.Key_Escape) {
-                                            wifiService.clearError()
-                                            wifiPanel.promptSsid = ""
-                                            content.forceActiveFocus()
-                                            event.accepted = true
-                                        }
-                                    }
+                            onPromptOpenChanged: {
+                                if (row.promptOpen) {
+                                    passwordField.text = ""
+                                    passwordField.forceActiveFocus()
                                 }
                             }
 
-                            Row {
+                            Rectangle {
+                                id: rowCard
+
                                 width: parent.width
-                                height: 24
+                                height: 52
+                                radius: 14
+                                color: rowHover.hovered ? Theme.panelSurface : "transparent"
 
-                                spacing: 12
+                                HoverHandler {
+                                    id: rowHover
 
-                                Text {
-                                    width: parent.width - connectAction.width - cancelAction.width - 24
-                                    height: parent.height
-                                    verticalAlignment: Text.AlignVCenter
-                                    elide: Text.ElideRight
-
-                                    text: {
-                                        if (row.net && row.net.connecting) return "Connecting…"
-                                        if (wifiService.failedNetwork === row.ssid && wifiService.connectError !== "") return wifiService.connectError
-                                        return ""
-                                    }
-                                    color: wifiService.failedNetwork === row.ssid && !(row.net && row.net.connecting) ? Theme.accent : Theme.textMuted
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 11
+                                    cursorShape: Qt.PointingHandCursor
                                 }
 
-                                Text {
-                                    id: cancelAction
+                                Row {
+                                    anchors.fill: parent
 
-                                    height: parent.height
-                                    verticalAlignment: Text.AlignVCenter
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: row.netConnected ? 44 : 12
 
-                                    text: "Cancel"
-                                    color: cancelHover.hovered ? Theme.text : Theme.textMuted
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 12
+                                    spacing: 10
+
+                                    IconImage {
+                                        anchors.verticalCenter: parent.verticalCenter
+
+                                        width: 28
+                                        height: 28
+
+                                        source: {
+                                            switch (row.net ? row.net.level : -1) {
+                                            case 4: return Quickshell.iconPath("network-wireless-signal-excellent-symbolic", "network-wireless-signal-excellent")
+                                            case 3: return Quickshell.iconPath("network-wireless-signal-good-symbolic", "network-wireless-signal-good")
+                                            case 2: return Quickshell.iconPath("network-wireless-signal-ok-symbolic", "network-wireless-signal-ok")
+                                            case 1: return Quickshell.iconPath("network-wireless-signal-weak-symbolic", "network-wireless-signal-weak")
+                                            default: return Quickshell.iconPath("network-wireless-signal-none-symbolic", "network-wireless-signal-none")
+                                            }
+                                        }
+
+                                        asynchronous: true
+                                    }
+
+                                    Column {
+                                        anchors.verticalCenter: parent.verticalCenter
+
+                                        width: parent.width - 28 - 10
+
+                                        spacing: 2
+
+                                        Text {
+                                            width: parent.width
+                                            elide: Text.ElideRight
+
+                                            text: row.net ? row.net.name : ""
+                                            color: Theme.text
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 13
+                                            font.weight: row.net && row.net.connected ? Font.DemiBold : Font.Normal
+                                        }
+
+                                        Text {
+                                            width: parent.width
+                                            elide: Text.ElideRight
+
+                                            text: root.wifiStatusText(row.net)
+                                            color: Theme.textMuted
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 11
+                                        }
+                                    }
+
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+
+                                    acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                    cursorShape: Qt.PointingHandCursor
+
+                                    onClicked: (mouse) => {
+                                        if (row.net === null || row.net === undefined) return
+                                        if (mouse.button === Qt.RightButton) {
+                                            if (row.net.known) wifiService.forgetNetwork(row.net.name)
+                                            return
+                                        }
+                                        if (row.netConnected) {
+                                            wifiPanel.promptSsid = ""
+                                            wifiPanel.menuSsid = row.menuOpen ? "" : row.ssid
+                                            return
+                                        }
+                                        if (row.net.secured && !row.net.known) {
+                                            wifiService.clearError()
+                                            wifiPanel.menuSsid = ""
+                                            wifiPanel.promptSsid = row.net.name
+                                        } else {
+                                            wifiPanel.promptSsid = ""
+                                            wifiPanel.menuSsid = ""
+                                            wifiService.connectNetwork(row.net.name)
+                                        }
+                                    }
+                                }
+
+                                Item {
+                                    id: moreButton
+
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 8
+                                    anchors.verticalCenter: parent.verticalCenter
+
+                                    width: 28
+                                    height: 28
+                                    visible: row.netConnected
+
+                                    Rectangle {
+                                        anchors.fill: parent
+
+                                        radius: 14
+                                        color: moreHover.hovered ? Theme.panelSurface : "transparent"
+                                    }
 
                                     HoverHandler {
-                                        id: cancelHover
+                                        id: moreHover
 
                                         cursorShape: Qt.PointingHandCursor
+                                    }
+
+                                    IconImage {
+                                        anchors.centerIn: parent
+
+                                        width: 18
+                                        height: 18
+
+                                        source: Quickshell.iconPath("view-more-symbolic", "open-menu-symbolic")
+                                        asynchronous: true
                                     }
 
                                     MouseArea {
@@ -1727,607 +1639,729 @@ PanelWindow {
                                         cursorShape: Qt.PointingHandCursor
 
                                         onClicked: {
-                                            wifiService.clearError()
                                             wifiPanel.promptSsid = ""
-                                            content.forceActiveFocus()
+                                            wifiPanel.menuSsid = row.menuOpen ? "" : row.ssid
                                         }
                                     }
                                 }
+                            }
 
-                                Text {
-                                    id: connectAction
+                            Item {
+                                id: promptBox
 
-                                    height: parent.height
-                                    verticalAlignment: Text.AlignVCenter
+                                anchors.top: rowCard.bottom
+                                anchors.topMargin: 6
+                                anchors.left: parent.left
+                                anchors.right: parent.right
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 12
 
-                                    readonly property bool ready: passwordField.text.length > 0 && !(row.net && row.net.connecting)
+                                height: 66
+                                visible: row.showPrompt
 
-                                    text: "Connect"
-                                    color: connectAction.ready ? Theme.accent : Theme.textMuted
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 12
-                                    font.weight: Font.DemiBold
+                                Column {
+                                    anchors.top: parent.top
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
 
-                                    MouseArea {
-                                        anchors.fill: parent
+                                    spacing: 8
 
-                                        enabled: connectAction.ready
-                                        cursorShape: Qt.PointingHandCursor
+                                    Rectangle {
+                                        width: parent.width
+                                        height: 34
 
-                                        onClicked: wifiService.connectNetwork(row.ssid, passwordField.text)
+                                        radius: 8
+                                        color: Theme.panelSurface
+                                        border.width: passwordField.activeFocus ? 1 : 0
+                                        border.color: Theme.accent
+
+                                        TextField {
+                                            id: passwordField
+
+                                            anchors.fill: parent
+                                            anchors.leftMargin: 10
+                                            anchors.rightMargin: 10
+
+                                            verticalAlignment: TextInput.AlignVCenter
+                                            echoMode: TextInput.Password
+                                            passwordCharacter: "•"
+
+                                            placeholderText: "Password"
+                                            placeholderTextColor: Theme.textMuted
+                                            color: Theme.text
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 12
+
+                                            selectByMouse: true
+
+                                            background: Rectangle {
+                                                color: "transparent"
+                                            }
+
+                                            onAccepted: {
+                                                if (passwordField.text.length > 0)
+                                                    wifiService.connectNetwork(row.ssid, passwordField.text)
+                                            }
+
+                                            Keys.onPressed: (event) => {
+                                                if (event.key === Qt.Key_Escape) {
+                                                    wifiService.clearError()
+                                                    wifiPanel.promptSsid = ""
+                                                    content.forceActiveFocus()
+                                                    event.accepted = true
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    Row {
+                                        width: parent.width
+                                        height: 24
+
+                                        spacing: 12
+
+                                        Text {
+                                            width: parent.width - connectAction.width - cancelAction.width - 24
+                                            height: parent.height
+                                            verticalAlignment: Text.AlignVCenter
+                                            elide: Text.ElideRight
+
+                                            text: {
+                                                if (row.net && row.net.connecting) return "Connecting…"
+                                                if (wifiService.failedNetwork === row.ssid && wifiService.connectError !== "") return wifiService.connectError
+                                                return ""
+                                            }
+                                            color: wifiService.failedNetwork === row.ssid && !(row.net && row.net.connecting) ? Theme.accent : Theme.textMuted
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 11
+                                        }
+
+                                        Text {
+                                            id: cancelAction
+
+                                            height: parent.height
+                                            verticalAlignment: Text.AlignVCenter
+
+                                            text: "Cancel"
+                                            color: cancelHover.hovered ? Theme.text : Theme.textMuted
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 12
+
+                                            HoverHandler {
+                                                id: cancelHover
+
+                                                cursorShape: Qt.PointingHandCursor
+                                            }
+
+                                            MouseArea {
+                                                anchors.fill: parent
+
+                                                cursorShape: Qt.PointingHandCursor
+
+                                                onClicked: {
+                                                    wifiService.clearError()
+                                                    wifiPanel.promptSsid = ""
+                                                    content.forceActiveFocus()
+                                                }
+                                            }
+                                        }
+
+                                        Text {
+                                            id: connectAction
+
+                                            height: parent.height
+                                            verticalAlignment: Text.AlignVCenter
+
+                                            readonly property bool ready: passwordField.text.length > 0 && !(row.net && row.net.connecting)
+
+                                            text: "Connect"
+                                            color: connectAction.ready ? Theme.accent : Theme.textMuted
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 12
+                                            font.weight: Font.DemiBold
+
+                                            MouseArea {
+                                                anchors.fill: parent
+
+                                                enabled: connectAction.ready
+                                                cursorShape: Qt.PointingHandCursor
+
+                                                onClicked: wifiService.connectNetwork(row.ssid, passwordField.text)
+                                            }
+                                        }
                                     }
                                 }
                             }
                         }
                     }
-                }
-            }
 
-            Rectangle {
-                id: addRow
+                    Rectangle {
+                        id: addRow
 
-                anchors {
-                    left: parent.left
-                    right: parent.right
-                    bottom: parent.bottom
-                }
+                        anchors {
+                            left: parent.left
+                            right: parent.right
+                            bottom: parent.bottom
+                        }
 
-                z: 5
-                height: 36
-                radius: 12
-                visible: wifiService.enabled
-                color: addRowHover.hovered ? Theme.panelSurface : "transparent"
+                        z: 5
+                        height: 36
+                        radius: 12
+                        visible: wifiService.enabled
+                        color: addRowHover.hovered ? Theme.panelSurface : "transparent"
 
-                HoverHandler {
-                    id: addRowHover
+                        HoverHandler {
+                            id: addRowHover
 
-                    cursorShape: Qt.PointingHandCursor
-                }
+                            cursorShape: Qt.PointingHandCursor
+                        }
 
-                Row {
-                    anchors.left: parent.left
-                    anchors.leftMargin: 12
-                    anchors.verticalCenter: parent.verticalCenter
+                        Row {
+                            anchors.left: parent.left
+                            anchors.leftMargin: 12
+                            anchors.verticalCenter: parent.verticalCenter
 
-                    spacing: 10
+                            spacing: 10
 
-                    IconImage {
-                        anchors.verticalCenter: parent.verticalCenter
+                            IconImage {
+                                anchors.verticalCenter: parent.verticalCenter
 
-                        width: 18
-                        height: 18
+                                width: 18
+                                height: 18
 
-                        source: Quickshell.iconPath("list-add-symbolic", "list-add")
-                        asynchronous: true
-                    }
+                                source: Quickshell.iconPath("list-add-symbolic", "list-add")
+                                asynchronous: true
+                            }
 
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
 
-                        text: "Add Hidden Network…"
-                        color: Theme.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
+                                text: "Add Hidden Network…"
+                                color: Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                            }
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+
+                            cursorShape: Qt.PointingHandCursor
+
+                            onClicked: {
+                                wifiPanel.menuSsid = ""
+                                wifiPanel.promptSsid = ""
+                                wifiPanel.addOpen = true
+                            }
+                        }
                     }
                 }
 
                 MouseArea {
+                    id: menuBackdrop
+
                     anchors.fill: parent
 
-                    cursorShape: Qt.PointingHandCursor
+                    z: 20
+                    visible: wifiPanel.menuSsid !== ""
 
-                    onClicked: {
-                        wifiPanel.menuSsid = ""
-                        wifiPanel.promptSsid = ""
-                        wifiPanel.addOpen = true
-                    }
-                }
-            }
-        }
-
-        MouseArea {
-            id: menuBackdrop
-
-            anchors.fill: parent
-
-            z: 20
-            visible: wifiPanel.menuSsid !== ""
-
-            onClicked: wifiPanel.menuSsid = ""
-        }
-
-        Rectangle {
-            id: menuPopup
-
-            z: 21
-            visible: wifiPanel.menuSsid !== ""
-
-            anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.rightMargin: 14
-            anchors.topMargin: 52
-
-            width: 184
-            height: menuPopupColumn.height + 12
-
-            // Separation from the dark list comes from the crisp accent hairline;
-            // fill stays Theme.panelBackground.
-            radius: 10
-            color: Theme.panelBackground
-            border.width: 1
-            border.color: Theme.accent
-
-            Column {
-                id: menuPopupColumn
-
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.topMargin: 6
-                anchors.leftMargin: 6
-                anchors.rightMargin: 6
-
-                Rectangle {
-                    width: parent.width
-                    height: 34
-                    radius: 6
-                    color: popupDisconnectHover.hovered ? Theme.panelSurface : "transparent"
-                    Behavior on color { ColorAnimation { duration: 100 } }
-
-                    HoverHandler {
-                        id: popupDisconnectHover
-
-                        cursorShape: Qt.PointingHandCursor
-                    }
-
-                    Text {
-                        anchors.left: parent.left
-                        anchors.leftMargin: 10
-                        anchors.verticalCenter: parent.verticalCenter
-
-                        text: "Disconnect"
-                        color: popupDisconnectHover.hovered ? Theme.accent : Theme.text
-                        Behavior on color { ColorAnimation { duration: 100 } }
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-
-                        cursorShape: Qt.PointingHandCursor
-
-                        onClicked: {
-                            wifiService.disconnectCurrentNetwork()
-                            wifiPanel.menuSsid = ""
-                        }
-                    }
+                    onClicked: wifiPanel.menuSsid = ""
                 }
 
                 Rectangle {
-                    width: parent.width
-                    height: 34
-                    radius: 6
-                    visible: wifiPanel.menuNet && wifiPanel.menuNet.known
-                    color: popupForgetHover.hovered ? Theme.panelSurface : "transparent"
-                    Behavior on color { ColorAnimation { duration: 100 } }
+                    id: menuPopup
 
-                    HoverHandler {
-                        id: popupForgetHover
+                    z: 21
+                    visible: wifiPanel.menuSsid !== ""
 
-                        cursorShape: Qt.PointingHandCursor
-                    }
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.rightMargin: 14
+                    anchors.topMargin: 52
 
-                    Text {
-                        anchors.left: parent.left
-                        anchors.leftMargin: 10
-                        anchors.verticalCenter: parent.verticalCenter
+                    width: 184
+                    height: menuPopupColumn.height + 12
 
-                        text: "Forget Network"
-                        color: popupForgetHover.hovered ? Theme.accent : Theme.text
-                        Behavior on color { ColorAnimation { duration: 100 } }
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-
-                        cursorShape: Qt.PointingHandCursor
-
-                        onClicked: {
-                            wifiService.forgetNetwork(wifiPanel.menuSsid)
-                            wifiPanel.menuSsid = ""
-                        }
-                    }
-                }
-            }
-        }
-
-        MouseArea {
-            id: addBackdrop
-
-            anchors.fill: parent
-
-            z: 22
-            visible: wifiPanel.addOpen
-
-            onClicked: wifiPanel.addOpen = false
-
-            // Scrim: darken the network list behind the input dialog.
-            Rectangle {
-                anchors.fill: parent
-                color: "#90000000"
-            }
-        }
-
-        Rectangle {
-            id: addNetworkModal
-
-            z: 23
-            visible: wifiPanel.addOpen
-
-            anchors.horizontalCenter: parent.horizontalCenter
-            anchors.top: parent.top
-            anchors.topMargin: 58
-
-            width: 300
-            height: addModalColumn.implicitHeight + 28
-
-            Behavior on height {
-                NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
-            }
-
-            // Dialog card: Theme.panelBackground fill, crisp accent hairline,
-            // floating over the scrim (addBackdrop).
-            radius: 10
-            color: Theme.panelBackground
-            border.width: 1
-            border.color: Theme.accent
-
-            Column {
-                id: addModalColumn
-
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.topMargin: 14
-                anchors.leftMargin: 14
-                anchors.rightMargin: 14
-
-                spacing: 10
-
-                Text {
-                    text: "Add Hidden Network"
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 13
-                    font.weight: Font.DemiBold
-                }
-
-                Rectangle {
-                    width: parent.width
-                    height: 34
-
-                    radius: 8
-                    color: Theme.panelSurface
-                    border.width: ssidInput.activeFocus ? 1 : 0
+                    // Separation from the dark list comes from the crisp accent hairline;
+                    // fill stays Theme.panelBackground.
+                    radius: 10
+                    color: Theme.panelBackground
+                    border.width: 1
                     border.color: Theme.accent
 
-                    TextField {
-                        id: ssidInput
+                    Column {
+                        id: menuPopupColumn
 
-                        anchors.fill: parent
-                        anchors.leftMargin: 10
-                        anchors.rightMargin: 10
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.topMargin: 6
+                        anchors.leftMargin: 6
+                        anchors.rightMargin: 6
 
-                        verticalAlignment: TextInput.AlignVCenter
+                        Rectangle {
+                            width: parent.width
+                            height: 34
+                            radius: 6
+                            color: popupDisconnectHover.hovered ? Theme.panelSurface : "transparent"
+                            Behavior on color { ColorAnimation { duration: 100 } }
 
-                        placeholderText: "Network name (SSID)"
-                        placeholderTextColor: Theme.textMuted
-                        color: Theme.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
+                            HoverHandler {
+                                id: popupDisconnectHover
 
-                        selectByMouse: true
+                                cursorShape: Qt.PointingHandCursor
+                            }
 
-                        background: Rectangle {
-                            color: "transparent"
+                            Text {
+                                anchors.left: parent.left
+                                anchors.leftMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+
+                                text: "Disconnect"
+                                color: popupDisconnectHover.hovered ? Theme.accent : Theme.text
+                                Behavior on color { ColorAnimation { duration: 100 } }
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+
+                                cursorShape: Qt.PointingHandCursor
+
+                                onClicked: {
+                                    wifiService.disconnectCurrentNetwork()
+                                    wifiPanel.menuSsid = ""
+                                }
+                            }
                         }
 
-                        onAccepted: {
-                            if (securityCombo.currentIndex === 1 && usernameInput.text.length === 0)
-                                usernameInput.forceActiveFocus()
-                            else if (wifiPanel.addSecured && hiddenPasswordInput.text.length === 0)
-                                hiddenPasswordInput.forceActiveFocus()
-                            else if (addConnectAction.ready)
-                                wifiService.connectHiddenNetwork(ssidInput.text, hiddenPasswordInput.text, wifiPanel.addSecurityType, usernameInput.text)
-                        }
+                        Rectangle {
+                            width: parent.width
+                            height: 34
+                            radius: 6
+                            visible: wifiPanel.menuNet && wifiPanel.menuNet.known
+                            color: popupForgetHover.hovered ? Theme.panelSurface : "transparent"
+                            Behavior on color { ColorAnimation { duration: 100 } }
 
-                        Keys.onPressed: (event) => {
-                            if (event.key === Qt.Key_Escape) {
-                                wifiPanel.addOpen = false
-                                content.forceActiveFocus()
-                                event.accepted = true
+                            HoverHandler {
+                                id: popupForgetHover
+
+                                cursorShape: Qt.PointingHandCursor
+                            }
+
+                            Text {
+                                anchors.left: parent.left
+                                anchors.leftMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+
+                                text: "Forget Network"
+                                color: popupForgetHover.hovered ? Theme.accent : Theme.text
+                                Behavior on color { ColorAnimation { duration: 100 } }
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+
+                                cursorShape: Qt.PointingHandCursor
+
+                                onClicked: {
+                                    wifiService.forgetNetwork(wifiPanel.menuSsid)
+                                    wifiPanel.menuSsid = ""
+                                }
                             }
                         }
                     }
                 }
 
-                ComboBox {
-                    id: securityCombo
+                MouseArea {
+                    id: addBackdrop
 
-                    width: parent.width
-                    height: 34
+                    anchors.fill: parent
 
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 12
+                    z: 22
+                    visible: wifiPanel.addOpen
 
-                    model: ["WPA/WPA2/WPA3 Personal", "WPA/WPA2/WPA3 Enterprise", "None / Open"]
-                    currentIndex: 0
+                    onClicked: wifiPanel.addOpen = false
 
-                    onCurrentIndexChanged: {
-                        wifiPanel.addSecurityType = securityCombo.currentIndex === 2 ? "open"
-                            : securityCombo.currentIndex === 1 ? "enterprise"
-                            : "personal"
-                        wifiPanel.addSecured = securityCombo.currentIndex !== 2
-                        if (securityCombo.currentIndex !== 1)
-                            usernameInput.text = ""
-                        if (securityCombo.currentIndex === 2)
-                            hiddenPasswordInput.text = ""
+                    // Scrim: darken the network list behind the input dialog.
+                    Rectangle {
+                        anchors.fill: parent
+                        color: "#90000000"
+                    }
+                }
+
+                Rectangle {
+                    id: addNetworkModal
+
+                    z: 23
+                    visible: wifiPanel.addOpen
+
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.top: parent.top
+                    anchors.topMargin: 58
+
+                    width: 300
+                    height: addModalColumn.implicitHeight + 28
+
+                    Behavior on height {
+                        NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
                     }
 
-                    background: Rectangle {
-                        radius: 8
-                        color: Theme.panelSurface
-                        border.width: securityCombo.activeFocus || securityCombo.popup.visible ? 1 : 0
-                        border.color: Theme.accent
-                    }
+                    // Dialog card: Theme.panelBackground fill, crisp accent hairline,
+                    // floating over the scrim (addBackdrop).
+                    radius: 10
+                    color: Theme.panelBackground
+                    border.width: 1
+                    border.color: Theme.accent
 
-                    contentItem: Text {
-                        leftPadding: 10
-                        rightPadding: securityCombo.indicator.width + 6
+                    Column {
+                        id: addModalColumn
 
-                        text: securityCombo.displayText
-                        color: Theme.text
-                        font: securityCombo.font
-                        verticalAlignment: Text.AlignVCenter
-                        elide: Text.ElideRight
-                    }
+                        anchors.top: parent.top
+                        anchors.left: parent.left
+                        anchors.right: parent.right
+                        anchors.topMargin: 14
+                        anchors.leftMargin: 14
+                        anchors.rightMargin: 14
 
-                    indicator: IconImage {
-                        x: securityCombo.width - width - 10
-                        y: (securityCombo.height - height) / 2
+                        spacing: 10
 
-                        width: 14
-                        height: 14
-
-                        source: Quickshell.iconPath("pan-down-symbolic", "go-down-symbolic")
-                        asynchronous: true
-                    }
-
-                    delegate: ItemDelegate {
-                        width: securityCombo.width
-                        height: 32
-
-                        highlighted: securityCombo.highlightedIndex === index
-
-                        contentItem: Text {
-                            leftPadding: 6
-
-                            text: modelData
+                        Text {
+                            text: "Add Hidden Network"
                             color: Theme.text
                             font.family: Theme.fontFamily
-                            font.pixelSize: 12
-                            verticalAlignment: Text.AlignVCenter
-                            elide: Text.ElideRight
+                            font.pixelSize: 13
+                            font.weight: Font.DemiBold
                         }
 
-                        background: Rectangle {
-                            radius: 6
-                            color: highlighted ? Theme.panelSurface : "transparent"
-                        }
-                    }
+                        Rectangle {
+                            width: parent.width
+                            height: 34
 
-                    popup: Popup {
-                        y: securityCombo.height + 4
-                        width: securityCombo.width
-                        padding: 4
-
-                        implicitHeight: contentItem.implicitHeight + 8
-
-                        background: Rectangle {
-                            radius: 10
-                            color: Theme.background
-                            border.width: 1
+                            radius: 8
+                            color: Theme.panelSurface
+                            border.width: ssidInput.activeFocus ? 1 : 0
                             border.color: Theme.accent
+
+                            TextField {
+                                id: ssidInput
+
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
+
+                                verticalAlignment: TextInput.AlignVCenter
+
+                                placeholderText: "Network name (SSID)"
+                                placeholderTextColor: Theme.textMuted
+                                color: Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+
+                                selectByMouse: true
+
+                                background: Rectangle {
+                                    color: "transparent"
+                                }
+
+                                onAccepted: {
+                                    if (securityCombo.currentIndex === 1 && usernameInput.text.length === 0)
+                                        usernameInput.forceActiveFocus()
+                                    else if (wifiPanel.addSecured && hiddenPasswordInput.text.length === 0)
+                                        hiddenPasswordInput.forceActiveFocus()
+                                    else if (addConnectAction.ready)
+                                        wifiService.connectHiddenNetwork(ssidInput.text, hiddenPasswordInput.text, wifiPanel.addSecurityType, usernameInput.text)
+                                }
+
+                                Keys.onPressed: (event) => {
+                                    if (event.key === Qt.Key_Escape) {
+                                        wifiPanel.addOpen = false
+                                        content.forceActiveFocus()
+                                        event.accepted = true
+                                    }
+                                }
+                            }
                         }
 
-                        contentItem: ListView {
-                            clip: true
-                            implicitHeight: contentHeight
-                            model: securityCombo.popup.visible ? securityCombo.delegateModel : null
-                            currentIndex: securityCombo.highlightedIndex
+                        ComboBox {
+                            id: securityCombo
+
+                            width: parent.width
+                            height: 34
+
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 12
+
+                            model: ["WPA/WPA2/WPA3 Personal", "WPA/WPA2/WPA3 Enterprise", "None / Open"]
+                            currentIndex: 0
+
+                            onCurrentIndexChanged: {
+                                wifiPanel.addSecurityType = securityCombo.currentIndex === 2 ? "open"
+                                    : securityCombo.currentIndex === 1 ? "enterprise"
+                                    : "personal"
+                                wifiPanel.addSecured = securityCombo.currentIndex !== 2
+                                if (securityCombo.currentIndex !== 1)
+                                    usernameInput.text = ""
+                                if (securityCombo.currentIndex === 2)
+                                    hiddenPasswordInput.text = ""
+                            }
+
+                            background: Rectangle {
+                                radius: 8
+                                color: Theme.panelSurface
+                                border.width: securityCombo.activeFocus || securityCombo.popup.visible ? 1 : 0
+                                border.color: Theme.accent
+                            }
+
+                            contentItem: Text {
+                                leftPadding: 10
+                                rightPadding: securityCombo.indicator.width + 6
+
+                                text: securityCombo.displayText
+                                color: Theme.text
+                                font: securityCombo.font
+                                verticalAlignment: Text.AlignVCenter
+                                elide: Text.ElideRight
+                            }
+
+                            indicator: IconImage {
+                                x: securityCombo.width - width - 10
+                                y: (securityCombo.height - height) / 2
+
+                                width: 14
+                                height: 14
+
+                                source: Quickshell.iconPath("pan-down-symbolic", "go-down-symbolic")
+                                asynchronous: true
+                            }
+
+                            delegate: ItemDelegate {
+                                width: securityCombo.width
+                                height: 32
+
+                                highlighted: securityCombo.highlightedIndex === index
+
+                                contentItem: Text {
+                                    leftPadding: 6
+
+                                    text: modelData
+                                    color: Theme.text
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 12
+                                    verticalAlignment: Text.AlignVCenter
+                                    elide: Text.ElideRight
+                                }
+
+                                background: Rectangle {
+                                    radius: 6
+                                    color: highlighted ? Theme.panelSurface : "transparent"
+                                }
+                            }
+
+                            popup: Popup {
+                                y: securityCombo.height + 4
+                                width: securityCombo.width
+                                padding: 4
+
+                                implicitHeight: contentItem.implicitHeight + 8
+
+                                background: Rectangle {
+                                    radius: 10
+                                    color: Theme.background
+                                    border.width: 1
+                                    border.color: Theme.accent
+                                }
+
+                                contentItem: ListView {
+                                    clip: true
+                                    implicitHeight: contentHeight
+                                    model: securityCombo.popup.visible ? securityCombo.delegateModel : null
+                                    currentIndex: securityCombo.highlightedIndex
+                                }
+                            }
                         }
-                    }
-                }
 
-                Rectangle {
-                    width: parent.width
-                    height: 34
+                        Rectangle {
+                            width: parent.width
+                            height: 34
 
-                    visible: securityCombo.currentIndex === 1
+                            visible: securityCombo.currentIndex === 1
 
-                    radius: 8
-                    color: Theme.panelSurface
-                    border.width: usernameInput.activeFocus ? 1 : 0
-                    border.color: Theme.accent
+                            radius: 8
+                            color: Theme.panelSurface
+                            border.width: usernameInput.activeFocus ? 1 : 0
+                            border.color: Theme.accent
 
-                    TextField {
-                        id: usernameInput
+                            TextField {
+                                id: usernameInput
 
-                        anchors.fill: parent
-                        anchors.leftMargin: 10
-                        anchors.rightMargin: 10
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
 
-                        verticalAlignment: TextInput.AlignVCenter
+                                verticalAlignment: TextInput.AlignVCenter
 
-                        placeholderText: "Username"
-                        placeholderTextColor: Theme.textMuted
-                        color: Theme.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
+                                placeholderText: "Username"
+                                placeholderTextColor: Theme.textMuted
+                                color: Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
 
-                        selectByMouse: true
+                                selectByMouse: true
 
-                        background: Rectangle {
-                            color: "transparent"
+                                background: Rectangle {
+                                    color: "transparent"
+                                }
+
+                                onAccepted: hiddenPasswordInput.forceActiveFocus()
+
+                                Keys.onPressed: (event) => {
+                                    if (event.key === Qt.Key_Escape) {
+                                        wifiPanel.addOpen = false
+                                        content.forceActiveFocus()
+                                        event.accepted = true
+                                    }
+                                }
+                            }
                         }
 
-                        onAccepted: hiddenPasswordInput.forceActiveFocus()
+                        Rectangle {
+                            width: parent.width
+                            height: 34
 
-                        Keys.onPressed: (event) => {
-                            if (event.key === Qt.Key_Escape) {
-                                wifiPanel.addOpen = false
-                                content.forceActiveFocus()
-                                event.accepted = true
+                            visible: securityCombo.currentIndex !== 2
+
+                            radius: 8
+                            color: Theme.panelSurface
+                            border.width: hiddenPasswordInput.activeFocus ? 1 : 0
+                            border.color: Theme.accent
+
+                            TextField {
+                                id: hiddenPasswordInput
+
+                                anchors.fill: parent
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 10
+
+                                verticalAlignment: TextInput.AlignVCenter
+                                echoMode: TextInput.Password
+                                passwordCharacter: "•"
+
+                                placeholderText: "Password"
+                                placeholderTextColor: Theme.textMuted
+                                color: Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+
+                                selectByMouse: true
+
+                                background: Rectangle {
+                                    color: "transparent"
+                                }
+
+                                onAccepted: {
+                                    if (addConnectAction.ready)
+                                        wifiService.connectHiddenNetwork(ssidInput.text, hiddenPasswordInput.text, wifiPanel.addSecurityType, usernameInput.text)
+                                }
+
+                                Keys.onPressed: (event) => {
+                                    if (event.key === Qt.Key_Escape) {
+                                        wifiPanel.addOpen = false
+                                        content.forceActiveFocus()
+                                        event.accepted = true
+                                    }
+                                }
+                            }
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 24
+
+                            spacing: 12
+
+                            Text {
+                                width: parent.width - addConnectAction.width - addCancelAction.width - 24
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+                                elide: Text.ElideRight
+
+                                text: {
+                                    if (wifiService.pendingNetwork !== "" && wifiService.pendingNetwork === ssidInput.text) return "Connecting…"
+                                    return wifiService.connectError
+                                }
+                                color: wifiService.connectError !== "" ? Theme.accent : Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                            }
+
+                            Text {
+                                id: addCancelAction
+
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+
+                                text: "Cancel"
+                                color: addCancelHover.hovered ? Theme.text : Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+
+                                HoverHandler {
+                                    id: addCancelHover
+
+                                    cursorShape: Qt.PointingHandCursor
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+
+                                    cursorShape: Qt.PointingHandCursor
+
+                                    onClicked: wifiPanel.addOpen = false
+                                }
+                            }
+
+                            Text {
+                                id: addConnectAction
+
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+
+                                readonly property bool ready: ssidInput.text.length > 0
+                                    && (securityCombo.currentIndex !== 1 || usernameInput.text.length > 0)
+                                    && (!wifiPanel.addSecured || hiddenPasswordInput.text.length > 0)
+
+                                text: "Connect"
+                                color: addConnectAction.ready ? Theme.accent : Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+
+                                MouseArea {
+                                    anchors.fill: parent
+
+                                    enabled: addConnectAction.ready
+                                    cursorShape: Qt.PointingHandCursor
+
+                                    onClicked: wifiService.connectHiddenNetwork(ssidInput.text, hiddenPasswordInput.text, wifiPanel.addSecurityType, usernameInput.text)
+                                }
                             }
                         }
                     }
-                }
 
-                Rectangle {
-                    width: parent.width
-                    height: 34
+                    Connections {
+                        target: wifiService
 
-                    visible: securityCombo.currentIndex !== 2
+                        enabled: wifiPanel.addOpen
 
-                    radius: 8
-                    color: Theme.panelSurface
-                    border.width: hiddenPasswordInput.activeFocus ? 1 : 0
-                    border.color: Theme.accent
-
-                    TextField {
-                        id: hiddenPasswordInput
-
-                        anchors.fill: parent
-                        anchors.leftMargin: 10
-                        anchors.rightMargin: 10
-
-                        verticalAlignment: TextInput.AlignVCenter
-                        echoMode: TextInput.Password
-                        passwordCharacter: "•"
-
-                        placeholderText: "Password"
-                        placeholderTextColor: Theme.textMuted
-                        color: Theme.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-
-                        selectByMouse: true
-
-                        background: Rectangle {
-                            color: "transparent"
-                        }
-
-                        onAccepted: {
-                            if (addConnectAction.ready)
-                                wifiService.connectHiddenNetwork(ssidInput.text, hiddenPasswordInput.text, wifiPanel.addSecurityType, usernameInput.text)
-                        }
-
-                        Keys.onPressed: (event) => {
-                            if (event.key === Qt.Key_Escape) {
+                        function onConnectionNameChanged() {
+                            if (wifiPanel.addOpen && ssidInput.text.length > 0 && wifiService.connectionName === ssidInput.text)
                                 wifiPanel.addOpen = false
-                                content.forceActiveFocus()
-                                event.accepted = true
-                            }
                         }
                     }
-                }
-
-                Row {
-                    width: parent.width
-                    height: 24
-
-                    spacing: 12
-
-                    Text {
-                        width: parent.width - addConnectAction.width - addCancelAction.width - 24
-                        height: parent.height
-                        verticalAlignment: Text.AlignVCenter
-                        elide: Text.ElideRight
-
-                        text: {
-                            if (wifiService.pendingNetwork !== "" && wifiService.pendingNetwork === ssidInput.text) return "Connecting…"
-                            return wifiService.connectError
-                        }
-                        color: wifiService.connectError !== "" ? Theme.accent : Theme.textMuted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 11
-                    }
-
-                    Text {
-                        id: addCancelAction
-
-                        height: parent.height
-                        verticalAlignment: Text.AlignVCenter
-
-                        text: "Cancel"
-                        color: addCancelHover.hovered ? Theme.text : Theme.textMuted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-
-                        HoverHandler {
-                            id: addCancelHover
-
-                            cursorShape: Qt.PointingHandCursor
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-
-                            cursorShape: Qt.PointingHandCursor
-
-                            onClicked: wifiPanel.addOpen = false
-                        }
-                    }
-
-                    Text {
-                        id: addConnectAction
-
-                        height: parent.height
-                        verticalAlignment: Text.AlignVCenter
-
-                        readonly property bool ready: ssidInput.text.length > 0
-                            && (securityCombo.currentIndex !== 1 || usernameInput.text.length > 0)
-                            && (!wifiPanel.addSecured || hiddenPasswordInput.text.length > 0)
-
-                        text: "Connect"
-                        color: addConnectAction.ready ? Theme.accent : Theme.textMuted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                        font.weight: Font.DemiBold
-
-                        MouseArea {
-                            anchors.fill: parent
-
-                            enabled: addConnectAction.ready
-                            cursorShape: Qt.PointingHandCursor
-
-                            onClicked: wifiService.connectHiddenNetwork(ssidInput.text, hiddenPasswordInput.text, wifiPanel.addSecurityType, usernameInput.text)
-                        }
-                    }
-                }
-            }
-
-            Connections {
-                target: wifiService
-
-                enabled: wifiPanel.addOpen
-
-                function onConnectionNameChanged() {
-                    if (wifiPanel.addOpen && ssidInput.text.length > 0 && wifiService.connectionName === ssidInput.text)
-                        wifiPanel.addOpen = false
                 }
             }
         }
@@ -2354,6 +2388,10 @@ PanelWindow {
 
         enabled: root.bluetoothPanelOpen
         visible: bluetoothPanel.opacity > 0
+
+        // Latched by the content Loader below: the panel content tree
+        // is created on first open and kept for the rest of the session.
+        property bool _contentLatched: false
 
         // Shared glass highlight (see ControlTile): full-bleed rect using
         // the panel's live radius (it morphs on open/close); falloff shaped
@@ -2415,440 +2453,183 @@ PanelWindow {
             }
         }
 
-        Item {
-            id: bluetoothPanelContent
+        // Lazy content stage (Loader latch, the Launcher pattern): the
+        // whole content tree under this panel - lists, menus, dialogs -
+        // does not exist until the panel is first opened, so a panel the
+        // user never opens costs no objects at shell startup.
+        Loader {
+            id: bluetoothContentLoader
 
-            anchors {
-                top: parent.top
-                left: parent.left
-                right: parent.right
-                bottom: parent.bottom
-            }
+            anchors.fill: parent
+            active: root.bluetoothPanelOpen || bluetoothPanel._contentLatched
+            sourceComponent: bluetoothContentComponent
 
-            anchors.margins: 14
+            onLoaded: bluetoothPanel._contentLatched = true
+        }
 
-            opacity: root.bluetoothPanelOpen ? 1 : 0
-            visible: bluetoothPanelContent.opacity > 0
-
-            Behavior on opacity {
-                NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
-            }
+        Component {
+            id: bluetoothContentComponent
 
             Item {
-                id: btHeader
+                anchors.fill: parent
 
-                anchors {
-                    top: parent.top
-                    left: parent.left
-                    right: parent.right
-                }
+                Item {
+                    id: bluetoothPanelContent
 
-                height: 32
-
-                MouseArea {
-                    id: btBackButton
-
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    width: 32
-                    height: 32
-                    cursorShape: Qt.PointingHandCursor
-
-                    onClicked: root.bluetoothPanelOpen = false
-
-                    Rectangle {
-                        anchors.fill: parent
-
-                        radius: 16
-                        color: btBackHover.hovered ? Theme.panelSurface : "transparent"
+                    anchors {
+                        top: parent.top
+                        left: parent.left
+                        right: parent.right
+                        bottom: parent.bottom
                     }
 
-                    HoverHandler {
-                        id: btBackHover
+                    anchors.margins: 14
+
+                    opacity: root.bluetoothPanelOpen ? 1 : 0
+                    visible: bluetoothPanelContent.opacity > 0
+
+                    Behavior on opacity {
+                        NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
                     }
 
-                    IconImage {
-                        anchors.centerIn: parent
+                    Item {
+                        id: btHeader
 
-                        width: 18
-                        height: 18
-
-                        source: Quickshell.iconPath("go-previous-symbolic", "go-previous")
-                        asynchronous: true
-                    }
-                }
-
-                Text {
-                    anchors.left: btBackButton.right
-                    anchors.leftMargin: 8
-                    anchors.right: btPowerToggle.left
-                    anchors.rightMargin: 10
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    text: "Bluetooth"
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 16
-                    font.weight: Font.DemiBold
-                    elide: Text.ElideRight
-                }
-
-                MouseArea {
-                    id: btRescan
-
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    width: 32
-                    height: 32
-                    enabled: bluetoothService.enabled && !bluetoothService.scanning
-                    cursorShape: Qt.PointingHandCursor
-
-                    onClicked: bluetoothService.requestScan()
-
-                    Rectangle {
-                        anchors.fill: parent
-
-                        radius: 16
-                        color: btRescanHover.hovered ? Theme.panelSurface : "transparent"
-                    }
-
-                    HoverHandler {
-                        id: btRescanHover
-                    }
-
-                    IconImage {
-                        id: btRescanIcon
-
-                        anchors.centerIn: parent
-
-                        width: 18
-                        height: 18
-                        opacity: bluetoothService.scanning ? 0.4 : 1
-
-                        source: Quickshell.iconPath("view-refresh-symbolic", "view-refresh")
-                        asynchronous: true
-
-                        RotationAnimation {
-                            id: btRescanSpin
-
-                            target: btRescanIcon
-                            running: bluetoothService.scanning
-                            from: 0
-                            to: 360
-                            duration: 900
-                            loops: Animation.Infinite
-
-                            onRunningChanged: if (!btRescanSpin.running) btRescanIcon.rotation = 0
+                        anchors {
+                            top: parent.top
+                            left: parent.left
+                            right: parent.right
                         }
-                    }
-                }
 
-                Rectangle {
-                    id: btPowerToggle
+                        height: 32
 
-                    z: 2
+                        MouseArea {
+                            id: btBackButton
 
-                    anchors.right: btRescan.left
-                    anchors.rightMargin: 12
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    width: 44
-                    height: 24
-                    radius: 12
-                    color: bluetoothService.enabled ? Theme.accent : Theme.panelSurface
-                    border.width: 1
-                    border.color: bluetoothService.enabled ? "transparent" : Qt.rgba(1, 1, 1, 0.2)
-
-                    Rectangle {
-                        width: 18
-                        height: 18
-                        radius: 9
-                        y: 3
-                        x: bluetoothService.enabled ? parent.width - width - 3 : 3
-                        color: bluetoothService.enabled ? Theme.background : Theme.textMuted
-
-                        Behavior on x {
-                            NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
-                        }
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-
-                        cursorShape: Qt.PointingHandCursor
-
-                        onClicked: bluetoothService.togglePower()
-                    }
-                }
-            }
-
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.top: btHeader.bottom
-                anchors.topMargin: 12
-
-                text: {
-                    if (!bluetoothService.enabled) return "Bluetooth is Off"
-                    if (bluetoothService.scanning) return "Scanning for devices…"
-                    return "No devices found"
-                }
-                color: Theme.textMuted
-                font.family: Theme.fontFamily
-                font.pixelSize: 12
-                visible: bluetoothService.devices.length === 0
-            }
-
-            ListView {
-                id: btList
-
-                anchors {
-                    top: btHeader.bottom
-                    left: parent.left
-                    right: parent.right
-                    bottom: parent.bottom
-                }
-
-                anchors.topMargin: 8
-
-                clip: true
-                spacing: 4
-                visible: bluetoothService.devices.length > 0
-                model: bluetoothService.devices
-
-                delegate: Rectangle {
-                    id: btRow
-
-                    required property var modelData
-
-                    readonly property var dev: btRow.modelData
-                    readonly property string addr: btRow.dev ? btRow.dev.address : ""
-                    // transient BlueZ states - block the row action while in flight
-                    readonly property bool btBusy: btRow.dev
-                        && (btRow.dev.state === BluetoothDeviceState.Connecting
-                            || btRow.dev.state === BluetoothDeviceState.Disconnecting)
-
-                    width: btList.width
-                    height: 52
-                    radius: 14
-                    color: btRowHover.hovered ? Theme.panelSurface : "transparent"
-
-                    HoverHandler {
-                        id: btRowHover
-
-                        cursorShape: Qt.PointingHandCursor
-                    }
-
-                    Row {
-                        anchors.fill: parent
-
-                        anchors.leftMargin: 12
-                        anchors.rightMargin: btRowActions.width + 20
-
-                        spacing: 10
-
-                        IconImage {
+                            anchors.left: parent.left
                             anchors.verticalCenter: parent.verticalCenter
 
-                            width: 26
-                            height: 26
+                            width: 32
+                            height: 32
+                            cursorShape: Qt.PointingHandCursor
 
-                            source: Quickshell.iconPath(btRow.dev ? btRow.dev.icon : "bluetooth", "bluetooth")
-                            asynchronous: true
-                        }
+                            onClicked: root.bluetoothPanelOpen = false
 
-                        Column {
-                            anchors.verticalCenter: parent.verticalCenter
-
-                            width: parent.width - 26 - 10
-
-                            spacing: 2
-
-                            Text {
-                                width: parent.width
-                                elide: Text.ElideRight
-
-                                text: btRow.dev ? btRow.dev.name : ""
-                                color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 13
-                                font.weight: btRow.dev && btRow.dev.connected ? Font.DemiBold : Font.Normal
-                            }
-
-                            Text {
-                                width: parent.width
-                                elide: Text.ElideRight
-
-                                text: {
-                                    if (!btRow.dev) return ""
-                                    if (btRow.dev.state === BluetoothDeviceState.Connecting) return "Connecting…"
-                                    if (btRow.dev.state === BluetoothDeviceState.Disconnecting) return "Disconnecting…"
-                                    if (btRow.dev.connected) return "Connected"
-                                    if (btRow.dev.paired) return "Paired"
-                                    return "Available"
-                                }
-                                color: Theme.textMuted
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 11
-                            }
-                        }
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-
-                        cursorShape: Qt.PointingHandCursor
-
-                        onClicked: {
-                            if (btRow.btBusy) return
-                            if (btRow.dev && btRow.dev.paired && !btRow.dev.connected)
-                                bluetoothService.connectDevice(btRow.addr)
-                        }
-                    }
-
-                    Row {
-                        id: btRowActions
-
-                        anchors.right: parent.right
-                        anchors.rightMargin: 12
-                        anchors.verticalCenter: parent.verticalCenter
-
-                        spacing: 10
-
-                        // Fixed slots so a device connecting (battery cluster
-                        // appearing) or the action label changing length never
-                        // reflows the name column - btRowActions.width is constant.
-                        //
-                        // Battery cluster: [level glyph] [NN%], unified
-                        // single-glyph set from assets/best-battery-icon/ (the
-                        // charging state is baked into its own glyph, so there is
-                        // no separate flash overlay), tinted via ColorOverlay
-                        // (the SVGs are solid #000). The cell is a fixed 52px
-                        // wide regardless of contents.
-                        Item {
-                            id: btBatteryCell
-
-                            anchors.verticalCenter: parent.verticalCenter
-                            width: 52
-                            height: 20
-
-                            readonly property bool hasBattery: btRow.dev && btRow.dev.batteryAvailable
-                            readonly property int pct: btBatteryCell.hasBattery
-                                ? Math.round(btRow.dev.battery * 100)   // battery is a 0.0-1.0 double
-                                : 0
-                            // Quickshell.Bluetooth's BluetoothDevice exposes no
-                            // charge-state signal, so a BT peripheral never
-                            // reports charging; kept for parity with the system
-                            // battery mapping, lights up the instant it is true.
-                            readonly property bool charging: false
-
-                            readonly property string levelFile: {
-                                if (btBatteryCell.charging) return "battery-charging-svgrepo-com.svg"
-                                const p = btBatteryCell.pct
-                                if (p >= 90) return "battery-full-svgrepo-com.svg"
-                                if (p >= 65) return "battery-75-svgrepo-com.svg"
-                                if (p >= 35) return "battery-half-svgrepo-com.svg"
-                                if (p >= 15) return "battery-low-svgrepo-com.svg"
-                                return "battery-empty-svgrepo-com.svg"
-                            }
-
-                            Row {
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 4
-                                visible: btBatteryCell.hasBattery
-
-                                Item {
-                                    width: 22
-                                    height: 18
-                                    anchors.verticalCenter: parent.verticalCenter
-
-                                    Image {
-                                        id: btLevelImg
-                                        anchors.fill: parent
-                                        visible: false
-                                        asynchronous: true
-                                        fillMode: Image.PreserveAspectFit
-                                        sourceSize.width: 44
-                                        sourceSize.height: 36
-                                        source: "file://" + Quickshell.shellPath("assets/best-battery-icon/" + btBatteryCell.levelFile)
-                                    }
-                                    ColorOverlay {
-                                        anchors.fill: btLevelImg
-                                        source: btLevelImg
-                                        color: btBatteryCell.charging ? Theme.accent : Theme.textMuted
-                                    }
-                                }
-
-                                Text {
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    width: 24
-                                    horizontalAlignment: Text.AlignRight
-                                    text: btBatteryCell.pct + "%"
-                                    color: Theme.textMuted
-                                    font.family: Theme.fontFamily
-                                    font.pixelSize: 11
-                                }
-                            }
-                        }
-
-                        Text {
-                            id: btActionText
-
-                            anchors.verticalCenter: parent.verticalCenter
-
-                            width: 66
-                            horizontalAlignment: Text.AlignRight
-                            text: {
-                                if (!btRow.dev) return ""
-                                if (btRow.dev.connected) return "Disconnect"
-                                if (btRow.dev.paired) return "Connect"
-                                return "Pair"
-                            }
-                            color: btActionHover.hovered ? Theme.text : Theme.accent
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 11
-                            font.weight: Font.DemiBold
-                            opacity: btRow.btBusy ? 0.35 : 1
-
-                            HoverHandler {
-                                id: btActionHover
-
-                                enabled: !btRow.btBusy
-                                cursorShape: Qt.PointingHandCursor
-                            }
-
-                            MouseArea {
+                            Rectangle {
                                 anchors.fill: parent
 
-                                enabled: !btRow.btBusy
-                                cursorShape: Qt.PointingHandCursor
-
-                                onClicked: {
-                                    if (!btRow.dev) return
-                                    if (btRow.dev.connected) bluetoothService.disconnectDevice(btRow.addr)
-                                    else if (btRow.dev.paired) bluetoothService.connectDevice(btRow.addr)
-                                    else bluetoothService.pairDevice(btRow.addr)
-                                }
+                                radius: 16
+                                color: btBackHover.hovered ? Theme.panelSurface : "transparent"
                             }
-                        }
 
-                        Item {
-                            anchors.verticalCenter: parent.verticalCenter
-
-                            width: 22
-                            height: 22
-                            visible: btRow.dev && btRow.dev.paired
+                            HoverHandler {
+                                id: btBackHover
+                            }
 
                             IconImage {
                                 anchors.centerIn: parent
 
-                                width: 16
-                                height: 16
+                                width: 18
+                                height: 18
 
-                                source: Quickshell.iconPath("view-more-symbolic", "open-menu-symbolic")
+                                source: Quickshell.iconPath("go-previous-symbolic", "go-previous")
                                 asynchronous: true
+                            }
+                        }
+
+                        Text {
+                            anchors.left: btBackButton.right
+                            anchors.leftMargin: 8
+                            anchors.right: btPowerToggle.left
+                            anchors.rightMargin: 10
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            text: "Bluetooth"
+                            color: Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 16
+                            font.weight: Font.DemiBold
+                            elide: Text.ElideRight
+                        }
+
+                        MouseArea {
+                            id: btRescan
+
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            width: 32
+                            height: 32
+                            enabled: bluetoothService.enabled && !bluetoothService.scanning
+                            cursorShape: Qt.PointingHandCursor
+
+                            onClicked: bluetoothService.requestScan()
+
+                            Rectangle {
+                                anchors.fill: parent
+
+                                radius: 16
+                                color: btRescanHover.hovered ? Theme.panelSurface : "transparent"
+                            }
+
+                            HoverHandler {
+                                id: btRescanHover
+                            }
+
+                            IconImage {
+                                id: btRescanIcon
+
+                                anchors.centerIn: parent
+
+                                width: 18
+                                height: 18
+                                opacity: bluetoothService.scanning ? 0.4 : 1
+
+                                source: Quickshell.iconPath("view-refresh-symbolic", "view-refresh")
+                                asynchronous: true
+
+                                RotationAnimation {
+                                    id: btRescanSpin
+
+                                    target: btRescanIcon
+                                    running: bluetoothService.scanning
+                                    from: 0
+                                    to: 360
+                                    duration: 900
+                                    loops: Animation.Infinite
+
+                                    onRunningChanged: if (!btRescanSpin.running) btRescanIcon.rotation = 0
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            id: btPowerToggle
+
+                            z: 2
+
+                            anchors.right: btRescan.left
+                            anchors.rightMargin: 12
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            width: 44
+                            height: 24
+                            radius: 12
+                            color: bluetoothService.enabled ? Theme.accent : Theme.panelSurface
+                            border.width: 1
+                            border.color: bluetoothService.enabled ? "transparent" : Qt.rgba(1, 1, 1, 0.2)
+
+                            Rectangle {
+                                width: 18
+                                height: 18
+                                radius: 9
+                                y: 3
+                                x: bluetoothService.enabled ? parent.width - width - 3 : 3
+                                color: bluetoothService.enabled ? Theme.background : Theme.textMuted
+
+                                Behavior on x {
+                                    NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+                                }
                             }
 
                             MouseArea {
@@ -2856,138 +2637,417 @@ PanelWindow {
 
                                 cursorShape: Qt.PointingHandCursor
 
-                                onClicked: bluetoothPanel.menuAddr = bluetoothPanel.menuAddr === btRow.addr ? "" : btRow.addr
+                                onClicked: bluetoothService.togglePower()
+                            }
+                        }
+                    }
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.top: btHeader.bottom
+                        anchors.topMargin: 12
+
+                        text: {
+                            if (!bluetoothService.enabled) return "Bluetooth is Off"
+                            if (bluetoothService.scanning) return "Scanning for devices…"
+                            return "No devices found"
+                        }
+                        color: Theme.textMuted
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 12
+                        visible: bluetoothService.devices.length === 0
+                    }
+
+                    ListView {
+                        id: btList
+
+                        anchors {
+                            top: btHeader.bottom
+                            left: parent.left
+                            right: parent.right
+                            bottom: parent.bottom
+                        }
+
+                        anchors.topMargin: 8
+
+                        clip: true
+                        spacing: 4
+                        visible: bluetoothService.devices.length > 0
+                        model: bluetoothService.devices
+
+                        delegate: Rectangle {
+                            id: btRow
+
+                            required property var modelData
+
+                            readonly property var dev: btRow.modelData
+                            readonly property string addr: btRow.dev ? btRow.dev.address : ""
+                            // transient BlueZ states - block the row action while in flight
+                            readonly property bool btBusy: btRow.dev
+                                && (btRow.dev.state === BluetoothDeviceState.Connecting
+                                    || btRow.dev.state === BluetoothDeviceState.Disconnecting)
+
+                            width: btList.width
+                            height: 52
+                            radius: 14
+                            color: btRowHover.hovered ? Theme.panelSurface : "transparent"
+
+                            HoverHandler {
+                                id: btRowHover
+
+                                cursorShape: Qt.PointingHandCursor
+                            }
+
+                            Row {
+                                anchors.fill: parent
+
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: btRowActions.width + 20
+
+                                spacing: 10
+
+                                IconImage {
+                                    anchors.verticalCenter: parent.verticalCenter
+
+                                    width: 26
+                                    height: 26
+
+                                    source: Quickshell.iconPath(btRow.dev ? btRow.dev.icon : "bluetooth", "bluetooth")
+                                    asynchronous: true
+                                }
+
+                                Column {
+                                    anchors.verticalCenter: parent.verticalCenter
+
+                                    width: parent.width - 26 - 10
+
+                                    spacing: 2
+
+                                    Text {
+                                        width: parent.width
+                                        elide: Text.ElideRight
+
+                                        text: btRow.dev ? btRow.dev.name : ""
+                                        color: Theme.text
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 13
+                                        font.weight: btRow.dev && btRow.dev.connected ? Font.DemiBold : Font.Normal
+                                    }
+
+                                    Text {
+                                        width: parent.width
+                                        elide: Text.ElideRight
+
+                                        text: {
+                                            if (!btRow.dev) return ""
+                                            if (btRow.dev.state === BluetoothDeviceState.Connecting) return "Connecting…"
+                                            if (btRow.dev.state === BluetoothDeviceState.Disconnecting) return "Disconnecting…"
+                                            if (btRow.dev.connected) return "Connected"
+                                            if (btRow.dev.paired) return "Paired"
+                                            return "Available"
+                                        }
+                                        color: Theme.textMuted
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 11
+                                    }
+                                }
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+
+                                cursorShape: Qt.PointingHandCursor
+
+                                onClicked: {
+                                    if (btRow.btBusy) return
+                                    if (btRow.dev && btRow.dev.paired && !btRow.dev.connected)
+                                        bluetoothService.connectDevice(btRow.addr)
+                                }
+                            }
+
+                            Row {
+                                id: btRowActions
+
+                                anchors.right: parent.right
+                                anchors.rightMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+
+                                spacing: 10
+
+                                // Fixed slots so a device connecting (battery cluster
+                                // appearing) or the action label changing length never
+                                // reflows the name column - btRowActions.width is constant.
+                                //
+                                // Battery cluster: [level glyph] [NN%], unified
+                                // single-glyph set from assets/best-battery-icon/ (the
+                                // charging state is baked into its own glyph, so there is
+                                // no separate flash overlay), tinted via ColorOverlay
+                                // (the SVGs are solid #000). The cell is a fixed 52px
+                                // wide regardless of contents.
+                                Item {
+                                    id: btBatteryCell
+
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: 52
+                                    height: 20
+
+                                    readonly property bool hasBattery: btRow.dev && btRow.dev.batteryAvailable
+                                    readonly property int pct: btBatteryCell.hasBattery
+                                        ? Math.round(btRow.dev.battery * 100)   // battery is a 0.0-1.0 double
+                                        : 0
+                                    // Quickshell.Bluetooth's BluetoothDevice exposes no
+                                    // charge-state signal, so a BT peripheral never
+                                    // reports charging; kept for parity with the system
+                                    // battery mapping, lights up the instant it is true.
+                                    readonly property bool charging: false
+
+                                    readonly property string levelFile: {
+                                        if (btBatteryCell.charging) return "battery-charging-svgrepo-com.svg"
+                                        const p = btBatteryCell.pct
+                                        if (p >= 90) return "battery-full-svgrepo-com.svg"
+                                        if (p >= 65) return "battery-75-svgrepo-com.svg"
+                                        if (p >= 35) return "battery-half-svgrepo-com.svg"
+                                        if (p >= 15) return "battery-low-svgrepo-com.svg"
+                                        return "battery-empty-svgrepo-com.svg"
+                                    }
+
+                                    Row {
+                                        anchors.right: parent.right
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        spacing: 4
+                                        visible: btBatteryCell.hasBattery
+
+                                        Item {
+                                            width: 22
+                                            height: 18
+                                            anchors.verticalCenter: parent.verticalCenter
+
+                                            Image {
+                                                id: btLevelImg
+                                                anchors.fill: parent
+                                                visible: false
+                                                asynchronous: true
+                                                fillMode: Image.PreserveAspectFit
+                                                sourceSize.width: 44
+                                                sourceSize.height: 36
+                                                source: "file://" + Quickshell.shellPath("assets/best-battery-icon/" + btBatteryCell.levelFile)
+                                            }
+                                            ColorOverlay {
+                                                anchors.fill: btLevelImg
+                                                source: btLevelImg
+                                                color: btBatteryCell.charging ? Theme.accent : Theme.textMuted
+                                            }
+                                        }
+
+                                        Text {
+                                            anchors.verticalCenter: parent.verticalCenter
+                                            width: 24
+                                            horizontalAlignment: Text.AlignRight
+                                            text: btBatteryCell.pct + "%"
+                                            color: Theme.textMuted
+                                            font.family: Theme.fontFamily
+                                            font.pixelSize: 11
+                                        }
+                                    }
+                                }
+
+                                Text {
+                                    id: btActionText
+
+                                    anchors.verticalCenter: parent.verticalCenter
+
+                                    width: 66
+                                    horizontalAlignment: Text.AlignRight
+                                    text: {
+                                        if (!btRow.dev) return ""
+                                        if (btRow.dev.connected) return "Disconnect"
+                                        if (btRow.dev.paired) return "Connect"
+                                        return "Pair"
+                                    }
+                                    color: btActionHover.hovered ? Theme.text : Theme.accent
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    font.weight: Font.DemiBold
+                                    opacity: btRow.btBusy ? 0.35 : 1
+
+                                    HoverHandler {
+                                        id: btActionHover
+
+                                        enabled: !btRow.btBusy
+                                        cursorShape: Qt.PointingHandCursor
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+
+                                        enabled: !btRow.btBusy
+                                        cursorShape: Qt.PointingHandCursor
+
+                                        onClicked: {
+                                            if (!btRow.dev) return
+                                            if (btRow.dev.connected) bluetoothService.disconnectDevice(btRow.addr)
+                                            else if (btRow.dev.paired) bluetoothService.connectDevice(btRow.addr)
+                                            else bluetoothService.pairDevice(btRow.addr)
+                                        }
+                                    }
+                                }
+
+                                Item {
+                                    anchors.verticalCenter: parent.verticalCenter
+
+                                    width: 22
+                                    height: 22
+                                    visible: btRow.dev && btRow.dev.paired
+
+                                    IconImage {
+                                        anchors.centerIn: parent
+
+                                        width: 16
+                                        height: 16
+
+                                        source: Quickshell.iconPath("view-more-symbolic", "open-menu-symbolic")
+                                        asynchronous: true
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+
+                                        cursorShape: Qt.PointingHandCursor
+
+                                        onClicked: bluetoothPanel.menuAddr = bluetoothPanel.menuAddr === btRow.addr ? "" : btRow.addr
+                                    }
+                                }
                             }
                         }
                     }
                 }
-            }
-        }
 
-        MouseArea {
-            id: btMenuBackdrop
+                MouseArea {
+                    id: btMenuBackdrop
 
-            anchors.fill: parent
+                    anchors.fill: parent
 
-            z: 20
-            visible: bluetoothPanel.menuAddr !== ""
+                    z: 20
+                    visible: bluetoothPanel.menuAddr !== ""
 
-            onClicked: bluetoothPanel.menuAddr = ""
-        }
-
-        Rectangle {
-            id: btMenuPopup
-
-            z: 21
-            visible: bluetoothPanel.menuAddr !== ""
-
-            anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.rightMargin: 14
-            anchors.topMargin: 52
-
-            width: 180
-            height: btMenuColumn.height + 12
-
-            // Separation from the dark list comes from the crisp accent hairline;
-            // fill stays Theme.panelBackground.
-            radius: 10
-            color: Theme.panelBackground
-            border.width: 1
-            border.color: Theme.accent
-
-            Column {
-                id: btMenuColumn
-
-                anchors.top: parent.top
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.topMargin: 6
-                anchors.leftMargin: 6
-                anchors.rightMargin: 6
-
-                Rectangle {
-                    width: parent.width
-                    height: 34
-                    radius: 6
-                    color: btTrustHover.hovered ? Theme.panelSurface : "transparent"
-                    Behavior on color { ColorAnimation { duration: 100 } }
-
-                    HoverHandler {
-                        id: btTrustHover
-
-                        cursorShape: Qt.PointingHandCursor
-                    }
-
-                    Text {
-                        anchors.left: parent.left
-                        anchors.leftMargin: 10
-                        anchors.verticalCenter: parent.verticalCenter
-
-                        text: "Trust Device"
-                        color: btTrustHover.hovered ? Theme.accent : Theme.text
-                        Behavior on color { ColorAnimation { duration: 100 } }
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                    }
-
-                    Text {
-                        anchors.right: parent.right
-                        anchors.rightMargin: 10
-                        anchors.verticalCenter: parent.verticalCenter
-
-                        text: (bluetoothPanel.menuDevice && bluetoothPanel.menuDevice.trusted) ? "✓" : ""
-                        color: Theme.accent
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 13
-                        font.weight: Font.DemiBold
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-
-                        cursorShape: Qt.PointingHandCursor
-
-                        onClicked: {
-                            if (bluetoothPanel.menuDevice)
-                                bluetoothService.setTrusted(bluetoothPanel.menuAddr, !bluetoothPanel.menuDevice.trusted)
-                        }
-                    }
+                    onClicked: bluetoothPanel.menuAddr = ""
                 }
 
                 Rectangle {
-                    width: parent.width
-                    height: 34
-                    radius: 6
-                    color: btForgetHover.hovered ? Theme.panelSurface : "transparent"
-                    Behavior on color { ColorAnimation { duration: 100 } }
+                    id: btMenuPopup
 
-                    HoverHandler {
-                        id: btForgetHover
+                    z: 21
+                    visible: bluetoothPanel.menuAddr !== ""
 
-                        cursorShape: Qt.PointingHandCursor
-                    }
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    anchors.rightMargin: 14
+                    anchors.topMargin: 52
 
-                    Text {
+                    width: 180
+                    height: btMenuColumn.height + 12
+
+                    // Separation from the dark list comes from the crisp accent hairline;
+                    // fill stays Theme.panelBackground.
+                    radius: 10
+                    color: Theme.panelBackground
+                    border.width: 1
+                    border.color: Theme.accent
+
+                    Column {
+                        id: btMenuColumn
+
+                        anchors.top: parent.top
                         anchors.left: parent.left
-                        anchors.leftMargin: 10
-                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.right: parent.right
+                        anchors.topMargin: 6
+                        anchors.leftMargin: 6
+                        anchors.rightMargin: 6
 
-                        text: "Forget Device"
-                        color: btForgetHover.hovered ? Theme.accent : Theme.text
-                        Behavior on color { ColorAnimation { duration: 100 } }
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                    }
+                        Rectangle {
+                            width: parent.width
+                            height: 34
+                            radius: 6
+                            color: btTrustHover.hovered ? Theme.panelSurface : "transparent"
+                            Behavior on color { ColorAnimation { duration: 100 } }
 
-                    MouseArea {
-                        anchors.fill: parent
+                            HoverHandler {
+                                id: btTrustHover
 
-                        cursorShape: Qt.PointingHandCursor
+                                cursorShape: Qt.PointingHandCursor
+                            }
 
-                        onClicked: {
-                            bluetoothService.forgetDevice(bluetoothPanel.menuAddr)
-                            bluetoothPanel.menuAddr = ""
+                            Text {
+                                anchors.left: parent.left
+                                anchors.leftMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+
+                                text: "Trust Device"
+                                color: btTrustHover.hovered ? Theme.accent : Theme.text
+                                Behavior on color { ColorAnimation { duration: 100 } }
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                            }
+
+                            Text {
+                                anchors.right: parent.right
+                                anchors.rightMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+
+                                text: (bluetoothPanel.menuDevice && bluetoothPanel.menuDevice.trusted) ? "✓" : ""
+                                color: Theme.accent
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 13
+                                font.weight: Font.DemiBold
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+
+                                cursorShape: Qt.PointingHandCursor
+
+                                onClicked: {
+                                    if (bluetoothPanel.menuDevice)
+                                        bluetoothService.setTrusted(bluetoothPanel.menuAddr, !bluetoothPanel.menuDevice.trusted)
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            width: parent.width
+                            height: 34
+                            radius: 6
+                            color: btForgetHover.hovered ? Theme.panelSurface : "transparent"
+                            Behavior on color { ColorAnimation { duration: 100 } }
+
+                            HoverHandler {
+                                id: btForgetHover
+
+                                cursorShape: Qt.PointingHandCursor
+                            }
+
+                            Text {
+                                anchors.left: parent.left
+                                anchors.leftMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+
+                                text: "Forget Device"
+                                color: btForgetHover.hovered ? Theme.accent : Theme.text
+                                Behavior on color { ColorAnimation { duration: 100 } }
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+
+                                cursorShape: Qt.PointingHandCursor
+
+                                onClicked: {
+                                    bluetoothService.forgetDevice(bluetoothPanel.menuAddr)
+                                    bluetoothPanel.menuAddr = ""
+                                }
+                            }
                         }
                     }
                 }
@@ -3016,6 +3076,10 @@ PanelWindow {
 
         enabled: root.hotspotPanelOpen
         visible: hotspotPanel.opacity > 0
+
+        // Latched by the content Loader below: the panel content tree
+        // is created on first open and kept for the rest of the session.
+        property bool _contentLatched: false
 
         // Shared glass highlight (see ControlTile): full-bleed rect using
         // the panel's live radius (it morphs on open/close); falloff shaped
@@ -3071,9 +3135,7 @@ PanelWindow {
             if (!hotspotPanel.visible) {
                 hotspotPanel.revealPassword = false
             } else {
-                hsSsidField.text = hotspotService.ssid
-                hsPasswordField.text = hotspotService.password
-                hsSecurityCombo.currentIndex = hotspotService.secured ? 0 : 1
+                if (hotspotContentLoader.item) hotspotContentLoader.item.syncFieldsFromService()
                 hotspotService.updateStatus()
             }
         }
@@ -3093,356 +3155,159 @@ PanelWindow {
             enabled: root.hotspotPanelOpen
 
             function onSsidChanged() {
-                if (!hsSsidField.activeFocus) hsSsidField.text = hotspotService.ssid
+                if (hotspotContentLoader.item) hotspotContentLoader.item.syncSsidField()
             }
             function onPasswordChanged() {
-                if (!hsPasswordField.activeFocus) hsPasswordField.text = hotspotService.password
+                if (hotspotContentLoader.item) hotspotContentLoader.item.syncPasswordField()
             }
             function onSecuredChanged() {
-                hsSecurityCombo.currentIndex = hotspotService.secured ? 0 : 1
+                if (hotspotContentLoader.item) hotspotContentLoader.item.syncSecuredField()
             }
         }
 
-        Item {
-            id: hotspotPanelContent
+        // Lazy content stage (Loader latch, the Launcher pattern): the
+        // whole content tree under this panel - lists, menus, dialogs -
+        // does not exist until the panel is first opened, so a panel the
+        // user never opens costs no objects at shell startup.
+        Loader {
+            id: hotspotContentLoader
 
-            anchors {
-                top: parent.top
-                left: parent.left
-                right: parent.right
-                bottom: parent.bottom
-            }
+            anchors.fill: parent
+            active: root.hotspotPanelOpen || hotspotPanel._contentLatched
+            sourceComponent: hotspotContentComponent
 
-            anchors.margins: 14
+            onLoaded: hotspotPanel._contentLatched = true
+        }
 
-            opacity: root.hotspotPanelOpen ? 1 : 0
-            visible: hotspotPanelContent.opacity > 0
-
-            Behavior on opacity {
-                NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
-            }
+        Component {
+            id: hotspotContentComponent
 
             Item {
-                id: hsHeader
+                anchors.fill: parent
 
-                anchors {
-                    top: parent.top
-                    left: parent.left
-                    right: parent.right
+                function syncFieldsFromService() {
+                    hsSsidField.text = hotspotService.ssid
+                    hsPasswordField.text = hotspotService.password
+                    hsSecurityCombo.currentIndex = hotspotService.secured ? 0 : 1
                 }
 
-                height: 32
-
-                MouseArea {
-                    id: hsBackButton
-
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    width: 32
-                    height: 32
-                    cursorShape: Qt.PointingHandCursor
-
-                    onClicked: root.hotspotPanelOpen = false
-
-                    Rectangle {
-                        anchors.fill: parent
-
-                        radius: 16
-                        color: hsBackHover.hovered ? Theme.panelSurface : "transparent"
-                    }
-
-                    HoverHandler {
-                        id: hsBackHover
-                    }
-
-                    IconImage {
-                        anchors.centerIn: parent
-
-                        width: 18
-                        height: 18
-
-                        source: Quickshell.iconPath("go-previous-symbolic", "go-previous")
-                        asynchronous: true
-                    }
+                function syncSsidField() {
+                    if (!hsSsidField.activeFocus) hsSsidField.text = hotspotService.ssid
                 }
 
-                Text {
-                    anchors.left: hsBackButton.right
-                    anchors.leftMargin: 8
-                    anchors.right: hsPowerToggle.left
-                    anchors.rightMargin: 10
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    text: "Mobile Hotspot"
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 16
-                    font.weight: Font.DemiBold
-                    elide: Text.ElideRight
+                function syncPasswordField() {
+                    if (!hsPasswordField.activeFocus) hsPasswordField.text = hotspotService.password
                 }
 
-                Rectangle {
-                    id: hsPowerToggle
-
-                    z: 2
-
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    width: 44
-                    height: 24
-                    radius: 12
-                    color: hotspotService.enabled ? Theme.accent : Theme.panelSurface
-                    border.width: 1
-                    border.color: hotspotService.enabled ? "transparent" : Qt.rgba(1, 1, 1, 0.2)
-
-                    Rectangle {
-                        width: 18
-                        height: 18
-                        radius: 9
-                        y: 3
-                        x: hotspotService.enabled ? parent.width - width - 3 : 3
-                        color: hotspotService.enabled ? Theme.background : Theme.textMuted
-
-                        Behavior on x {
-                            NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
-                        }
-                    }
-
-                    MouseArea {
-                        anchors.fill: parent
-
-                        cursorShape: Qt.PointingHandCursor
-
-                        onClicked: hotspotService.toggleHotspot()
-                    }
-                }
-            }
-
-            Column {
-                anchors {
-                    top: hsHeader.bottom
-                    left: parent.left
-                    right: parent.right
+                function syncSecuredField() {
+                    hsSecurityCombo.currentIndex = hotspotService.secured ? 0 : 1
                 }
 
-                anchors.topMargin: 18
+                Item {
+                    id: hotspotPanelContent
 
-                spacing: 14
-
-                Column {
-                    width: parent.width
-
-                    spacing: 4
-
-                    Text {
-                        text: "Network name"
-                        color: Theme.textMuted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 11
+                    anchors {
+                        top: parent.top
+                        left: parent.left
+                        right: parent.right
+                        bottom: parent.bottom
                     }
 
-                    Rectangle {
-                        width: parent.width
-                        height: 34
+                    anchors.margins: 14
 
-                        radius: 8
-                        // Dark fill, always-on accent hairline to define the bounds.
-                        color: Theme.background
-                        border.width: 1
-                        border.color: Theme.accent
+                    opacity: root.hotspotPanelOpen ? 1 : 0
+                    visible: hotspotPanelContent.opacity > 0
 
-                        TextField {
-                            id: hsSsidField
-
-                            anchors.fill: parent
-                            anchors.leftMargin: 10
-                            anchors.rightMargin: 10
-
-                            verticalAlignment: TextInput.AlignVCenter
-
-                            placeholderText: "Hotspot name"
-                            placeholderTextColor: Theme.textMuted
-                            color: Theme.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 12
-
-                            selectByMouse: true
-
-                            background: Rectangle {
-                                color: "transparent"
-                            }
-                        }
-                    }
-                }
-
-                Column {
-                    width: parent.width
-
-                    spacing: 4
-
-                    Text {
-                        text: "Security"
-                        color: Theme.textMuted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 11
+                    Behavior on opacity {
+                        NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
                     }
 
-                    ComboBox {
-                        id: hsSecurityCombo
+                    Item {
+                        id: hsHeader
 
-                        width: parent.width
-                        height: 34
-
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-
-                        model: ["WPA2/WPA3 Personal", "None / Open"]
-                        currentIndex: 0
-
-                        background: Rectangle {
-                            radius: 8
-                            // Match the SSID / password fields: dark fill, always-on
-                            // accent hairline.
-                            color: Theme.background
-                            border.width: 1
-                            border.color: Theme.accent
+                        anchors {
+                            top: parent.top
+                            left: parent.left
+                            right: parent.right
                         }
 
-                        contentItem: Text {
-                            leftPadding: 10
-                            rightPadding: hsSecurityCombo.indicator.width + 6
+                        height: 32
 
-                            text: hsSecurityCombo.displayText
-                            color: Theme.text
-                            font: hsSecurityCombo.font
-                            verticalAlignment: Text.AlignVCenter
-                            elide: Text.ElideRight
-                        }
+                        MouseArea {
+                            id: hsBackButton
 
-                        indicator: IconImage {
-                            x: hsSecurityCombo.width - width - 10
-                            y: (hsSecurityCombo.height - height) / 2
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
 
-                            width: 14
-                            height: 14
-
-                            source: Quickshell.iconPath("pan-down-symbolic", "go-down-symbolic")
-                            asynchronous: true
-                        }
-
-                        delegate: ItemDelegate {
-                            width: hsSecurityCombo.width
+                            width: 32
                             height: 32
+                            cursorShape: Qt.PointingHandCursor
 
-                            highlighted: hsSecurityCombo.highlightedIndex === index
+                            onClicked: root.hotspotPanelOpen = false
 
-                            contentItem: Text {
-                                leftPadding: 6
+                            Rectangle {
+                                anchors.fill: parent
 
-                                text: modelData
-                                color: Theme.text
-                                font.family: Theme.fontFamily
-                                font.pixelSize: 12
-                                verticalAlignment: Text.AlignVCenter
-                                elide: Text.ElideRight
+                                radius: 16
+                                color: hsBackHover.hovered ? Theme.panelSurface : "transparent"
                             }
 
-                            background: Rectangle {
-                                radius: 6
-                                color: highlighted ? Theme.panelRaised : "transparent"
-                            }
-                        }
-
-                        popup: Popup {
-                            y: hsSecurityCombo.height + 4
-                            width: hsSecurityCombo.width
-                            padding: 4
-
-                            implicitHeight: contentItem.implicitHeight + 8
-
-                            background: Rectangle {
-                                radius: 10
-                                color: Theme.background
-                                border.width: 1
-                                border.color: Theme.accent
+                            HoverHandler {
+                                id: hsBackHover
                             }
 
-                            contentItem: ListView {
-                                clip: true
-                                implicitHeight: contentHeight
-                                model: hsSecurityCombo.popup.visible ? hsSecurityCombo.delegateModel : null
-                                currentIndex: hsSecurityCombo.highlightedIndex
-                            }
-                        }
-                    }
-                }
+                            IconImage {
+                                anchors.centerIn: parent
 
-                Column {
-                    width: parent.width
+                                width: 18
+                                height: 18
 
-                    spacing: 4
-                    visible: hsSecurityCombo.currentIndex === 0
-
-                    Text {
-                        text: "Password"
-                        color: Theme.textMuted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 11
-                    }
-
-                    Rectangle {
-                        width: parent.width
-                        height: 34
-
-                        radius: 8
-                        // Dark fill, always-on accent hairline to define the bounds.
-                        color: Theme.background
-                        border.width: 1
-                        border.color: Theme.accent
-
-                        TextField {
-                            id: hsPasswordField
-
-                            anchors.fill: parent
-                            anchors.leftMargin: 10
-                            anchors.rightMargin: hsRevealButton.width + 20
-
-                            verticalAlignment: TextInput.AlignVCenter
-                            echoMode: hotspotPanel.revealPassword ? TextInput.Normal : TextInput.Password
-                            passwordCharacter: "•"
-
-                            placeholderText: "Password"
-                            placeholderTextColor: Theme.textMuted
-                            color: Theme.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 12
-
-                            selectByMouse: true
-
-                            background: Rectangle {
-                                color: "transparent"
+                                source: Quickshell.iconPath("go-previous-symbolic", "go-previous")
+                                asynchronous: true
                             }
                         }
 
                         Text {
-                            id: hsRevealButton
-
-                            anchors.right: parent.right
+                            anchors.left: hsBackButton.right
+                            anchors.leftMargin: 8
+                            anchors.right: hsPowerToggle.left
                             anchors.rightMargin: 10
                             anchors.verticalCenter: parent.verticalCenter
 
-                            text: hotspotPanel.revealPassword ? "Hide" : "Show"
-                            color: hsRevealHover.hovered ? Theme.text : Theme.accent
+                            text: "Mobile Hotspot"
+                            color: Theme.text
                             font.family: Theme.fontFamily
-                            font.pixelSize: 11
+                            font.pixelSize: 16
                             font.weight: Font.DemiBold
+                            elide: Text.ElideRight
+                        }
 
-                            HoverHandler {
-                                id: hsRevealHover
+                        Rectangle {
+                            id: hsPowerToggle
 
-                                cursorShape: Qt.PointingHandCursor
+                            z: 2
+
+                            anchors.right: parent.right
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            width: 44
+                            height: 24
+                            radius: 12
+                            color: hotspotService.enabled ? Theme.accent : Theme.panelSurface
+                            border.width: 1
+                            border.color: hotspotService.enabled ? "transparent" : Qt.rgba(1, 1, 1, 0.2)
+
+                            Rectangle {
+                                width: 18
+                                height: 18
+                                radius: 9
+                                y: 3
+                                x: hotspotService.enabled ? parent.width - width - 3 : 3
+                                color: hotspotService.enabled ? Theme.background : Theme.textMuted
+
+                                Behavior on x {
+                                    NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
+                                }
                             }
 
                             MouseArea {
@@ -3450,54 +3315,291 @@ PanelWindow {
 
                                 cursorShape: Qt.PointingHandCursor
 
-                                onClicked: hotspotPanel.revealPassword = !hotspotPanel.revealPassword
+                                onClicked: hotspotService.toggleHotspot()
                             }
                         }
                     }
-                }
 
-                Row {
-                    width: parent.width
-                    height: 26
+                    Column {
+                        anchors {
+                            top: hsHeader.bottom
+                            left: parent.left
+                            right: parent.right
+                        }
 
-                    spacing: 12
+                        anchors.topMargin: 18
 
-                    Text {
-                        width: parent.width - hsSaveButton.width - 12
-                        height: parent.height
-                        verticalAlignment: Text.AlignVCenter
-                        elide: Text.ElideRight
+                        spacing: 14
 
-                        text: hotspotService.enabled
-                            ? hotspotService.clientCount + (hotspotService.clientCount === 1 ? " device connected" : " devices connected")
-                            : "Hotspot is Off"
-                        color: Theme.textMuted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 11
-                    }
+                        Column {
+                            width: parent.width
 
-                    Text {
-                        id: hsSaveButton
+                            spacing: 4
 
-                        height: parent.height
-                        verticalAlignment: Text.AlignVCenter
+                            Text {
+                                text: "Network name"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                            }
 
-                        readonly property bool ready: hsSsidField.text.length > 0
-                            && (hsSecurityCombo.currentIndex !== 0 || hsPasswordField.text.length >= 8)
+                            Rectangle {
+                                width: parent.width
+                                height: 34
 
-                        text: "Apply"
-                        color: hsSaveButton.ready ? Theme.accent : Theme.textMuted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 12
-                        font.weight: Font.DemiBold
+                                radius: 8
+                                // Dark fill, always-on accent hairline to define the bounds.
+                                color: Theme.background
+                                border.width: 1
+                                border.color: Theme.accent
 
-                        MouseArea {
-                            anchors.fill: parent
+                                TextField {
+                                    id: hsSsidField
 
-                            enabled: hsSaveButton.ready
-                            cursorShape: Qt.PointingHandCursor
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 10
+                                    anchors.rightMargin: 10
 
-                            onClicked: hotspotService.updateConfiguration(hsSsidField.text, hsPasswordField.text, hsSecurityCombo.currentIndex === 0)
+                                    verticalAlignment: TextInput.AlignVCenter
+
+                                    placeholderText: "Hotspot name"
+                                    placeholderTextColor: Theme.textMuted
+                                    color: Theme.text
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 12
+
+                                    selectByMouse: true
+
+                                    background: Rectangle {
+                                        color: "transparent"
+                                    }
+                                }
+                            }
+                        }
+
+                        Column {
+                            width: parent.width
+
+                            spacing: 4
+
+                            Text {
+                                text: "Security"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                            }
+
+                            ComboBox {
+                                id: hsSecurityCombo
+
+                                width: parent.width
+                                height: 34
+
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+
+                                model: ["WPA2/WPA3 Personal", "None / Open"]
+                                currentIndex: 0
+
+                                background: Rectangle {
+                                    radius: 8
+                                    // Match the SSID / password fields: dark fill, always-on
+                                    // accent hairline.
+                                    color: Theme.background
+                                    border.width: 1
+                                    border.color: Theme.accent
+                                }
+
+                                contentItem: Text {
+                                    leftPadding: 10
+                                    rightPadding: hsSecurityCombo.indicator.width + 6
+
+                                    text: hsSecurityCombo.displayText
+                                    color: Theme.text
+                                    font: hsSecurityCombo.font
+                                    verticalAlignment: Text.AlignVCenter
+                                    elide: Text.ElideRight
+                                }
+
+                                indicator: IconImage {
+                                    x: hsSecurityCombo.width - width - 10
+                                    y: (hsSecurityCombo.height - height) / 2
+
+                                    width: 14
+                                    height: 14
+
+                                    source: Quickshell.iconPath("pan-down-symbolic", "go-down-symbolic")
+                                    asynchronous: true
+                                }
+
+                                delegate: ItemDelegate {
+                                    width: hsSecurityCombo.width
+                                    height: 32
+
+                                    highlighted: hsSecurityCombo.highlightedIndex === index
+
+                                    contentItem: Text {
+                                        leftPadding: 6
+
+                                        text: modelData
+                                        color: Theme.text
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 12
+                                        verticalAlignment: Text.AlignVCenter
+                                        elide: Text.ElideRight
+                                    }
+
+                                    background: Rectangle {
+                                        radius: 6
+                                        color: highlighted ? Theme.panelRaised : "transparent"
+                                    }
+                                }
+
+                                popup: Popup {
+                                    y: hsSecurityCombo.height + 4
+                                    width: hsSecurityCombo.width
+                                    padding: 4
+
+                                    implicitHeight: contentItem.implicitHeight + 8
+
+                                    background: Rectangle {
+                                        radius: 10
+                                        color: Theme.background
+                                        border.width: 1
+                                        border.color: Theme.accent
+                                    }
+
+                                    contentItem: ListView {
+                                        clip: true
+                                        implicitHeight: contentHeight
+                                        model: hsSecurityCombo.popup.visible ? hsSecurityCombo.delegateModel : null
+                                        currentIndex: hsSecurityCombo.highlightedIndex
+                                    }
+                                }
+                            }
+                        }
+
+                        Column {
+                            width: parent.width
+
+                            spacing: 4
+                            visible: hsSecurityCombo.currentIndex === 0
+
+                            Text {
+                                text: "Password"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                            }
+
+                            Rectangle {
+                                width: parent.width
+                                height: 34
+
+                                radius: 8
+                                // Dark fill, always-on accent hairline to define the bounds.
+                                color: Theme.background
+                                border.width: 1
+                                border.color: Theme.accent
+
+                                TextField {
+                                    id: hsPasswordField
+
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 10
+                                    anchors.rightMargin: hsRevealButton.width + 20
+
+                                    verticalAlignment: TextInput.AlignVCenter
+                                    echoMode: hotspotPanel.revealPassword ? TextInput.Normal : TextInput.Password
+                                    passwordCharacter: "•"
+
+                                    placeholderText: "Password"
+                                    placeholderTextColor: Theme.textMuted
+                                    color: Theme.text
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 12
+
+                                    selectByMouse: true
+
+                                    background: Rectangle {
+                                        color: "transparent"
+                                    }
+                                }
+
+                                Text {
+                                    id: hsRevealButton
+
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 10
+                                    anchors.verticalCenter: parent.verticalCenter
+
+                                    text: hotspotPanel.revealPassword ? "Hide" : "Show"
+                                    color: hsRevealHover.hovered ? Theme.text : Theme.accent
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 11
+                                    font.weight: Font.DemiBold
+
+                                    HoverHandler {
+                                        id: hsRevealHover
+
+                                        cursorShape: Qt.PointingHandCursor
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+
+                                        cursorShape: Qt.PointingHandCursor
+
+                                        onClicked: hotspotPanel.revealPassword = !hotspotPanel.revealPassword
+                                    }
+                                }
+                            }
+                        }
+
+                        Row {
+                            width: parent.width
+                            height: 26
+
+                            spacing: 12
+
+                            Text {
+                                width: parent.width - hsSaveButton.width - 12
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+                                elide: Text.ElideRight
+
+                                text: hotspotService.enabled
+                                    ? hotspotService.clientCount + (hotspotService.clientCount === 1 ? " device connected" : " devices connected")
+                                    : "Hotspot is Off"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                            }
+
+                            Text {
+                                id: hsSaveButton
+
+                                height: parent.height
+                                verticalAlignment: Text.AlignVCenter
+
+                                readonly property bool ready: hsSsidField.text.length > 0
+                                    && (hsSecurityCombo.currentIndex !== 0 || hsPasswordField.text.length >= 8)
+
+                                text: "Apply"
+                                color: hsSaveButton.ready ? Theme.accent : Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 12
+                                font.weight: Font.DemiBold
+
+                                MouseArea {
+                                    anchors.fill: parent
+
+                                    enabled: hsSaveButton.ready
+                                    cursorShape: Qt.PointingHandCursor
+
+                                    onClicked: hotspotService.updateConfiguration(hsSsidField.text, hsPasswordField.text, hsSecurityCombo.currentIndex === 0)
+                                }
+                            }
                         }
                     }
                 }
@@ -3526,6 +3628,10 @@ PanelWindow {
 
         enabled: root.audioOutputPanelOpen
         visible: audioOutputPanel.opacity > 0
+
+        // Latched by the content Loader below: the panel content tree
+        // is created on first open and kept for the rest of the session.
+        property bool _contentLatched: false
 
         // Shared glass highlight (see ControlTile): full-bleed rect using
         // the panel's live radius (it morphs on open/close); falloff shaped
@@ -3577,186 +3683,208 @@ PanelWindow {
             if (audioOutputPanel.visible) audioService.refresh()
         }
 
-        Item {
-            id: audioOutputContent
+        // Lazy content stage (Loader latch, the Launcher pattern): the
+        // whole content tree under this panel - lists, menus, dialogs -
+        // does not exist until the panel is first opened, so a panel the
+        // user never opens costs no objects at shell startup.
+        Loader {
+            id: audioOutputContentLoader
 
-            anchors {
-                top: parent.top
-                left: parent.left
-                right: parent.right
-                bottom: parent.bottom
-            }
+            anchors.fill: parent
+            active: root.audioOutputPanelOpen || audioOutputPanel._contentLatched
+            sourceComponent: audioOutputContentComponent
 
-            anchors.margins: 14
+            onLoaded: audioOutputPanel._contentLatched = true
+        }
 
-            opacity: root.audioOutputPanelOpen ? 1 : 0
-            visible: audioOutputContent.opacity > 0
-
-            Behavior on opacity {
-                NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
-            }
+        Component {
+            id: audioOutputContentComponent
 
             Item {
-                id: aoHeader
+                anchors.fill: parent
 
-                anchors {
-                    top: parent.top
-                    left: parent.left
-                    right: parent.right
-                }
+                Item {
+                    id: audioOutputContent
 
-                height: 32
-
-                MouseArea {
-                    id: aoBackButton
-
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-
-                    width: 32
-                    height: 32
-                    cursorShape: Qt.PointingHandCursor
-
-                    onClicked: root.audioOutputPanelOpen = false
-
-                    Rectangle {
-                        anchors.fill: parent
-
-                        radius: 16
-                        color: aoBackHover.hovered ? Theme.panelSurface : "transparent"
+                    anchors {
+                        top: parent.top
+                        left: parent.left
+                        right: parent.right
+                        bottom: parent.bottom
                     }
 
-                    HoverHandler {
-                        id: aoBackHover
+                    anchors.margins: 14
+
+                    opacity: root.audioOutputPanelOpen ? 1 : 0
+                    visible: audioOutputContent.opacity > 0
+
+                    Behavior on opacity {
+                        NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
                     }
 
-                    IconImage {
-                        anchors.centerIn: parent
+                    Item {
+                        id: aoHeader
 
-                        width: 18
-                        height: 18
+                        anchors {
+                            top: parent.top
+                            left: parent.left
+                            right: parent.right
+                        }
 
-                        source: Quickshell.iconPath("go-previous-symbolic", "go-previous")
-                        asynchronous: true
-                    }
-                }
+                        height: 32
 
-                Text {
-                    anchors.left: aoBackButton.right
-                    anchors.leftMargin: 8
-                    anchors.verticalCenter: parent.verticalCenter
+                        MouseArea {
+                            id: aoBackButton
 
-                    text: "Audio Output"
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 16
-                    font.weight: Font.DemiBold
-                }
-            }
-
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                anchors.top: aoHeader.bottom
-                anchors.topMargin: 12
-
-                visible: audioService.sinks.length === 0
-                text: "No output devices"
-                color: Theme.textMuted
-                font.family: Theme.fontFamily
-                font.pixelSize: 12
-            }
-
-            ListView {
-                id: aoList
-
-                anchors {
-                    top: aoHeader.bottom
-                    left: parent.left
-                    right: parent.right
-                    bottom: parent.bottom
-                }
-
-                anchors.topMargin: 8
-
-                clip: true
-                spacing: 4
-                visible: audioService.sinks.length > 0
-                model: audioService.sinks
-
-                delegate: Rectangle {
-                    id: aoRow
-
-                    required property var modelData
-
-                    readonly property var sink: aoRow.modelData
-
-                    width: aoList.width
-                    height: 52
-                    radius: 14
-                    color: aoRowHover.hovered || (aoRow.sink && aoRow.sink.isDefault)
-                        ? Theme.panelSurface
-                        : "transparent"
-
-                    HoverHandler {
-                        id: aoRowHover
-
-                        cursorShape: Qt.PointingHandCursor
-                    }
-
-                    Row {
-                        anchors.fill: parent
-
-                        anchors.leftMargin: 12
-                        anchors.rightMargin: 12
-
-                        spacing: 10
-
-                        IconImage {
+                            anchors.left: parent.left
                             anchors.verticalCenter: parent.verticalCenter
 
-                            width: 24
-                            height: 24
+                            width: 32
+                            height: 32
+                            cursorShape: Qt.PointingHandCursor
 
-                            source: Quickshell.iconPath("audio-speakers-symbolic", "audio-speakers")
-                            asynchronous: true
+                            onClicked: root.audioOutputPanelOpen = false
+
+                            Rectangle {
+                                anchors.fill: parent
+
+                                radius: 16
+                                color: aoBackHover.hovered ? Theme.panelSurface : "transparent"
+                            }
+
+                            HoverHandler {
+                                id: aoBackHover
+                            }
+
+                            IconImage {
+                                anchors.centerIn: parent
+
+                                width: 18
+                                height: 18
+
+                                source: Quickshell.iconPath("go-previous-symbolic", "go-previous")
+                                asynchronous: true
+                            }
                         }
 
                         Text {
+                            anchors.left: aoBackButton.right
+                            anchors.leftMargin: 8
                             anchors.verticalCenter: parent.verticalCenter
 
-                            width: parent.width - 24 - 10 - (aoCheck.visible ? aoCheck.width + 10 : 0)
-                            elide: Text.ElideRight
-
-                            text: aoRow.sink ? aoRow.sink.description : ""
+                            text: "Audio Output"
                             color: Theme.text
                             font.family: Theme.fontFamily
-                            font.pixelSize: 13
-                            font.weight: aoRow.sink && aoRow.sink.isDefault ? Font.DemiBold : Font.Normal
+                            font.pixelSize: 16
+                            font.weight: Font.DemiBold
                         }
                     }
 
-                    IconImage {
-                        id: aoCheck
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.top: aoHeader.bottom
+                        anchors.topMargin: 12
 
-                        anchors.right: parent.right
-                        anchors.rightMargin: 12
-                        anchors.verticalCenter: parent.verticalCenter
-
-                        width: 18
-                        height: 18
-                        visible: aoRow.sink && aoRow.sink.isDefault
-
-                        source: Quickshell.iconPath("object-select-symbolic", "emblem-default")
-                        asynchronous: true
+                        visible: audioService.sinks.length === 0
+                        text: "No output devices"
+                        color: Theme.textMuted
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 12
                     }
 
-                    MouseArea {
-                        anchors.fill: parent
+                    ListView {
+                        id: aoList
 
-                        cursorShape: Qt.PointingHandCursor
+                        anchors {
+                            top: aoHeader.bottom
+                            left: parent.left
+                            right: parent.right
+                            bottom: parent.bottom
+                        }
 
-                        onClicked: {
-                            if (aoRow.sink) audioService.setDefaultSink(aoRow.sink.id)
+                        anchors.topMargin: 8
+
+                        clip: true
+                        spacing: 4
+                        visible: audioService.sinks.length > 0
+                        model: audioService.sinks
+
+                        delegate: Rectangle {
+                            id: aoRow
+
+                            required property var modelData
+
+                            readonly property var sink: aoRow.modelData
+
+                            width: aoList.width
+                            height: 52
+                            radius: 14
+                            color: aoRowHover.hovered || (aoRow.sink && aoRow.sink.isDefault)
+                                ? Theme.panelSurface
+                                : "transparent"
+
+                            HoverHandler {
+                                id: aoRowHover
+
+                                cursorShape: Qt.PointingHandCursor
+                            }
+
+                            Row {
+                                anchors.fill: parent
+
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 12
+
+                                spacing: 10
+
+                                IconImage {
+                                    anchors.verticalCenter: parent.verticalCenter
+
+                                    width: 24
+                                    height: 24
+
+                                    source: Quickshell.iconPath("audio-speakers-symbolic", "audio-speakers")
+                                    asynchronous: true
+                                }
+
+                                Text {
+                                    anchors.verticalCenter: parent.verticalCenter
+
+                                    width: parent.width - 24 - 10 - (aoCheck.visible ? aoCheck.width + 10 : 0)
+                                    elide: Text.ElideRight
+
+                                    text: aoRow.sink ? aoRow.sink.description : ""
+                                    color: Theme.text
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 13
+                                    font.weight: aoRow.sink && aoRow.sink.isDefault ? Font.DemiBold : Font.Normal
+                                }
+                            }
+
+                            IconImage {
+                                id: aoCheck
+
+                                anchors.right: parent.right
+                                anchors.rightMargin: 12
+                                anchors.verticalCenter: parent.verticalCenter
+
+                                width: 18
+                                height: 18
+                                visible: aoRow.sink && aoRow.sink.isDefault
+
+                                source: Quickshell.iconPath("object-select-symbolic", "emblem-default")
+                                asynchronous: true
+                            }
+
+                            MouseArea {
+                                anchors.fill: parent
+
+                                cursorShape: Qt.PointingHandCursor
+
+                                onClicked: {
+                                    if (aoRow.sink) audioService.setDefaultSink(aoRow.sink.id)
+                                }
+                            }
                         }
                     }
                 }
