@@ -95,20 +95,43 @@ Item {
     // just below the panel tone (x0.86, not a deep drop) and quieter than
     // the panel family (saturation x0.7), so idle tiles read as part of
     // the panel, slightly recessed - never as separate dark blocks.
-    property color backgroundSunken: Qt.hsla(root._seedHue, root._neutralSat * 0.7, root._baseL * 0.86, 1)
+    property color backgroundSunken: Qt.hsla(root._panelHue, root._panelSat * 0.7, root._baseL * 0.86, 1)
     property color backgroundInset: root._tone(root._baseL * 0.58)
 
-    // Control Center panel ladder: the CC panel family sits one bright
-    // step above the shell background (+0.025 lightness, ~1.4x its
-    // luminance at the typical base), and the panel's internal surfaces
-    // re-anchor on that step so the hover/raised/overlay gaps match the
-    // global ladder's spacing. Only Control Center (panel, detail
-    // panels, tiles, sliders) consumes these; other modules keep the
-    // global tones above.
-    property color panelBackground: root._tone(root._baseL + 0.025)
-    property color panelSurface: root._tone(root._baseL + 0.065)
-    property color panelRaised: root._tone(root._baseL + 0.105)
-    property color panelOverlay: root._tone(root._baseL + 0.140)
+    // Control Center panel family: the CC surfaces get their own hue and
+    // saturation so the panel reads as the wallpaper's blue (or its own
+    // seed family), not a muted teal-grey. Saturation keeps 80% of the
+    // seed's (the global neutral keeps 55%): at the neutral rate the
+    // panel's channels converge toward grey and an azure seed's high
+    // green channel takes over the read. The hue correction is
+    // conditional: only seeds in the cyan/azure band (175-215 deg) are
+    // pulled toward 210 deg - the royal-blue pole of a blue palette
+    // (color5/color6) - by at most 9 deg; every other hue passes through
+    // untouched, and achromatic seeds keep the neutral behaviour exactly.
+    readonly property real _panelSat: root._seedSat < 0.05
+        ? root._neutralSat
+        : Math.max(0.28, Math.min(0.55, root._seedSat * 0.8))
+    readonly property real _panelHue: {
+        if (root._seedSat < 0.05) return root._seedHue
+        var hDeg = root._seedHue * 360
+        if (hDeg < 175 || hDeg > 215) return root._seedHue
+        var shift = Math.max(0, Math.min(210 - hDeg, 9))
+        return (hDeg + shift) / 360
+    }
+    function _panelTone(lightness) {
+        return Qt.hsla(root._panelHue, root._panelSat, lightness, 1)
+    }
+
+    // The CC panel family sits one bright step above the shell background
+    // (+0.025 lightness, ~1.4x its luminance at the typical base), and the
+    // panel's internal surfaces re-anchor on that step so the
+    // hover/raised/overlay gaps match the global ladder's spacing. Only
+    // Control Center (panel, detail panels, tiles, sliders) consumes
+    // these; other modules keep the global tones above.
+    property color panelBackground: root._panelTone(root._baseL + 0.025)
+    property color panelSurface: root._panelTone(root._baseL + 0.065)
+    property color panelRaised: root._panelTone(root._baseL + 0.105)
+    property color panelOverlay: root._panelTone(root._baseL + 0.140)
 
     // Legacy alias of `surface`. (Bar widgets' open-state fill used this
     // until they moved to the light active scheme - activeSurface and
