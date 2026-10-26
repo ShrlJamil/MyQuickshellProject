@@ -198,7 +198,7 @@ Item {
         width: 5
         height: 54
         radius: 2.5
-        color: Theme.onActiveSurface
+        color: Theme.activeAccent
 
         x: Math.max(4, Math.min(root.width - width - 4, root.width * root.clampedFraction - width / 2))
     }

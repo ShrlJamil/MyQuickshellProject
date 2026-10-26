@@ -22,6 +22,11 @@ PanelWindow {
     screen: modelData.screen
 
     property bool open: barState.mode === "center" && barState.screen === modelData.screen
+
+    // The header power button asks shell.qml to run the existing `power`
+    // IPC handler's show() - the button itself touches no system action
+    // and writes no barState.
+    signal powerRequested()
     property bool closing: false
     property bool pendingCaptureOpen: false
     property bool pendingColorPick: false
@@ -90,8 +95,9 @@ PanelWindow {
     readonly property real gridTileSize: 215
     readonly property real gridTileHeight: 68
     readonly property real sliderHeight: 48
+    readonly property real headerHeight: 30
     readonly property real tilesHeight: root.heroHeight + 5 + root.gridTileHeight * 4 + 15
-    readonly property real contentHeight: root.tilesHeight + root.rowGap + root.sliderHeight + root.rowGap + root.sliderHeight + root.panelPadding * 2
+    readonly property real contentHeight: root.headerHeight + root.rowGap + root.tilesHeight + root.rowGap + root.sliderHeight + root.rowGap + root.sliderHeight + root.panelPadding * 2
 
     implicitWidth: root.colWidth * 2 + root.colGap
     implicitHeight: root.contentHeight
@@ -285,6 +291,91 @@ PanelWindow {
 
             radius: 24
             color: Theme.background
+        }
+
+        // Header row: uptime on the left, a small round power button on
+        // the right (outside the tile grid). The button only emits
+        // powerRequested - shell.qml runs the `power` IPC show().
+        Item {
+            id: header
+
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: parent.top
+            }
+
+            anchors.leftMargin: root.panelPadding
+            anchors.rightMargin: root.panelPadding
+            anchors.topMargin: root.panelPadding
+
+            height: root.headerHeight
+
+            Text {
+                anchors {
+                    left: parent.left
+                    verticalCenter: parent.verticalCenter
+                }
+
+                text: UptimeService.pretty
+                color: Theme.textMuted
+                font.family: Theme.fontFamily
+                font.pixelSize: 13
+                font.weight: Font.Medium
+            }
+
+            Rectangle {
+                id: powerButton
+
+                anchors {
+                    right: parent.right
+                    verticalCenter: parent.verticalCenter
+                }
+
+                width: 30
+                height: 30
+                radius: 15
+                color: powerHover.hovered ? Theme.surface : Theme.backgroundSunken
+
+                HoverHandler {
+                    id: powerHover
+
+                    cursorShape: Qt.PointingHandCursor
+                }
+
+                Image {
+                    id: powerGlyph
+
+                    anchors.centerIn: parent
+
+                    width: 16
+                    height: 16
+
+                    source: "file://" + Quickshell.shellPath("assets/power-material-svgrepo-com.svg")
+                    sourceSize.width: 32
+                    sourceSize.height: 32
+                    fillMode: Image.PreserveAspectFit
+                    asynchronous: true
+                    smooth: true
+                    mipmap: true
+                    visible: false
+                }
+
+                ColorOverlay {
+                    anchors.fill: powerGlyph
+                    source: powerGlyph
+                    visible: powerGlyph.status === Image.Ready
+                    color: Theme.icon
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+
+                    cursorShape: Qt.PointingHandCursor
+
+                    onClicked: root.powerRequested()
+                }
+            }
         }
 
         // Fast scale-fade from the bar trigger's corner (top-right, matching the
@@ -904,10 +995,10 @@ PanelWindow {
             anchors {
                 left: parent.left
                 right: parent.right
-                top: parent.top
+                top: header.bottom
             }
 
-            anchors.topMargin: root.panelPadding
+            anchors.topMargin: root.rowGap
             anchors.leftMargin: root.panelPadding
             anchors.rightMargin: root.panelPadding
 

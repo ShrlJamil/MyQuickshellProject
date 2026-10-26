@@ -130,6 +130,8 @@ ShellRoot {
     }
 
     IpcHandler {
+        id: powerIpc
+
         target: "power"
 
         function show(): void {
@@ -397,7 +399,9 @@ ShellRoot {
     Variants {
         model: Quickshell.screens.filter(screen => isBarScreen(screen) || barScreen() === null).map(screen => ({ barState: barState, screen: screen }))
 
-        delegate: ControlCenter {}
+        delegate: ControlCenter {
+            onPowerRequested: powerIpc.show()
+        }
     }
 
     Variants {

@@ -118,6 +118,10 @@ Item {
     // hover DARKENS, as a light surface must.
     property color activeSurface: Qt.hsla(root._seedHue, root._activeSat, 0.80, 1)
     property color activeSurfaceHover: Qt.hsla(root._seedHue, root._activeSat, 0.76, 1)
+    // The vivid seed colour itself at the active saturation - mid-tone,
+    // so it reads on BOTH the light active surface and the dark shell
+    // (the slider knob straddles the two).
+    property color activeAccent: Qt.hsla(root._seedHue, root._activeSat, 0.55, 1)
     property color onActiveSurface: Qt.hsla(root._seedHue, Math.min(root._activeSat, 0.55), 0.12, 1)
     property color onActiveSurfaceDim: Qt.hsla(root._seedHue, root._activeSat * 0.85, 0.28, 1)
 

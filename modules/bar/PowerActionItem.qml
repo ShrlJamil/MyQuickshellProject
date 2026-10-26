@@ -11,44 +11,8 @@ Item {
     property string iconSource: ""
     property string shortcutKey: ""
     property bool selected: false
-    property int holdDuration: 1000
-    property bool isHolding: false
-    property real progress: 0
 
     signal actionRequested(string actionId)
-
-    function startHold() {
-        if (root.isHolding || root.progress >= 1) return
-        root.isHolding = true
-        returnAnim.stop()
-        holdAnim.from = root.progress
-        holdAnim.duration = Math.max(1, Math.round((1 - root.progress) * root.holdDuration))
-        holdAnim.start()
-    }
-
-    function cancelHold() {
-        if (!root.isHolding || root.progress >= 1) return
-        root.isHolding = false
-        holdAnim.stop()
-        returnAnim.from = root.progress
-        returnAnim.duration = Math.round(root.progress * 200)
-        returnAnim.start()
-    }
-
-    function finishHold() {
-        if (!root.isHolding) return
-        root.isHolding = false
-        holdAnim.stop()
-        root.progress = 1
-        root.actionRequested(root.actionId)
-    }
-
-    function reset() {
-        holdAnim.stop()
-        returnAnim.stop()
-        root.isHolding = false
-        root.progress = 0
-    }
 
     Item {
         id: visual
@@ -62,39 +26,16 @@ Item {
 
             radius: 12
             clip: true
-            color: root.selected || hover.hovered || root.isHolding ? Theme.surfaceHover : "transparent"
+            // Selected wears the light active scheme (dark foreground
+            // below); hover on the dark card stays the white overlay.
+            color: root.selected ? (hover.hovered ? Theme.activeSurfaceHover : Theme.activeSurface)
+                : (hover.hovered ? Theme.surfaceHover : "transparent")
 
-            // High-contrast hover: subtle outline so the focused tile pops
-            // against the dark menu background.
-            readonly property bool active: root.selected || hover.hovered || root.isHolding
-            border.width: tileBase.active ? 1 : 0
+            // Subtle outline so a hovered tile pops against the dark menu
+            // background. The selected tile needs none - its light fill
+            // is the signal.
+            border.width: hover.hovered && !root.selected ? 1 : 0
             border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
-
-            Rectangle {
-                id: progressFill
-
-                anchors {
-                    left: parent.left
-                    top: parent.top
-                    bottom: parent.bottom
-                }
-
-                width: parent.width * root.progress
-
-                readonly property bool full: root.progress >= 0.999
-
-                // Left edge hugs the frame's 12px corners; the advancing right
-                // edge stays a flat 90 line until the fill is complete, then it
-                // rounds too so the full bar seals cleanly inside the frame.
-                radius: parent.radius
-                topRightRadius: progressFill.full ? parent.radius : 0
-                bottomRightRadius: progressFill.full ? parent.radius : 0
-
-                visible: root.isHolding || root.progress > 0
-
-                color: Theme.accent
-                opacity: 0.35
-            }
         }
 
         Column {
@@ -129,7 +70,7 @@ Item {
                     anchors.fill: iconImage
 
                     source: iconImage
-                    color: Theme.text
+                    color: root.selected ? Theme.onActiveSurface : Theme.text
                     visible: root.iconSource !== ""
                 }
             }
@@ -138,7 +79,7 @@ Item {
                 width: parent.width
 
                 text: root.label
-                color: Theme.text
+                color: root.selected ? Theme.onActiveSurface : Theme.text
                 font.pixelSize: 12
                 font.family: Theme.fontFamily
                 font.weight: Font.DemiBold
@@ -147,7 +88,7 @@ Item {
             }
         }
 
-        // Hold-shortcut hint, tucked in the corner so it never disturbs the
+        // Shortcut hint, tucked in the corner so it never disturbs the
         // centred icon + label.
         Text {
             anchors {
@@ -159,7 +100,7 @@ Item {
 
             visible: root.shortcutKey !== ""
             text: root.shortcutKey.toUpperCase()
-            color: Theme.textMuted
+            color: root.selected ? Theme.onActiveSurfaceDim : Theme.textMuted
             font.family: Theme.fontFamily
             font.pixelSize: 10
             font.weight: Font.Bold
@@ -170,45 +111,13 @@ Item {
         id: hover
 
         cursorShape: Qt.PointingHandCursor
-
-        onHoveredChanged: {
-            if (root.isHolding && !hover.hovered) root.cancelHold()
-        }
     }
 
-    TapHandler {
-        id: tap
+    MouseArea {
+        anchors.fill: parent
 
-        onPressedChanged: {
-            if (tap.pressed) root.startHold()
-            else root.cancelHold()
-        }
+        cursorShape: Qt.PointingHandCursor
 
-        onCanceled: root.cancelHold()
-    }
-
-    NumberAnimation {
-        id: holdAnim
-
-        target: root
-        property: "progress"
-        to: 1
-
-        easing.type: Easing.Linear
-
-        onFinished: root.finishHold()
-    }
-
-    NumberAnimation {
-        id: returnAnim
-
-        target: root
-        property: "progress"
-        to: 0
-
-        duration: 200
-        easing.type: Easing.OutCubic
-
-        onFinished: root.progress = 0
+        onClicked: root.actionRequested(root.actionId)
     }
 }
