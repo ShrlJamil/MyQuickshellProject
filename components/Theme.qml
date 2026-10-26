@@ -45,6 +45,13 @@ Item {
     // Same treatment: parsed, but the icon colour is derived from the
     // seed (see `icon` below), not taken from the palette's constant.
     property color _palIcon: "#F2F4F5"
+    // Palette text colours, retained as anchors only: the public text
+    // tokens are DERIVED from the seed (see below), so their contrast
+    // against the derived surfaces is set by the recipe, not by however
+    // the template happened to filter color7/color8 for this wallpaper.
+    property color _palText: "#ffffff"
+    property color _palTextDim: "#a6adc8"
+    property color _palTextMuted: "#888888"
 
     // ---- Tonal recipe (THE tuning knobs) ----------------------------------
     // Seed hue: the accent's hue; fall back to the background's, then to a
@@ -54,14 +61,19 @@ Item {
     readonly property real _seedSat: root._palAccent.hslSaturation
     // Neutral chroma: a solid echo of the seed (over half its saturation,
     // capped) - dark here means a DEEPER SHADE OF THE WALLPAPER'S COLOUR
-    // (dark blue from a blue wallpaper), never near-black grey. HSL at low
-    // lightness needs this much saturation for the tint to stay visible.
-    readonly property real _neutralSat: Math.max(0.12, Math.min(0.45, root._seedSat * 0.55))
+    // (dark blue from a blue wallpaper), never near-black grey. The floor
+    // (0.22) guarantees the tint is always present, even for a pale seed.
+    readonly property real _neutralSat: Math.max(0.22, Math.min(0.42, root._seedSat * 0.55))
     // Base tone: the palette background's lightness, clamped into a dark
-    // register so a bright-ish palette cannot lift the whole shell.
-    readonly property real _baseL: Math.max(0.05, Math.min(0.11, root._palBackground.hslLightness))
+    // register - raised in Tahap 2 ([0.09, 0.15]) so surfaces have room
+    // to actually show the seed's colour instead of collapsing to black,
+    // while a bright-ish palette still cannot lift the whole shell.
+    readonly property real _baseL: Math.max(0.09, Math.min(0.15, root._palBackground.hslLightness))
     // Container (ON-state) chroma: over half the seed's, capped muted.
     readonly property real _containerSat: Math.max(0.10, Math.min(0.38, root._seedSat * 0.55))
+    // Text chroma: a quieter slice of the neutral saturation - text
+    // carries the seed's hue family without becoming coloured itself.
+    readonly property real _textSat: Math.min(root._neutralSat, 0.25)
 
     function _tone(lightness) {
         return Qt.hsla(root._seedHue, root._neutralSat, lightness, 1)
@@ -69,30 +81,34 @@ Item {
 
     // ---- Semantic surface tokens (derived) --------------------------------
     property color background: root._tone(root._baseL)
-    property color surface: root._tone(root._baseL + 0.05)
-    property color surfaceRaised: root._tone(root._baseL + 0.095)
-    property color surfaceOverlay: root._tone(root._baseL + 0.14)
-    property color backgroundSunken: root._tone(root._baseL * 0.70)
-    property color backgroundInset: root._tone(root._baseL * 0.52)
+    property color surface: root._tone(root._baseL + 0.045)
+    property color surfaceRaised: root._tone(root._baseL + 0.085)
+    property color surfaceOverlay: root._tone(root._baseL + 0.125)
+    property color backgroundSunken: root._tone(root._baseL * 0.74)
+    property color backgroundInset: root._tone(root._baseL * 0.58)
 
     // Bar widgets' ACTIVE (open-state) fill = the neutral container tone,
     // same as `surface`: one family everywhere. (Pre-experiment this was a
     // desaturated raw surface; the tonal ladder makes that a no-op.)
     property color surfaceDesaturated: root.surface
 
-    // ON-state tile fill: the seed's muted container tone.
-    property color activeTile: Qt.hsla(root._seedHue, root._containerSat, 0.30, 1)
+    // ON-state tile fill: the seed's muted container tone, anchored
+    // RELATIVE to the base tone (+0.17) so its jump from the surrounding
+    // surfaces is the same for every wallpaper.
+    property color activeTile: Qt.hsla(root._seedHue, root._containerSat, root._baseL + 0.17, 1)
     // Its hover: the same container one tone step up.
-    property color activeTileHover: Qt.hsla(root._seedHue, root._containerSat, 0.34, 1)
+    property color activeTileHover: Qt.hsla(root._seedHue, root._containerSat, root._baseL + 0.21, 1)
 
     // Accent passes through from the palette (his template already tunes
-    // it); text colours likewise stay palette-direct below.
+    // it). Text colours do NOT: they are derived from the seed at fixed
+    // lightness levels, so their contrast against the derived surfaces
+    // holds for every wallpaper.
     property color accent: root._palAccent
 
     property color surfaceHover: Qt.rgba(1, 1, 1, 0.05)
-    property color text: "#ffffff"
-    property color textDim: "#a6adc8"
-    property color textMuted: "#888888"
+    property color text: Qt.hsla(root._seedHue, root._textSat, 0.92, 1)
+    property color textDim: Qt.hsla(root._seedHue, root._textSat, 0.74, 1)
+    property color textMuted: Qt.hsla(root._seedHue, root._textSat, 0.66, 1)
 
     // Raw wallust palette, mirrored 1:1 and UNFILTERED (color0-15 +
     // cursor). Reserved for future use: nothing consumes these yet; they
@@ -217,9 +233,9 @@ Item {
         if (paletteAdapter.surface) root._palSurface = paletteAdapter.surface
         // surfaceRaised / surfaceOverlay palette keys are still parsed but
         // the tonal recipe derives both tiers; they land nowhere for now.
-        if (paletteAdapter.text) root.text = paletteAdapter.text
-        if (paletteAdapter.textDim) root.textDim = paletteAdapter.textDim
-        if (paletteAdapter.textMuted) root.textMuted = paletteAdapter.textMuted
+        if (paletteAdapter.text) root._palText = paletteAdapter.text
+        if (paletteAdapter.textDim) root._palTextDim = paletteAdapter.textDim
+        if (paletteAdapter.textMuted) root._palTextMuted = paletteAdapter.textMuted
         if (paletteAdapter.accent) root._palAccent = paletteAdapter.accent
         if (paletteAdapter.activeTile) root._palActiveTile = paletteAdapter.activeTile
         if (paletteAdapter.icon) root._palIcon = paletteAdapter.icon
