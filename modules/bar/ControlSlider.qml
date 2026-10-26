@@ -30,12 +30,57 @@ Item {
         ? Math.max(0, Math.min(1, (root._shown - root.from) / (root.to - root.from)))
         : 0
 
-    implicitHeight: 28
+    implicitHeight: 44
 
-    // Inner horizontal padding so the icon / track / value sit clear of the
-    // curved ends of the pill background they're drawn on. 28px clears the
-    // full-pill (radius 50) arc into the flat centre band.
-    property real edgeInset: 28
+    // Horizontal inset for the icon / value label inside the row body.
+    property real edgeInset: 16
+
+    // The row body IS the track: the filled portion is drawn full-height
+    // in the seed container tone, from the row's left edge to the value
+    // position. The section rectangle behind provides the unfilled tone
+    // (and the hover lift), so track and fill read as one surface.
+    Rectangle {
+        id: fill
+
+        anchors {
+            left: parent.left
+            top: parent.top
+            bottom: parent.bottom
+        }
+
+        width: parent.width * root.clampedFraction
+        radius: 13
+        color: Theme.activeTile
+    }
+
+    // Whole-row drag/click surface. Declared before the icon slot so the
+    // icon's own MouseArea (mute etc.) still wins inside its slot; every
+    // other point of the row, including both ends, slides.
+    MouseArea {
+        id: dragArea
+
+        anchors.fill: parent
+
+        cursorShape: Qt.PointingHandCursor
+
+        onPressed: (mouse) => {
+            root._active = true
+            root._apply(mouse.x)
+        }
+
+        onPositionChanged: (mouse) => {
+            if (dragArea.pressed) root._apply(mouse.x)
+        }
+
+        onReleased: root._active = false
+        onCanceled: root._active = false
+
+        onWheel: (wheel) => {
+            const step = wheel.angleDelta.y > 0 ? 5 : -5
+            const nv = Math.max(root.from, Math.min(root.to, root.value + step))
+            root.moved(Math.round(nv))
+        }
+    }
 
     Item {
         id: iconSlot
@@ -116,82 +161,23 @@ Item {
         font.weight: Font.DemiBold
     }
 
+    // Slim VERTICAL thumb: a thin rounded bar centred on the fill edge,
+    // clamped inside the row so it never clips at either extreme.
     Rectangle {
-        id: track
+        id: knob
 
-        anchors {
-            left: iconSlot.right
-            right: root.rightText !== "" ? valueLabel.left : parent.right
-            verticalCenter: parent.verticalCenter
-        }
+        anchors.verticalCenter: parent.verticalCenter
 
-        anchors.leftMargin: 12
-        anchors.rightMargin: root.rightText !== "" ? 12 : root.edgeInset
+        width: 5
+        height: 28
+        radius: 2.5
+        color: Theme.icon
 
-        height: 10
-        radius: 5
-        color: Theme.surface
-
-        Rectangle {
-            id: fill
-
-            anchors {
-                left: parent.left
-                top: parent.top
-                bottom: parent.bottom
-            }
-
-            width: track.width * root.clampedFraction
-            radius: track.radius
-            color: Theme.accent
-        }
-
-        // Horizontal pill thumb, centred on the track, clamped so it never
-        // clips past either end.
-        Rectangle {
-            id: knob
-
-            anchors.verticalCenter: track.verticalCenter
-
-            width: 22
-            height: 12
-            radius: 6
-            color: Theme.icon
-
-            x: Math.max(0, Math.min(track.width - width, fill.width - width / 2))
-        }
-
-        MouseArea {
-            id: dragArea
-
-            anchors.fill: parent
-            anchors.topMargin: -10
-            anchors.bottomMargin: -10
-
-            cursorShape: Qt.PointingHandCursor
-
-            onPressed: (mouse) => {
-                root._active = true
-                root._apply(mouse.x)
-            }
-
-            onPositionChanged: (mouse) => {
-                if (dragArea.pressed) root._apply(mouse.x)
-            }
-
-            onReleased: root._active = false
-            onCanceled: root._active = false
-
-            onWheel: (wheel) => {
-                const step = wheel.angleDelta.y > 0 ? 5 : -5
-                const nv = Math.max(root.from, Math.min(root.to, root.value + step))
-                root.moved(Math.round(nv))
-            }
-        }
+        x: Math.max(4, Math.min(root.width - width - 4, fill.width - width / 2))
     }
 
     function _apply(px) {
-        const f = Math.max(0, Math.min(1, px / track.width))
+        const f = root.width > 0 ? Math.max(0, Math.min(1, px / root.width)) : 0
         root._pending = root.from + f * (root.to - root.from)
         root.moved(Math.round(root._pending))
     }

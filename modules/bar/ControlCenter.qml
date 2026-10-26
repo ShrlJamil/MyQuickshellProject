@@ -89,7 +89,7 @@ PanelWindow {
     readonly property real heroHeight: 68
     readonly property real gridTileSize: 215
     readonly property real gridTileHeight: 56
-    readonly property real sliderHeight: 68
+    readonly property real sliderHeight: 58
     readonly property real tilesHeight: root.heroHeight + 5 + root.gridTileHeight * 4 + 15
     readonly property real contentHeight: root.tilesHeight + root.rowGap + root.sliderHeight + root.rowGap + root.sliderHeight + root.panelPadding * 2
 
@@ -390,12 +390,12 @@ PanelWindow {
             anchors {
                 left: parent.left
                 right: parent.right
-                top: parent.top
+                top: soundTile.bottom
             }
 
             anchors.leftMargin: root.panelPadding
             anchors.rightMargin: root.panelPadding
-            anchors.topMargin: root.panelPadding
+            anchors.topMargin: root.rowGap
 
             height: root.tilesHeight
 
@@ -904,17 +904,17 @@ PanelWindow {
             anchors {
                 left: parent.left
                 right: parent.right
-                top: columns.bottom
+                top: parent.top
             }
 
-            anchors.topMargin: root.rowGap
+            anchors.topMargin: root.panelPadding
             anchors.leftMargin: root.panelPadding
             anchors.rightMargin: root.panelPadding
 
             height: root.sliderHeight
 
-            // Full pill.
-            radius: height / 2
+            // Rounded rectangle (radius 13), no longer a full pill.
+            radius: 13
             color: {
                 const c = displayHover.hovered ? Theme.surface : Theme.backgroundSunken
                 return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
@@ -930,7 +930,7 @@ PanelWindow {
             // with the tile's own pill radius; falloff shaped by stops.
             Rectangle {
                 anchors.fill: parent
-                radius: height / 2
+                radius: 13
                 gradient: Gradient {
                     GradientStop {
                         position: 0
@@ -960,8 +960,8 @@ PanelWindow {
                 // so track / icon / value all align with the title above.
                 anchors.leftMargin: 0
                 anchors.rightMargin: 0
-                anchors.topMargin: 14
-                anchors.bottomMargin: 14
+                anchors.topMargin: 0
+                anchors.bottomMargin: 0
 
                 iconSource: {
                     if (brightnessService.brightness < 34)
@@ -994,8 +994,8 @@ PanelWindow {
 
             height: root.sliderHeight
 
-            // Full pill.
-            radius: height / 2
+            // Rounded rectangle (radius 13), no longer a full pill.
+            radius: 13
             color: {
                 const c = soundHover.hovered ? Theme.surface : Theme.backgroundSunken
                 return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
@@ -1011,7 +1011,7 @@ PanelWindow {
             // with the tile's own pill radius; falloff shaped by stops.
             Rectangle {
                 anchors.fill: parent
-                radius: height / 2
+                radius: 13
                 gradient: Gradient {
                     GradientStop {
                         position: 0
@@ -1041,8 +1041,8 @@ PanelWindow {
                 // so track / icon / value all align with the title above.
                 anchors.leftMargin: 0
                 anchors.rightMargin: 0
-                anchors.topMargin: 14
-                anchors.bottomMargin: 14
+                anchors.topMargin: 0
+                anchors.bottomMargin: 0
 
                 iconSource: {
                     if (audioService.muted || audioService.volume === 0)
