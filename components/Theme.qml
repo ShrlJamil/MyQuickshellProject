@@ -98,6 +98,18 @@ Item {
     property color backgroundSunken: Qt.hsla(root._seedHue, root._neutralSat * 0.7, root._baseL * 0.86, 1)
     property color backgroundInset: root._tone(root._baseL * 0.58)
 
+    // Control Center panel ladder: the CC panel family sits one bright
+    // step above the shell background (+0.025 lightness, ~1.4x its
+    // luminance at the typical base), and the panel's internal surfaces
+    // re-anchor on that step so the hover/raised/overlay gaps match the
+    // global ladder's spacing. Only Control Center (panel, detail
+    // panels, tiles, sliders) consumes these; other modules keep the
+    // global tones above.
+    property color panelBackground: root._tone(root._baseL + 0.025)
+    property color panelSurface: root._tone(root._baseL + 0.065)
+    property color panelRaised: root._tone(root._baseL + 0.105)
+    property color panelOverlay: root._tone(root._baseL + 0.140)
+
     // Legacy alias of `surface`. (Bar widgets' open-state fill used this
     // until they moved to the light active scheme - activeSurface and
     // friends; nothing consumes it now.)

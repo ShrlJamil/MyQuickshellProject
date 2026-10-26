@@ -289,8 +289,8 @@ PanelWindow {
         Rectangle {
             anchors.fill: parent
 
-            radius: 24
-            color: Theme.background
+            radius: 28
+            color: Theme.panelBackground
         }
 
         // Header row: uptime on the left, a small round power button on
@@ -335,7 +335,7 @@ PanelWindow {
                 width: 30
                 height: 30
                 radius: 15
-                color: powerHover.hovered ? Theme.surface : Theme.backgroundSunken
+                color: powerHover.hovered ? Theme.panelSurface : Theme.backgroundSunken
 
                 HoverHandler {
                     id: powerHover
@@ -509,7 +509,7 @@ PanelWindow {
                     // inner wifiActiveCircle reflects the on/off state.
                     radius: height / 2
                     color: {
-                        const c = wifiHover.hovered ? Theme.surface : Theme.backgroundSunken
+                        const c = wifiHover.hovered ? Theme.panelSurface : Theme.backgroundSunken
                         return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
                     }
 
@@ -678,7 +678,7 @@ PanelWindow {
                     height: 68
                     radius: height / 2
                     color: {
-                        const c = btHover.hovered ? Theme.surface : Theme.backgroundSunken
+                        const c = btHover.hovered ? Theme.panelSurface : Theme.backgroundSunken
                         return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
                     }
 
@@ -1007,7 +1007,7 @@ PanelWindow {
             // Rounded rectangle (radius 13), no longer a full pill.
             radius: 13
             color: {
-                const c = displayHover.hovered ? Theme.surface : Theme.backgroundSunken
+                const c = displayHover.hovered ? Theme.panelSurface : Theme.backgroundSunken
                 return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
             }
 
@@ -1088,7 +1088,7 @@ PanelWindow {
             // Rounded rectangle (radius 13), no longer a full pill.
             radius: 13
             color: {
-                const c = soundHover.hovered ? Theme.surface : Theme.backgroundSunken
+                const c = soundHover.hovered ? Theme.panelSurface : Theme.backgroundSunken
                 return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
             }
 
@@ -1167,7 +1167,7 @@ PanelWindow {
             : Qt.point(0, 0)
 
         z: 10
-        color: Theme.background
+        color: Theme.panelBackground
         clip: true
 
         x: root.wifiPanelOpen ? 0 : wifiPanel.originPos.x
@@ -1321,7 +1321,7 @@ PanelWindow {
                         anchors.fill: parent
 
                         radius: 16
-                        color: backHover.hovered ? Theme.surface : "transparent"
+                        color: backHover.hovered ? Theme.panelSurface : "transparent"
                     }
 
                     HoverHandler {
@@ -1368,7 +1368,7 @@ PanelWindow {
                         anchors.fill: parent
 
                         radius: 16
-                        color: rescanHover.hovered ? Theme.surface : "transparent"
+                        color: rescanHover.hovered ? Theme.panelSurface : "transparent"
                     }
 
                     HoverHandler {
@@ -1472,7 +1472,7 @@ PanelWindow {
                         width: parent.width
                         height: 52
                         radius: 14
-                        color: rowHover.hovered ? Theme.surface : "transparent"
+                        color: rowHover.hovered ? Theme.panelSurface : "transparent"
 
                         HoverHandler {
                             id: rowHover
@@ -1582,7 +1582,7 @@ PanelWindow {
                                 anchors.fill: parent
 
                                 radius: 14
-                                color: moreHover.hovered ? Theme.surface : "transparent"
+                                color: moreHover.hovered ? Theme.panelSurface : "transparent"
                             }
 
                             HoverHandler {
@@ -1639,7 +1639,7 @@ PanelWindow {
                                 height: 34
 
                                 radius: 8
-                                color: Theme.surface
+                                color: Theme.panelSurface
                                 border.width: passwordField.activeFocus ? 1 : 0
                                 border.color: Theme.accent
 
@@ -1776,7 +1776,7 @@ PanelWindow {
                 height: 36
                 radius: 12
                 visible: wifiService.enabled
-                color: addRowHover.hovered ? Theme.surface : "transparent"
+                color: addRowHover.hovered ? Theme.panelSurface : "transparent"
 
                 HoverHandler {
                     id: addRowHover
@@ -1851,9 +1851,9 @@ PanelWindow {
             height: menuPopupColumn.height + 12
 
             // Separation from the dark list comes from the crisp accent hairline;
-            // fill stays Theme.background.
+            // fill stays Theme.panelBackground.
             radius: 10
-            color: Theme.background
+            color: Theme.panelBackground
             border.width: 1
             border.color: Theme.accent
 
@@ -1871,7 +1871,7 @@ PanelWindow {
                     width: parent.width
                     height: 34
                     radius: 6
-                    color: popupDisconnectHover.hovered ? Theme.surface : "transparent"
+                    color: popupDisconnectHover.hovered ? Theme.panelSurface : "transparent"
                     Behavior on color { ColorAnimation { duration: 100 } }
 
                     HoverHandler {
@@ -1909,7 +1909,7 @@ PanelWindow {
                     height: 34
                     radius: 6
                     visible: wifiPanel.menuNet && wifiPanel.menuNet.known
-                    color: popupForgetHover.hovered ? Theme.surface : "transparent"
+                    color: popupForgetHover.hovered ? Theme.panelSurface : "transparent"
                     Behavior on color { ColorAnimation { duration: 100 } }
 
                     HoverHandler {
@@ -1978,10 +1978,10 @@ PanelWindow {
                 NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
             }
 
-            // Dialog card: Theme.background fill, crisp accent hairline,
+            // Dialog card: Theme.panelBackground fill, crisp accent hairline,
             // floating over the scrim (addBackdrop).
             radius: 10
-            color: Theme.background
+            color: Theme.panelBackground
             border.width: 1
             border.color: Theme.accent
 
@@ -2010,7 +2010,7 @@ PanelWindow {
                     height: 34
 
                     radius: 8
-                    color: Theme.surface
+                    color: Theme.panelSurface
                     border.width: ssidInput.activeFocus ? 1 : 0
                     border.color: Theme.accent
 
@@ -2079,7 +2079,7 @@ PanelWindow {
 
                     background: Rectangle {
                         radius: 8
-                        color: Theme.surface
+                        color: Theme.panelSurface
                         border.width: securityCombo.activeFocus || securityCombo.popup.visible ? 1 : 0
                         border.color: Theme.accent
                     }
@@ -2125,7 +2125,7 @@ PanelWindow {
 
                         background: Rectangle {
                             radius: 6
-                            color: highlighted ? Theme.surface : "transparent"
+                            color: highlighted ? Theme.panelSurface : "transparent"
                         }
                     }
 
@@ -2159,7 +2159,7 @@ PanelWindow {
                     visible: securityCombo.currentIndex === 1
 
                     radius: 8
-                    color: Theme.surface
+                    color: Theme.panelSurface
                     border.width: usernameInput.activeFocus ? 1 : 0
                     border.color: Theme.accent
 
@@ -2203,7 +2203,7 @@ PanelWindow {
                     visible: securityCombo.currentIndex !== 2
 
                     radius: 8
-                    color: Theme.surface
+                    color: Theme.panelSurface
                     border.width: hiddenPasswordInput.activeFocus ? 1 : 0
                     border.color: Theme.accent
 
@@ -2342,7 +2342,7 @@ PanelWindow {
             : Qt.point(0, 0)
 
         z: 11
-        color: Theme.background
+        color: Theme.panelBackground
         clip: true
 
         x: root.bluetoothPanelOpen ? 0 : bluetoothPanel.originPos.x
@@ -2461,7 +2461,7 @@ PanelWindow {
                         anchors.fill: parent
 
                         radius: 16
-                        color: btBackHover.hovered ? Theme.surface : "transparent"
+                        color: btBackHover.hovered ? Theme.panelSurface : "transparent"
                     }
 
                     HoverHandler {
@@ -2511,7 +2511,7 @@ PanelWindow {
                         anchors.fill: parent
 
                         radius: 16
-                        color: btRescanHover.hovered ? Theme.surface : "transparent"
+                        color: btRescanHover.hovered ? Theme.panelSurface : "transparent"
                     }
 
                     HoverHandler {
@@ -2557,7 +2557,7 @@ PanelWindow {
                     width: 44
                     height: 24
                     radius: 12
-                    color: bluetoothService.enabled ? Theme.accent : Theme.surface
+                    color: bluetoothService.enabled ? Theme.accent : Theme.panelSurface
                     border.width: 1
                     border.color: bluetoothService.enabled ? "transparent" : Qt.rgba(1, 1, 1, 0.2)
 
@@ -2632,7 +2632,7 @@ PanelWindow {
                     width: btList.width
                     height: 52
                     radius: 14
-                    color: btRowHover.hovered ? Theme.surface : "transparent"
+                    color: btRowHover.hovered ? Theme.panelSurface : "transparent"
 
                     HoverHandler {
                         id: btRowHover
@@ -2890,9 +2890,9 @@ PanelWindow {
             height: btMenuColumn.height + 12
 
             // Separation from the dark list comes from the crisp accent hairline;
-            // fill stays Theme.background.
+            // fill stays Theme.panelBackground.
             radius: 10
-            color: Theme.background
+            color: Theme.panelBackground
             border.width: 1
             border.color: Theme.accent
 
@@ -2910,7 +2910,7 @@ PanelWindow {
                     width: parent.width
                     height: 34
                     radius: 6
-                    color: btTrustHover.hovered ? Theme.surface : "transparent"
+                    color: btTrustHover.hovered ? Theme.panelSurface : "transparent"
                     Behavior on color { ColorAnimation { duration: 100 } }
 
                     HoverHandler {
@@ -2959,7 +2959,7 @@ PanelWindow {
                     width: parent.width
                     height: 34
                     radius: 6
-                    color: btForgetHover.hovered ? Theme.surface : "transparent"
+                    color: btForgetHover.hovered ? Theme.panelSurface : "transparent"
                     Behavior on color { ColorAnimation { duration: 100 } }
 
                     HoverHandler {
@@ -3004,7 +3004,7 @@ PanelWindow {
             : Qt.point(0, 0)
 
         z: 12
-        color: Theme.background
+        color: Theme.panelBackground
         clip: true
 
         x: root.hotspotPanelOpen ? 0 : hotspotPanel.originPos.x
@@ -3149,7 +3149,7 @@ PanelWindow {
                         anchors.fill: parent
 
                         radius: 16
-                        color: hsBackHover.hovered ? Theme.surface : "transparent"
+                        color: hsBackHover.hovered ? Theme.panelSurface : "transparent"
                     }
 
                     HoverHandler {
@@ -3193,7 +3193,7 @@ PanelWindow {
                     width: 44
                     height: 24
                     radius: 12
-                    color: hotspotService.enabled ? Theme.accent : Theme.surface
+                    color: hotspotService.enabled ? Theme.accent : Theme.panelSurface
                     border.width: 1
                     border.color: hotspotService.enabled ? "transparent" : Qt.rgba(1, 1, 1, 0.2)
 
@@ -3351,7 +3351,7 @@ PanelWindow {
 
                             background: Rectangle {
                                 radius: 6
-                                color: highlighted ? Theme.surfaceRaised : "transparent"
+                                color: highlighted ? Theme.panelRaised : "transparent"
                             }
                         }
 
@@ -3514,7 +3514,7 @@ PanelWindow {
             : Qt.point(0, 0)
 
         z: 13
-        color: Theme.background
+        color: Theme.panelBackground
         clip: true
 
         x: root.audioOutputPanelOpen ? 0 : audioOutputPanel.originPos.x
@@ -3623,7 +3623,7 @@ PanelWindow {
                         anchors.fill: parent
 
                         radius: 16
-                        color: aoBackHover.hovered ? Theme.surface : "transparent"
+                        color: aoBackHover.hovered ? Theme.panelSurface : "transparent"
                     }
 
                     HoverHandler {
@@ -3694,7 +3694,7 @@ PanelWindow {
                     height: 52
                     radius: 14
                     color: aoRowHover.hovered || (aoRow.sink && aoRow.sink.isDefault)
-                        ? Theme.surface
+                        ? Theme.panelSurface
                         : "transparent"
 
                     HoverHandler {

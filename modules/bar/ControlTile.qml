@@ -38,13 +38,13 @@ Item {
         border.color: "transparent"
         // Active  -> LIGHT seed surface (Theme.activeSurface) with dark
         // seed foreground (glyph + label flip to onActiveSurface).
-        // Inactive -> standard dark surface (Theme.background).
+        // Inactive -> sunken panel tone; hover lifts to panelSurface.
         color: {
             // Active tiles are solid state surfaces: no surfaceOpacity alpha.
             // Inactive tiles stay translucent material.
             if (root.active)
                 return hover.hovered ? Theme.activeSurfaceHover : Theme.activeSurface
-            const c = hover.hovered ? Theme.surface : Theme.backgroundSunken
+            const c = hover.hovered ? Theme.panelSurface : Theme.backgroundSunken
             return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
         }
 
