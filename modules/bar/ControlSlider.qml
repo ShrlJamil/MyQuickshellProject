@@ -46,8 +46,8 @@ Item {
             verticalCenter: parent.verticalCenter
         }
 
-        height: 30
-        radius: 15
+        height: 36
+        radius: 10
         color: Theme.backgroundInset
     }
 
@@ -189,7 +189,7 @@ Item {
     }
 
     // Slim VERTICAL thumb: a thin rounded bar, taller than the track band
-    // (38 vs 30) yet clear of the row's top/bottom edges, centred on the
+    // (38 vs 36) yet clear of the row's top/bottom edges, centred on the
     // value position and clamped inside the row at both extremes.
     Rectangle {
         id: knob
