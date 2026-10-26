@@ -159,7 +159,7 @@ PanelWindow {
         anchors.fill: parent
         anchors.margins: 8
         radius: Theme.cornerRadius
-        color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
+        color: Qt.rgba(Theme.panelBackground.r, Theme.panelBackground.g, Theme.panelBackground.b, Theme.moduleSurfaceOpacity)
         border.width: 1
         border.color: Theme.surfaceHover
 
@@ -471,7 +471,7 @@ PanelWindow {
                 width: 38
                 height: 20
                 radius: height / 2
-                color: NotificationService.doNotDisturb ? Theme.accent : Theme.surface
+                color: NotificationService.doNotDisturb ? Theme.accent : Theme.panelSurface
 
                 Rectangle {
                     width: 16
@@ -576,7 +576,7 @@ PanelWindow {
                 height: cardCol.implicitHeight + 20
                 radius: 12
                 color: {
-                    const c = cardHover.hovered ? Theme.surfaceRaised : Theme.surface
+                    const c = cardHover.hovered ? Theme.panelRaised : Theme.panelSurface
                     return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
                 }
 

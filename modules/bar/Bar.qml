@@ -27,6 +27,15 @@ PanelWindow {
     property bool surfaceActive: (barState.screen === root.screen && (barState.mode === "mediaPreview" || barState.mode === "mediaCompact"))
     property double _mediaPopoverClosedAt: 0
 
+    // Open the shell-rendered tray menu for an item (replaces the
+    // platform menu SystemTrayItem.display() would show).
+    function openTrayMenu(item, centerX) {
+        barState.mediaPopoverOpen = false
+        trayMenu.menuHandle = item.menu
+        trayMenu.anchorCenter = centerX
+        trayMenu.open = true
+    }
+
     // ---- single-window concave (tiled hug) --------------------------------
     // Reactive presence/count from the workspace model; floating + geometry
     // from event-driven one-shot `hyprctl clients -j` (the Toplevel API
@@ -701,12 +710,21 @@ PanelWindow {
 
                         onClicked: (mouse) => {
                             if (mouse.button === Qt.RightButton) {
-                                // Anchor the item's own context menu just below
-                                // the icon (coords are window-relative; barContent
+                                // Open the item's context menu as the shell's
+                                // own popover, centred under the icon
+                                // (coords are window-relative; barContent
                                 // sits at 0,0 in root).
+                                if (trayItem.modelData.hasMenu) {
+                                    const p = trayItem.mapToItem(barContent,
+                                        trayItem.width / 2, trayItem.height)
+                                    root.openTrayMenu(trayItem.modelData, p.x)
+                                }
+                            } else if (trayItem.modelData.onlyMenu && trayItem.modelData.hasMenu) {
+                                // Menu-only items have no activation; their
+                                // click opens the menu itself.
                                 const p = trayItem.mapToItem(barContent,
                                     trayItem.width / 2, trayItem.height)
-                                trayItem.modelData.display(root, p.x, p.y)
+                                root.openTrayMenu(trayItem.modelData, p.x)
                             } else {
                                 trayItem.modelData.activate()
                             }
@@ -729,9 +747,12 @@ PanelWindow {
 
             show: !holdLabel.visible && root.mediaService && root.mediaService.hasMedia
 
+            popoverOpen: barState.mediaPopoverOpen
+
             onActivateRequested: {
                 if (Date.now() - root._mediaPopoverClosedAt < 250)
                     return
+                trayMenu.open = false
                 barState.mediaPopoverOpen = !barState.mediaPopoverOpen
             }
         }
@@ -749,6 +770,14 @@ PanelWindow {
                 barState.mediaPopoverOpen = false
                 root._mediaPopoverClosedAt = Date.now()
             }
+        }
+
+        TrayMenuPopover {
+            id: trayMenu
+
+            screen: root.screen
+
+            onDismissRequested: trayMenu.open = false
         }
 
         // Microphone mute - sits just left of the battery. Click
