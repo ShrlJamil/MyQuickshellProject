@@ -480,8 +480,8 @@ PanelWindow {
                                 width: 46
                                 height: 46
                                 radius: width / 2
-                                // ON -> light muted tile, OFF -> subtle dark surface.
-                                color: wifiTile.wifiOn ? Theme.activeTile : Theme.surfaceHover
+                                // ON -> light active surface, OFF -> subtle dark surface.
+                                color: wifiTile.wifiOn ? Theme.activeSurface : Theme.surfaceHover
                             }
 
                             IconImage {
@@ -497,12 +497,12 @@ PanelWindow {
                             }
 
                             // network-wireless-symbolic is a monochrome glyph;
-                            // overlay it: the glyph stays Theme.icon (the
-                            // seed-tinted white) whether Wi-Fi is on or off.
+                            // overlay it: Theme.icon while off; on the light
+                            // active circle it flips to the dark onActiveSurface.
                             ColorOverlay {
                                 anchors.fill: wifiIcon
                                 source: wifiIcon
-                                color: Theme.icon
+                                color: wifiTile.wifiOn ? Theme.onActiveSurface : Theme.icon
                             }
 
                             MouseArea {
@@ -639,7 +639,7 @@ PanelWindow {
                                 width: 46
                                 height: 46
                                 radius: width / 2
-                                color: bluetoothTile.btOn ? Theme.activeTile : Theme.surfaceHover
+                                color: bluetoothTile.btOn ? Theme.activeSurface : Theme.surfaceHover
                             }
 
                             Image {
@@ -663,7 +663,7 @@ PanelWindow {
                             ColorOverlay {
                                 anchors.fill: btHeroIcon
                                 source: btHeroIcon
-                                color: Theme.icon
+                                color: bluetoothTile.btOn ? Theme.onActiveSurface : Theme.icon
                             }
 
                             MouseArea {

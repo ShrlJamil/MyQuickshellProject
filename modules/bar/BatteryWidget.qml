@@ -24,7 +24,7 @@ Item {
         anchors.topMargin: 3
         anchors.bottomMargin: 3
         radius: 15
-        color: root.popoverOpen ? Theme.surfaceDesaturated
+        color: root.popoverOpen ? ((tap.pressed || hover.hovered) ? Theme.activeSurfaceHover : Theme.activeSurface)
             : ((tap.pressed || hover.hovered) ? Theme.surfaceHover : "transparent")
     }
 
@@ -98,9 +98,13 @@ Item {
                     verticalOffset: 1
                     radius: 2
                     samples: 9
-                    color: Theme.textShadow
+                    color: root.popoverOpen ? Qt.rgba(1, 1, 1, 0.35) : Theme.textShadow
                 }
-                color: iconBox.attention ? Theme.accent : Theme.icon
+                // While the popover is open the pill wears the light
+                // active surface, so the glyph flips dark; the accent
+                // attention tint only applies on the dark bar.
+                color: root.popoverOpen ? Theme.onActiveSurface
+                    : (iconBox.attention ? Theme.accent : Theme.icon)
 
                 // Subtle fade, fires only while the Image reloads on a
                 // threshold cross, never while idle.
@@ -114,9 +118,10 @@ Item {
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: Math.round(BatteryService.percent) + "%"
-            color: BatteryService.low ? Theme.accent : Theme.icon
+            color: root.popoverOpen ? Theme.onActiveSurface
+                : (BatteryService.low ? Theme.accent : Theme.icon)
             style: Text.Raised
-            styleColor: Theme.textShadow
+            styleColor: root.popoverOpen ? Qt.rgba(1, 1, 1, 0.35) : Theme.textShadow
             font.family: Theme.fontFamily
             font.weight: Font.Black
             font.pixelSize: 14

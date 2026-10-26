@@ -51,7 +51,7 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: 15
-        color: root.centerOpen ? Theme.surfaceDesaturated
+        color: root.centerOpen ? (clusterTap.pressed || clusterHover.hovered ? Theme.activeSurfaceHover : Theme.activeSurface)
             : (clusterTap.pressed || clusterHover.hovered ? Theme.surfaceHover : "transparent")
     }
 
@@ -109,9 +109,10 @@ Item {
                     verticalOffset: 1
                     radius: 2
                     samples: 9
-                    color: Theme.textShadow
+                    color: root.centerOpen ? Qt.rgba(1, 1, 1, 0.35) : Theme.textShadow
                 }
-                color: wifiSlot.wifiOn ? Theme.icon : Theme.textMuted
+                color: root.centerOpen ? (wifiSlot.wifiOn ? Theme.onActiveSurface : Theme.onActiveSurfaceDim)
+                    : (wifiSlot.wifiOn ? Theme.icon : Theme.textMuted)
             }
         }
 
@@ -165,9 +166,9 @@ Item {
                     verticalOffset: 1
                     radius: 2
                     samples: 9
-                    color: Theme.textShadow
+                    color: root.centerOpen ? Qt.rgba(1, 1, 1, 0.35) : Theme.textShadow
                 }
-                color: Theme.icon
+                color: root.centerOpen ? Theme.onActiveSurface : Theme.icon
             }
         }
 
@@ -217,11 +218,11 @@ Item {
                     verticalOffset: 1
                     radius: 2
                     samples: 9
-                    color: Theme.textShadow
+                    color: root.centerOpen ? Qt.rgba(1, 1, 1, 0.35) : Theme.textShadow
                 }
                 // The off glyph carries the muted state - the tint stays
-                // Theme.icon, never dimmed.
-                color: Theme.icon
+                // full-strength in both schemes, never dimmed.
+                color: root.centerOpen ? Theme.onActiveSurface : Theme.icon
             }
         }
     }

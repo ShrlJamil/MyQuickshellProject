@@ -36,14 +36,14 @@ Item {
         radius: root.cornerRadius
         border.width: 0
         border.color: "transparent"
-        // Active  -> light muted (Theme.activeTile) surface; the glyph stays
-        // Theme.icon (the seed-tinted white) in BOTH states, by design.
+        // Active  -> LIGHT seed surface (Theme.activeSurface) with dark
+        // seed foreground (glyph + label flip to onActiveSurface).
         // Inactive -> standard dark surface (Theme.background).
         color: {
             // Active tiles are solid state surfaces: no surfaceOpacity alpha.
             // Inactive tiles stay translucent material.
             if (root.active)
-                return hover.hovered ? Theme.activeTileHover : Theme.activeTile
+                return hover.hovered ? Theme.activeSurfaceHover : Theme.activeSurface
             const c = hover.hovered ? Theme.surface : Theme.backgroundSunken
             return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
         }
@@ -125,7 +125,7 @@ Item {
                 anchors.fill: svgIcon
                 source: svgIcon
                 visible: root._localIcon && svgIcon.status === Image.Ready
-                color: Theme.icon
+                color: root.active ? Theme.onActiveSurface : Theme.icon
             }
         }
 
@@ -140,7 +140,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
 
             text: root.label
-            color: Theme.text
+            color: root.active ? Theme.onActiveSurface : Theme.text
             font.family: Theme.fontFamily
             font.pixelSize: root.labelPixelSize
             font.weight: Font.Medium

@@ -74,6 +74,13 @@ Item {
     // Text chroma: a quieter slice of the neutral saturation - text
     // carries the seed's hue family without becoming coloured itself.
     readonly property real _textSat: Math.min(root._neutralSat, 0.25)
+    // Active-state chroma: most of the seed's saturation, so the light
+    // active surface clearly carries the wallpaper's colour (never a
+    // milky neutral). Achromatic seeds get a near-neutral 0.05 instead:
+    // with no seed hue to carry, the fallback hue must not tint the
+    // active scheme blue.
+    readonly property real _activeSat: root._seedSat < 0.05 ? 0.05
+        : Math.max(0.40, Math.min(0.85, root._seedSat * 0.9))
 
     function _tone(lightness) {
         return Qt.hsla(root._seedHue, root._neutralSat, lightness, 1)
@@ -91,9 +98,9 @@ Item {
     property color backgroundSunken: Qt.hsla(root._seedHue, root._neutralSat * 0.7, root._baseL * 0.86, 1)
     property color backgroundInset: root._tone(root._baseL * 0.58)
 
-    // Bar widgets' ACTIVE (open-state) fill = the neutral container tone,
-    // same as `surface`: one family everywhere. (Pre-experiment this was a
-    // desaturated raw surface; the tonal ladder makes that a no-op.)
+    // Legacy alias of `surface`. (Bar widgets' open-state fill used this
+    // until they moved to the light active scheme - activeSurface and
+    // friends; nothing consumes it now.)
     property color surfaceDesaturated: root.surface
 
     // ON-state tile fill: the seed's muted container tone, anchored
@@ -102,6 +109,17 @@ Item {
     property color activeTile: Qt.hsla(root._seedHue, root._containerSat, root._baseL + 0.17, 1)
     // Its hover: the same container one tone step up.
     property color activeTileHover: Qt.hsla(root._seedHue, root._containerSat, root._baseL + 0.21, 1)
+
+    // Light ACTIVE scheme (Control Center): an active control is a LIGHT
+    // seed surface with DARK seed foreground - the inverse polarity of
+    // the dark container above. Lightness levels are fixed by the recipe
+    // (verified >= 7:1 for the main foreground and >= 4.5:1 for the dim
+    // one across blue/orange/purple/pale/achromatic/yellow/green seeds);
+    // hover DARKENS, as a light surface must.
+    property color activeSurface: Qt.hsla(root._seedHue, root._activeSat, 0.80, 1)
+    property color activeSurfaceHover: Qt.hsla(root._seedHue, root._activeSat, 0.76, 1)
+    property color onActiveSurface: Qt.hsla(root._seedHue, Math.min(root._activeSat, 0.55), 0.12, 1)
+    property color onActiveSurfaceDim: Qt.hsla(root._seedHue, root._activeSat * 0.85, 0.28, 1)
 
     // Accent passes through from the palette (his template already tunes
     // it). Text colours do NOT: they are derived from the seed at fixed
