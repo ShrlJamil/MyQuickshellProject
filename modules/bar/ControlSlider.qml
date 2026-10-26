@@ -35,35 +35,21 @@ Item {
     // Horizontal inset for the icon / value label inside the row body.
     property real edgeInset: 16
 
-    // Track band: a rounded groove centred in the row; its unfilled part
-    // keeps this shape and tone. The knob is TALLER than the band.
-    Rectangle {
-        id: track
-
-        anchors {
-            left: parent.left
-            right: parent.right
-            verticalCenter: parent.verticalCenter
-        }
-
-        height: 36
-        radius: 10
-        color: Theme.backgroundInset
-    }
-
-    // Progress: fills the band from the left (left end follows the band
-    // radius) and is clipped so the end facing the knob is SQUARE. Its
-    // width derives from the knob position, which holds a constant 4px
-    // gap between the progress end and the knob at every value.
+    // Progress: a 36px band centred in the row, drawn directly on the
+    // section background from ControlCenter, which serves as the track
+    // (its idle/hover tones show through wherever the progress has not
+    // reached). The left end keeps a 10px radius; the right end is
+    // clipped SQUARE. Width derives from the knob position, holding a
+    // constant 4px gap between the progress end and the knob.
     Item {
         id: fillClip
 
         anchors {
-            left: track.left
-            top: track.top
-            bottom: track.bottom
+            left: parent.left
+            verticalCenter: parent.verticalCenter
         }
 
+        height: 36
         width: Math.max(0, knob.x - 4)
         clip: true
 
@@ -74,8 +60,8 @@ Item {
                 bottom: parent.bottom
             }
 
-            width: fillClip.width + track.radius
-            radius: track.radius
+            width: fillClip.width + 10
+            radius: 10
             color: Theme.activeTile
         }
     }
@@ -188,8 +174,8 @@ Item {
         font.weight: Font.DemiBold
     }
 
-    // Slim VERTICAL thumb: a thin rounded bar, taller than the track band
-    // (38 vs 36) yet clear of the row's top/bottom edges, centred on the
+    // Slim VERTICAL thumb: a thin rounded bar, taller than the progress
+    // band (38 vs 36) yet clear of the row's top/bottom edges, centred on the
     // value position and clamped inside the row at both extremes.
     Rectangle {
         id: knob

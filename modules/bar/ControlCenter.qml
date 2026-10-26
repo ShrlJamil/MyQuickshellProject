@@ -88,7 +88,7 @@ PanelWindow {
     readonly property real panelPadding: 14
     readonly property real heroHeight: 68
     readonly property real gridTileSize: 215
-    readonly property real gridTileHeight: 56
+    readonly property real gridTileHeight: 68
     readonly property real sliderHeight: 48
     readonly property real tilesHeight: root.heroHeight + 5 + root.gridTileHeight * 4 + 15
     readonly property real contentHeight: root.tilesHeight + root.rowGap + root.sliderHeight + root.rowGap + root.sliderHeight + root.panelPadding * 2

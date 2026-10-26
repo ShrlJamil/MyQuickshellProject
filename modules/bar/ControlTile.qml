@@ -25,7 +25,7 @@ Item {
     readonly property real radius: root.cornerRadius
 
     readonly property real iconSlotSize: root.round ? Math.max(26, Math.round(Math.min(root.width, root.height) * 0.4)) : 34
-    readonly property real iconSize: root.round ? Math.max(22, Math.round(Math.min(root.width, root.height) * 0.34)) : 30
+    readonly property real iconSize: root.round ? Math.max(22, Math.round(Math.min(root.width, root.height) * 0.35)) : 30
     readonly property int labelPixelSize: root.round ? 13 : 12
 
     Rectangle {
