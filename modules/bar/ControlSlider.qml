@@ -30,27 +30,54 @@ Item {
         ? Math.max(0, Math.min(1, (root._shown - root.from) / (root.to - root.from)))
         : 0
 
-    implicitHeight: 44
+    implicitHeight: 48
 
     // Horizontal inset for the icon / value label inside the row body.
     property real edgeInset: 16
 
-    // The row body IS the track: the filled portion is drawn full-height
-    // in the seed container tone, from the row's left edge to the value
-    // position. The section rectangle behind provides the unfilled tone
-    // (and the hover lift), so track and fill read as one surface.
+    // Track band: a rounded groove centred in the row; its unfilled part
+    // keeps this shape and tone. The knob is TALLER than the band.
     Rectangle {
-        id: fill
+        id: track
 
         anchors {
             left: parent.left
-            top: parent.top
-            bottom: parent.bottom
+            right: parent.right
+            verticalCenter: parent.verticalCenter
         }
 
-        width: parent.width * root.clampedFraction
-        radius: 13
-        color: Theme.activeTile
+        height: 30
+        radius: 15
+        color: Theme.backgroundInset
+    }
+
+    // Progress: fills the band from the left (left end follows the band
+    // radius) and is clipped so the end facing the knob is SQUARE. Its
+    // width derives from the knob position, which holds a constant 4px
+    // gap between the progress end and the knob at every value.
+    Item {
+        id: fillClip
+
+        anchors {
+            left: track.left
+            top: track.top
+            bottom: track.bottom
+        }
+
+        width: Math.max(0, knob.x - 4)
+        clip: true
+
+        Rectangle {
+            anchors {
+                left: parent.left
+                top: parent.top
+                bottom: parent.bottom
+            }
+
+            width: fillClip.width + track.radius
+            radius: track.radius
+            color: Theme.activeTile
+        }
     }
 
     // Whole-row drag/click surface. Declared before the icon slot so the
@@ -161,19 +188,20 @@ Item {
         font.weight: Font.DemiBold
     }
 
-    // Slim VERTICAL thumb: a thin rounded bar centred on the fill edge,
-    // clamped inside the row so it never clips at either extreme.
+    // Slim VERTICAL thumb: a thin rounded bar, taller than the track band
+    // (38 vs 30) yet clear of the row's top/bottom edges, centred on the
+    // value position and clamped inside the row at both extremes.
     Rectangle {
         id: knob
 
         anchors.verticalCenter: parent.verticalCenter
 
         width: 5
-        height: 28
+        height: 38
         radius: 2.5
         color: Theme.icon
 
-        x: Math.max(4, Math.min(root.width - width - 4, fill.width - width / 2))
+        x: Math.max(4, Math.min(root.width - width - 4, root.width * root.clampedFraction - width / 2))
     }
 
     function _apply(px) {
