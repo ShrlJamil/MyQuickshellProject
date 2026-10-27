@@ -11,7 +11,7 @@ FocusScope {
     readonly property int pad: 16
     readonly property int headerHeight: 40
     readonly property int gap: 12
-    readonly property real sidebarWidth: Math.max(150, Math.min(216, root.width * 0.26))
+    readonly property real sidebarWidth: Math.max(180, Math.min(264, root.width * 0.30))
 
     readonly property color settingsBackground: "#0A0A0A"
     readonly property color settingsSurface: "#141414"
@@ -225,8 +225,8 @@ FocusScope {
                         readonly property bool active: root.categoryIndex === sidebarItem.index
 
                         width: parent.width
-                        height: 63
-                        radius: 12
+                        height: 50
+                        radius: 10
                         color: sidebarItem.active
                             ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, sidebarArea.containsMouse ? 0.26 : 0.18)
                             : (sidebarArea.containsMouse ? Theme.surfaceHover : "transparent")
@@ -247,8 +247,8 @@ FocusScope {
                             spacing: 10
 
                             Item {
-                                width: 30
-                                height: 30
+                                width: 24
+                                height: 24
                                 anchors.verticalCenter: parent.verticalCenter
 
                                 Image {
@@ -256,8 +256,8 @@ FocusScope {
 
                                     anchors.fill: parent
                                     source: Quickshell.iconPath(sidebarItem.modelData.icon, sidebarItem.modelData.fallback)
-                                    sourceSize.width: 60
-                                    sourceSize.height: 60
+                                    sourceSize.width: 48
+                                    sourceSize.height: 48
                                     fillMode: Image.PreserveAspectFit
                                     asynchronous: true
                                     smooth: true
@@ -277,13 +277,13 @@ FocusScope {
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
 
-                                width: parent.width - 40
+                                width: parent.width - 34
                                 text: sidebarItem.modelData.label
                                 color: sidebarItem.active
                                     ? Theme.accent
                                     : (sidebarArea.containsMouse ? Theme.text : Theme.textDim)
                                 font.family: Theme.fontFamily
-                                font.pixelSize: 20
+                                font.pixelSize: 16
                                 font.weight: sidebarItem.active ? Font.DemiBold : Font.Medium
                                 elide: Text.ElideRight
                             }
