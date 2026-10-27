@@ -136,10 +136,11 @@ Item {
 
     // Magnetic snap, measured in screen pixels so it feels the same at any zoom.
     // Hysteresis: engage within snapPx, hold until releasePx, then free again.
-    readonly property real snapPx: 8
-    readonly property real releasePx: 12
-    property real snapGuideX: NaN
-    property real snapGuideY: NaN
+    // Kept deliberately light (5/7 px): the magnets - edge adjacency AND
+    // edge alignment (tops/bottoms, lefts/rights) - should assist a near
+    // miss, not glue the block to a neighbour across a long pull.
+    readonly property real snapPx: 5
+    readonly property real releasePx: 7
     // Logical coordinate a snap is currently engaged on (NaN = free) - persists
     // across drag moves so the pointer can travel without re-latching.
     property real _snapEngagedX: NaN
@@ -213,8 +214,6 @@ Item {
 
         root._snapEngagedX = rx.engaged
         root._snapEngagedY = ry.engaged
-        root.snapGuideX = rx.guide
-        root.snapGuideY = ry.guide
 
         DisplayService.setPosition(name, Math.round(rx.pos), Math.round(ry.pos))
     }
@@ -388,7 +387,7 @@ Item {
 
                             radius: 8
                             opacity: monBlock.info && monBlock.info.disabled ? 0.35 : 1
-                            color: monBlock.selected ? settingsSurfaceOverlay : settingsSurface
+                            color: monBlock.selected ? settingsSurfaceOverlay : settingsSurfaceRaised
                             border.width: monBlock.selected ? 2 : 1
                             border.color: monBlock.selected ? Theme.accent : Theme.surfaceHover
 
@@ -456,8 +455,6 @@ Item {
 
                                 onReleased: {
                                     root.dragging = false
-                                    root.snapGuideX = NaN
-                                    root.snapGuideY = NaN
                                     root._snapEngagedX = NaN
                                     root._snapEngagedY = NaN
                                     // Integer normalize + mirror-on-full-overlap only -
@@ -467,27 +464,6 @@ Item {
                                 }
                             }
                         }
-                    }
-
-                    // Snap guide overlay - only visible mid-drag while a snap is engaged.
-                    Rectangle {
-                        visible: root.dragging && !isNaN(root.snapGuideX)
-                        width: 1
-                        height: canvasArea.height
-                        x: root.logicalToCanvasX(root.snapGuideX)
-                        y: 0
-                        color: Theme.accent
-                        opacity: 0.9
-                    }
-
-                    Rectangle {
-                        visible: root.dragging && !isNaN(root.snapGuideY)
-                        width: canvasArea.width
-                        height: 1
-                        x: 0
-                        y: root.logicalToCanvasY(root.snapGuideY)
-                        color: Theme.accent
-                        opacity: 0.9
                     }
 
                     Text {
@@ -511,7 +487,7 @@ Item {
             // used to be a segmented control here; they are momentary
             // commands (DisplayService keeps no "current preset" state to
             // show on the trigger), so they now live in modePopup, which
-            // opens centred on the page instead of dropping down.
+            // opens centred on this row's trigger instead of dropping down.
             Item {
                 width: parent.width
                 height: 36
@@ -539,10 +515,16 @@ Item {
                         right: parent.right
                         verticalCenter: parent.verticalCenter
                     }
-                    width: modeLabel.implicitWidth + 48
+                    // Same width as the menu it opens (modePopup binds its
+                    // width to this box), so the centred menu's edges line
+                    // up with the button's and nothing spills past the
+                    // content's right edge. The fill is a raised tier, not
+                    // settingsBackground: on the same-valued page
+                    // background the button was nearly invisible.
+                    width: 200
                     height: 32
                     radius: 8
-                    color: settingsBackground
+                    color: modeMouse.containsMouse ? settingsSurfaceOverlay : settingsSurfaceRaised
                     border.width: modeMouse.containsMouse ? 1 : 0
                     border.color: Theme.accent
 
@@ -579,7 +561,16 @@ Item {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
 
-                        onClicked: modePopup.open()
+                        onClicked: {
+                            // Centre the menu on this button: same width,
+                            // left edges aligned, vertically centred on the
+                            // button - it appears in place over the trigger
+                            // instead of dropping down below it.
+                            const p = modeBox.mapToItem(root, 0, 0)
+                            modePopup.x = p.x
+                            modePopup.y = p.y + modeBox.height / 2 - modePopup.implicitHeight / 2
+                            modePopup.open()
+                        }
                     }
                 }
             }
@@ -1040,16 +1031,16 @@ Item {
         }
     }
 
-    // Display-mode menu: the layout presets as a popup centred on the
-    // page - it appears in the middle instead of dropping down from its
-    // trigger (modeBox, in the row under the arrangement card). Picking a
-    // row applies the preset immediately, like the old segmented control.
+    // Display-mode menu: the layout presets as a popup centred on its
+    // trigger (modeBox, in the row under the arrangement card) - same
+    // width as the button, appearing in place over it instead of dropping
+    // down. Its x/y are set by the trigger's click handler on open.
+    // Picking a row applies the preset immediately, like the old
+    // segmented control.
     Popup {
         id: modePopup
 
-        x: (root.width - width) / 2
-        y: (root.height - height) / 2
-        width: 224
+        width: modeBox.width
         padding: 4
 
         background: Rectangle {
