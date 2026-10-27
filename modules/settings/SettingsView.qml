@@ -211,7 +211,7 @@ FocusScope {
             Column {
                 anchors.fill: parent
                 anchors.margins: 8
-                spacing: 4
+                spacing: 6
 
                 Repeater {
                     model: root.categories
@@ -225,8 +225,8 @@ FocusScope {
                         readonly property bool active: root.categoryIndex === sidebarItem.index
 
                         width: parent.width
-                        height: 42
-                        radius: 10
+                        height: 63
+                        radius: 12
                         color: sidebarItem.active
                             ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, sidebarArea.containsMouse ? 0.26 : 0.18)
                             : (sidebarArea.containsMouse ? Theme.surfaceHover : "transparent")
@@ -247,8 +247,8 @@ FocusScope {
                             spacing: 10
 
                             Item {
-                                width: 20
-                                height: 20
+                                width: 30
+                                height: 30
                                 anchors.verticalCenter: parent.verticalCenter
 
                                 Image {
@@ -256,8 +256,8 @@ FocusScope {
 
                                     anchors.fill: parent
                                     source: Quickshell.iconPath(sidebarItem.modelData.icon, sidebarItem.modelData.fallback)
-                                    sourceSize.width: 36
-                                    sourceSize.height: 36
+                                    sourceSize.width: 60
+                                    sourceSize.height: 60
                                     fillMode: Image.PreserveAspectFit
                                     asynchronous: true
                                     smooth: true
@@ -277,13 +277,13 @@ FocusScope {
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
 
-                                width: parent.width - 30
+                                width: parent.width - 40
                                 text: sidebarItem.modelData.label
                                 color: sidebarItem.active
                                     ? Theme.accent
                                     : (sidebarArea.containsMouse ? Theme.text : Theme.textDim)
                                 font.family: Theme.fontFamily
-                                font.pixelSize: 13
+                                font.pixelSize: 20
                                 font.weight: sidebarItem.active ? Font.DemiBold : Font.Medium
                                 elide: Text.ElideRight
                             }
