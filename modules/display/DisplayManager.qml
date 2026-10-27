@@ -136,11 +136,12 @@ Item {
 
     // Magnetic snap, measured in screen pixels so it feels the same at any zoom.
     // Hysteresis: engage within snapPx, hold until releasePx, then free again.
-    // Kept deliberately light (5/7 px): the magnets - edge adjacency AND
-    // edge alignment (tops/bottoms, lefts/rights) - should assist a near
-    // miss, not glue the block to a neighbour across a long pull.
-    readonly property real snapPx: 5
-    readonly property real releasePx: 7
+    // Kept to a whisper (2/3 px): the magnets - edge adjacency AND edge
+    // alignment (tops/bottoms, lefts/rights) - only catch a near-exact
+    // miss; anything stronger glues the block to a neighbour and, with
+    // the latch flapping at the boundary, makes it visibly shake.
+    readonly property real snapPx: 2
+    readonly property real releasePx: 3
     // Logical coordinate a snap is currently engaged on (NaN = free) - persists
     // across drag moves so the pointer can travel without re-latching.
     property real _snapEngagedX: NaN
@@ -426,8 +427,14 @@ Item {
 
                                 anchors.fill: parent
 
-                                property real pressX: 0
-                                property real pressY: 0
+                                // Without this the page's Flickable steals
+                                // the gesture mid-drag and the whole column
+                                // (the rows under the card included) scrolls
+                                // along under the pointer.
+                                preventStealing: true
+
+                                property real pressCanvasX: 0
+                                property real pressCanvasY: 0
                                 property real origX: 0
                                 property real origY: 0
 
@@ -440,16 +447,25 @@ Item {
                                     root._snapEngagedX = NaN
                                     root._snapEngagedY = NaN
                                     root.dragging = true
-                                    dragArea.pressX = mouse.x
-                                    dragArea.pressY = mouse.y
+                                    const cp = dragArea.mapToItem(canvasArea, mouse.x, mouse.y)
+                                    dragArea.pressCanvasX = cp.x
+                                    dragArea.pressCanvasY = cp.y
                                     dragArea.origX = monBlock.info.x
                                     dragArea.origY = monBlock.info.y
                                 }
 
                                 onPositionChanged: (mouse) => {
+                                    // Pointer tracked in CANVAS coordinates,
+                                    // never block-relative ones: the block
+                                    // moves to the committed (possibly
+                                    // snapped) position, and block-relative
+                                    // readings feed that movement back into
+                                    // the input - around a latched edge the
+                                    // block shook from exactly that loop.
+                                    const cp = dragArea.mapToItem(canvasArea, mouse.x, mouse.y)
                                     const s = root.viewScale
-                                    const dx = (mouse.x - dragArea.pressX) / s
-                                    const dy = (mouse.y - dragArea.pressY) / s
+                                    const dx = (cp.x - dragArea.pressCanvasX) / s
+                                    const dy = (cp.y - dragArea.pressCanvasY) / s
                                     root.applyDragSnap(monBlock.modelData, dragArea.origX + dx, dragArea.origY + dy)
                                 }
 
