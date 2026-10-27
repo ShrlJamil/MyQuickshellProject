@@ -78,31 +78,11 @@ Item {
         font.weight: Font.DemiBold
     }
 
-    Text {
-        id: pageDesc
-
-        anchors {
-            top: pageTitle.bottom
-            left: parent.left
-            right: parent.right
-            topMargin: 6
-            leftMargin: 10
-            rightMargin: 10
-        }
-
-        text: "Pick from your collection in ~/Pictures/Wallpapers, or import a new image. Applying updates every monitor and regenerates the wallust / matugen theme."
-        color: Theme.textDim
-        font.family: Theme.fontFamily
-        font.pixelSize: 12
-        lineHeight: 1.25
-        wrapMode: Text.WordWrap
-    }
-
     Rectangle {
         id: divider
 
         anchors {
-            top: pageDesc.bottom
+            top: pageTitle.bottom
             left: parent.left
             right: parent.right
             topMargin: 14

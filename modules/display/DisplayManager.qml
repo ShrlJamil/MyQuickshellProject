@@ -245,19 +245,60 @@ Item {
     }
 
     // ---- Page layout --------------------------------------------------------
-    // App-style settings page: a centred, width-capped column that scrolls
-    // when the window is short, with the action footer pinned below it.
-    // Sections: page header, arrangement card, preset segmented control,
-    // selected-monitor card with labelled rows. All state and actions still
-    // go through DisplayService exactly as before - this is presentation only.
-    Flickable {
-        id: flick
+    // App-style settings page sharing the Wallpaper page's layout pattern:
+    // a pinned header (title only - the page must read without explanation)
+    // over a divider, then a scrolling content column, with the action
+    // footer pinned below it. Content sections: arrangement card,
+    // selected-monitor + display-mode row, selected-monitor card with
+    // labelled rows. All
+    // state and actions still go through DisplayService exactly as before -
+    // this is presentation only.
+
+    // Page header - same title metrics and placement as the Wallpaper page.
+    Text {
+        id: pageTitle
 
         anchors {
             top: parent.top
             left: parent.left
             right: parent.right
+            topMargin: 10
+            leftMargin: 10
+            rightMargin: 10
+        }
+
+        text: "Display"
+        color: Theme.text
+        font.pixelSize: 18
+        font.family: Theme.fontFamily
+        font.weight: Font.DemiBold
+    }
+
+    Rectangle {
+        id: headerDivider
+
+        anchors {
+            top: pageTitle.bottom
+            left: parent.left
+            right: parent.right
+            topMargin: 14
+            leftMargin: 10
+            rightMargin: 10
+        }
+
+        height: 1
+        color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+    }
+
+    Flickable {
+        id: flick
+
+        anchors {
+            top: headerDivider.bottom
+            left: parent.left
+            right: parent.right
             bottom: actionFooter.top
+            topMargin: 14
         }
 
         contentWidth: width
@@ -274,31 +315,10 @@ Item {
             anchors {
                 top: parent.top
                 horizontalCenter: parent.horizontalCenter
-                topMargin: 16
             }
 
-            width: Math.max(280, Math.min(flick.width - 96, 980))
+            width: Math.max(280, Math.min(flick.width - 20, 980))
             spacing: 14
-
-            // Page header.
-            Column {
-                spacing: 2
-
-                Text {
-                    text: "Display"
-                    color: Theme.text
-                    font.pixelSize: 20
-                    font.family: Theme.fontFamily
-                    font.weight: Font.DemiBold
-                }
-
-                Text {
-                    text: "Arrange your monitors and adjust resolution, scale and rotation."
-                    color: Theme.textMuted
-                    font.pixelSize: 11
-                    font.family: Theme.fontFamily
-                }
-            }
 
             // Arrangement card: title + the drag canvas. The canvas is kept
             // deliberately plain - no grid, no origin crosshair - so the
@@ -484,63 +504,82 @@ Item {
                 }
             }
 
-            // Layout presets as one segmented control, left-aligned with the
-            // cards. The segments are momentary commands (DisplayService has
-            // no persistent "current preset" state to highlight), so only
-            // hover feedback is shown.
-            Rectangle {
-                id: presetBar
-
-                width: presetRow.implicitWidth + 4
+            // Selected monitor + display-mode row, directly under the
+            // arrangement card: the selected monitor's name on the left,
+            // the display-mode menu trigger on the right. The layout
+            // presets (Extend / Mirror / Internal Only / External Only)
+            // used to be a segmented control here; they are momentary
+            // commands (DisplayService keeps no "current preset" state to
+            // show on the trigger), so they now live in modePopup, which
+            // opens centred on the page instead of dropping down.
+            Item {
+                width: parent.width
                 height: 36
-                radius: height / 2
-                color: settingsBackground
-                border.width: 1
-                border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
 
-                Row {
-                    id: presetRow
+                Text {
+                    anchors {
+                        left: parent.left
+                        right: modeBox.left
+                        verticalCenter: parent.verticalCenter
+                        rightMargin: 12
+                    }
+                    text: "Selected Monitor: " + DisplayService.selectedMonitor
+                    color: Theme.text
+                    font.pixelSize: 13
+                    font.family: Theme.fontFamily
+                    font.weight: Font.DemiBold
+                    elide: Text.ElideRight
+                    visible: root.selectedInfo !== undefined
+                }
 
-                    anchors.centerIn: parent
-                    spacing: 2
+                Rectangle {
+                    id: modeBox
 
-                    Repeater {
-                        model: [
-                            { label: "Extend", preset: "extend" },
-                            { label: "Mirror", preset: "mirror" },
-                            { label: "Internal Only", preset: "internalOnly" },
-                            { label: "External Only", preset: "externalOnly" }
-                        ]
+                    anchors {
+                        right: parent.right
+                        verticalCenter: parent.verticalCenter
+                    }
+                    width: modeLabel.implicitWidth + 48
+                    height: 32
+                    radius: 8
+                    color: settingsBackground
+                    border.width: modeMouse.containsMouse ? 1 : 0
+                    border.color: Theme.accent
 
-                        delegate: Rectangle {
-                            id: presetSegment
+                    Text {
+                        id: modeLabel
 
-                            required property var modelData
-
-                            width: segmentLabel.implicitWidth + 22
-                            height: 30
-                            radius: height / 2
-                            color: segmentHover.hovered ? settingsSurfaceRaised : "transparent"
-
-                            HoverHandler {
-                                id: segmentHover
-                                cursorShape: Qt.PointingHandCursor
-                            }
-
-                            TapHandler {
-                                onTapped: DisplayService.applyPreset(presetSegment.modelData.preset)
-                            }
-
-                            Text {
-                                id: segmentLabel
-                                anchors.centerIn: parent
-                                text: presetSegment.modelData.label
-                                color: Theme.text
-                                font.pixelSize: 11
-                                font.family: Theme.fontFamily
-                                font.weight: Font.DemiBold
-                            }
+                        anchors {
+                            left: parent.left
+                            verticalCenter: parent.verticalCenter
+                            leftMargin: 12
                         }
+                        text: "Display Mode"
+                        color: Theme.text
+                        font.pixelSize: 12
+                        font.family: Theme.fontFamily
+                    }
+
+                    IconImage {
+                        anchors {
+                            right: parent.right
+                            verticalCenter: parent.verticalCenter
+                            rightMargin: 10
+                        }
+                        width: 14
+                        height: 14
+                        source: Quickshell.iconPath("pan-down-symbolic", "go-down-symbolic")
+                        asynchronous: true
+                    }
+
+                    MouseArea {
+                        id: modeMouse
+
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: modePopup.open()
                     }
                 }
             }
@@ -570,23 +609,6 @@ Item {
                         rightMargin: 16
                     }
                     spacing: 0
-
-                    Item {
-                        width: parent.width
-                        height: 30
-
-                        Text {
-                            anchors {
-                                left: parent.left
-                                verticalCenter: parent.verticalCenter
-                            }
-                            text: "Selected Monitor: " + DisplayService.selectedMonitor
-                            color: Theme.text
-                            font.pixelSize: 13
-                            font.family: Theme.fontFamily
-                            font.weight: Font.DemiBold
-                        }
-                    }
 
                     // Primary display preference. Hyprland has no native
                     // primary-output property, so this selects which display
@@ -1018,6 +1040,74 @@ Item {
         }
     }
 
+    // Display-mode menu: the layout presets as a popup centred on the
+    // page - it appears in the middle instead of dropping down from its
+    // trigger (modeBox, in the row under the arrangement card). Picking a
+    // row applies the preset immediately, like the old segmented control.
+    Popup {
+        id: modePopup
+
+        x: (root.width - width) / 2
+        y: (root.height - height) / 2
+        width: 224
+        padding: 4
+
+        background: Rectangle {
+            radius: 8
+            color: settingsSurfaceRaised
+            border.width: 1
+            border.color: settingsSurfaceOverlay
+        }
+
+        contentItem: Column {
+            spacing: 2
+
+            Repeater {
+                model: [
+                    { label: "Extend", preset: "extend" },
+                    { label: "Mirror", preset: "mirror" },
+                    { label: "Internal Only", preset: "internalOnly" },
+                    { label: "External Only", preset: "externalOnly" }
+                ]
+
+                delegate: Rectangle {
+                    id: modeRow
+
+                    required property var modelData
+
+                    width: modePopup.width - 8
+                    height: 32
+                    radius: 6
+                    color: modeRowHover.hovered ? settingsSurfaceOverlay : "transparent"
+
+                    HoverHandler {
+                        id: modeRowHover
+                        cursorShape: Qt.PointingHandCursor
+                    }
+
+                    TapHandler {
+                        onTapped: {
+                            DisplayService.applyPreset(modeRow.modelData.preset)
+                            modePopup.close()
+                        }
+                    }
+
+                    Text {
+                        anchors {
+                            left: parent.left
+                            verticalCenter: parent.verticalCenter
+                            leftMargin: 8
+                        }
+                        text: modeRow.modelData.label
+                        color: Theme.text
+                        font.pixelSize: 12
+                        font.family: Theme.fontFamily
+                    }
+                }
+            }
+        }
+    }
+
     // Action footer, pinned below the scroll area and aligned with the
     // content column: status message on the left, Cancel (discard un-applied
     // edits + close) and Apply (apply live + persist to monitors.lua) on the
@@ -1031,9 +1121,9 @@ Item {
             bottom: parent.bottom
             leftMargin: (root.width - contentColumn.width) / 2
             rightMargin: (root.width - contentColumn.width) / 2
-            bottomMargin: 14
+            bottomMargin: 10
         }
-        height: 46
+        height: 40
 
         Rectangle {
             anchors {
@@ -1052,7 +1142,7 @@ Item {
                 left: parent.left
                 bottom: parent.bottom
             }
-            height: 34
+            height: 30
             verticalAlignment: Text.AlignVCenter
             text: DisplayService.statusMessage
             color: DisplayService.statusIsError ? Theme.accent : Theme.textMuted
@@ -1071,7 +1161,7 @@ Item {
                 id: cancelButton
 
                 width: 90
-                height: 34
+                height: 30
                 radius: 8
                 color: settingsBackground
                 border.width: 1
@@ -1095,7 +1185,7 @@ Item {
                 id: applyButton
 
                 width: 90
-                height: 34
+                height: 30
                 radius: 8
                 color: Theme.accent
 
