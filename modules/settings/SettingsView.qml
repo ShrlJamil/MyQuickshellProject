@@ -225,7 +225,7 @@ FocusScope {
                         readonly property bool active: root.categoryIndex === sidebarItem.index
 
                         width: parent.width
-                        height: 36
+                        height: 42
                         radius: 10
                         color: sidebarItem.active
                             ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, sidebarArea.containsMouse ? 0.26 : 0.18)
@@ -247,8 +247,8 @@ FocusScope {
                             spacing: 10
 
                             Item {
-                                width: 18
-                                height: 18
+                                width: 20
+                                height: 20
                                 anchors.verticalCenter: parent.verticalCenter
 
                                 Image {
@@ -277,14 +277,14 @@ FocusScope {
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
 
-                                width: parent.width - 28
+                                width: parent.width - 30
                                 text: sidebarItem.modelData.label
                                 color: sidebarItem.active
                                     ? Theme.accent
                                     : (sidebarArea.containsMouse ? Theme.text : Theme.textDim)
                                 font.family: Theme.fontFamily
-                                font.pixelSize: 12
-                                font.weight: sidebarItem.active ? Font.DemiBold : Font.Normal
+                                font.pixelSize: 13
+                                font.weight: sidebarItem.active ? Font.DemiBold : Font.Medium
                                 elide: Text.ElideRight
                             }
                         }
