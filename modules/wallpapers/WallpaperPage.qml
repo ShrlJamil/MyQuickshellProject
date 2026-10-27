@@ -10,6 +10,14 @@ import "../../components"
 Item {
     id: root
 
+    // Local Settings surface tokens, set by the host (SettingsView) so this
+    // page stays monochrome-dark regardless of the global Wallust palette.
+    // Text, accent and hover tokens keep following the global theme.
+    property color settingsBackground: "#0A0A0A"
+    property color settingsSurface: "#141414"
+    property color settingsSurfaceRaised: "#1E1E1E"
+    property color settingsSurfaceOverlay: "#2A2A2A"
+
     onVisibleChanged: if (root.visible)
         WallpaperService.reload()
 
@@ -34,7 +42,7 @@ Item {
 
             anchors.centerIn: parent
             text: btn.label
-            color: btn.accent ? Theme.background : Theme.text
+            color: btn.accent ? settingsBackground : Theme.text
             font.family: Theme.fontFamily
             font.pixelSize: 12
             font.weight: Font.DemiBold
@@ -217,7 +225,7 @@ Item {
 
                         anchors.centerIn: parent
                         text: "ACTIVE"
-                        color: Theme.background
+                        color: settingsBackground
                         font.family: Theme.fontFamily
                         font.pixelSize: 8
                         font.weight: Font.Bold

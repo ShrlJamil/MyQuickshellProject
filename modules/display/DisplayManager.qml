@@ -19,6 +19,14 @@ Item {
     // Raised by Cancel so the host (the Settings window) tears the page down.
     signal closeRequested()
 
+    // Local Settings surface tokens, set by the host (SettingsView) so this
+    // page stays monochrome-dark regardless of the global Wallust palette.
+    // Text, accent and hover tokens keep following the global theme.
+    property color settingsBackground: "#0A0A0A"
+    property color settingsSurface: "#141414"
+    property color settingsSurfaceRaised: "#1E1E1E"
+    property color settingsSurfaceOverlay: "#2A2A2A"
+
     readonly property var selectedInfo: DisplayService.layout[DisplayService.selectedMonitor]
 
     // Cancel: throw away un-applied local edits and close. No `hyprctl eval`, no
@@ -301,7 +309,7 @@ Item {
                 width: parent.width
                 height: 238
                 radius: 14
-                color: Theme.surface
+                color: settingsSurface
                 border.width: 1
                 border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
 
@@ -360,7 +368,7 @@ Item {
 
                             radius: 8
                             opacity: monBlock.info && monBlock.info.disabled ? 0.35 : 1
-                            color: monBlock.selected ? Theme.surfaceOverlay : Theme.surface
+                            color: monBlock.selected ? settingsSurfaceOverlay : settingsSurface
                             border.width: monBlock.selected ? 2 : 1
                             border.color: monBlock.selected ? Theme.accent : Theme.surfaceHover
 
@@ -486,7 +494,7 @@ Item {
                 width: presetRow.implicitWidth + 4
                 height: 36
                 radius: height / 2
-                color: Theme.background
+                color: settingsBackground
                 border.width: 1
                 border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
 
@@ -512,7 +520,7 @@ Item {
                             width: segmentLabel.implicitWidth + 22
                             height: 30
                             radius: height / 2
-                            color: segmentHover.hovered ? Theme.surfaceRaised : "transparent"
+                            color: segmentHover.hovered ? settingsSurfaceRaised : "transparent"
 
                             HoverHandler {
                                 id: segmentHover
@@ -545,7 +553,7 @@ Item {
                 width: parent.width
                 height: monitorColumn.implicitHeight + 28
                 radius: 14
-                color: Theme.surface
+                color: settingsSurface
                 border.width: 1
                 border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
                 visible: root.selectedInfo !== undefined
@@ -612,7 +620,7 @@ Item {
                             width: 250
                             height: 32
                             radius: 8
-                            color: Theme.background
+                            color: settingsBackground
                             border.width: primaryMouse.containsMouse ? 1 : 0
                             border.color: Theme.accent
 
@@ -661,9 +669,9 @@ Item {
 
                                 background: Rectangle {
                                     radius: 8
-                                    color: Theme.surfaceRaised
+                                    color: settingsSurfaceRaised
                                     border.width: 1
-                                    border.color: Theme.surfaceOverlay
+                                    border.color: settingsSurfaceOverlay
                                 }
 
                                 contentItem: ListView {
@@ -699,7 +707,7 @@ Item {
 
                                         background: Rectangle {
                                             radius: 6
-                                            color: primaryDelegate.hovered ? Theme.surfaceRaised : "transparent"
+                                            color: primaryDelegate.hovered ? settingsSurfaceRaised : "transparent"
                                         }
 
                                         onClicked: {
@@ -773,7 +781,7 @@ Item {
                             width: 250
                             height: 32
                             radius: 8
-                            color: Theme.background
+                            color: settingsBackground
                             border.width: resolutionMouse.containsMouse ? 1 : 0
                             border.color: Theme.accent
 
@@ -822,9 +830,9 @@ Item {
 
                                 background: Rectangle {
                                     radius: 8
-                                    color: Theme.surfaceRaised
+                                    color: settingsSurfaceRaised
                                     border.width: 1
-                                    border.color: Theme.surfaceOverlay
+                                    border.color: settingsSurfaceOverlay
                                 }
 
                                 contentItem: ListView {
@@ -853,7 +861,7 @@ Item {
 
                                         background: Rectangle {
                                             radius: 6
-                                            color: modeDelegate.hovered ? Theme.surfaceRaised : "transparent"
+                                            color: modeDelegate.hovered ? settingsSurfaceRaised : "transparent"
                                         }
 
                                         onClicked: {
@@ -909,7 +917,7 @@ Item {
                                     width: 44
                                     height: 28
                                     radius: 10
-                                    color: scalePill.active ? Theme.accent : Theme.background
+                                    color: scalePill.active ? Theme.accent : settingsBackground
 
                                     TapHandler {
                                         onTapped: DisplayService.setScale(DisplayService.selectedMonitor, scalePill.modelData)
@@ -918,7 +926,7 @@ Item {
                                     Text {
                                         anchors.centerIn: parent
                                         text: scalePill.modelData.toFixed(2).replace(/0+$/, "").replace(/\.$/, "")
-                                        color: scalePill.active ? Theme.background : Theme.text
+                                        color: scalePill.active ? settingsBackground : Theme.text
                                         font.pixelSize: 11
                                         font.family: Theme.fontFamily
                                         font.weight: Font.DemiBold
@@ -968,7 +976,7 @@ Item {
                                     width: 44
                                     height: 28
                                     radius: 10
-                                    color: transformPill.active ? Theme.accent : Theme.background
+                                    color: transformPill.active ? Theme.accent : settingsBackground
 
                                     TapHandler {
                                         onTapped: DisplayService.setTransform(DisplayService.selectedMonitor, transformPill.modelData)
@@ -977,7 +985,7 @@ Item {
                                     Text {
                                         anchors.centerIn: parent
                                         text: (transformPill.modelData * 90) + "°"
-                                        color: transformPill.active ? Theme.background : Theme.text
+                                        color: transformPill.active ? settingsBackground : Theme.text
                                         font.pixelSize: 11
                                         font.family: Theme.fontFamily
                                         font.weight: Font.DemiBold
@@ -1065,7 +1073,7 @@ Item {
                 width: 90
                 height: 34
                 radius: 8
-                color: Theme.background
+                color: settingsBackground
                 border.width: 1
                 border.color: Theme.accent
 
@@ -1098,7 +1106,7 @@ Item {
                 Text {
                     anchors.centerIn: parent
                     text: "Apply"
-                    color: Theme.background
+                    color: settingsBackground
                     font.pixelSize: 12
                     font.family: Theme.fontFamily
                     font.weight: Font.DemiBold

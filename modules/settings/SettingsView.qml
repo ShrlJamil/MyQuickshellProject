@@ -13,6 +13,11 @@ FocusScope {
     readonly property int gap: 12
     readonly property real sidebarWidth: Math.max(150, Math.min(216, root.width * 0.26))
 
+    readonly property color settingsBackground: "#0A0A0A"
+    readonly property color settingsSurface: "#141414"
+    readonly property color settingsSurfaceRaised: "#1E1E1E"
+    readonly property color settingsSurfaceOverlay: "#2A2A2A"
+
     readonly property var categories: [
         {
             label: "Appearance",
@@ -95,7 +100,7 @@ FocusScope {
         id: baseLayer
 
         anchors.fill: parent
-        color: Theme.background
+        color: settingsBackground
         border.width: 1
         border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
     }
@@ -199,7 +204,7 @@ FocusScope {
 
             width: root.sidebarWidth
             radius: 14
-            color: Theme.surface
+            color: settingsSurface
             border.width: 1
             border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity * 0.7)
 
@@ -309,7 +314,7 @@ FocusScope {
             }
 
             radius: 14
-            color: Theme.background
+            color: settingsBackground
             border.width: 1
             border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
 
@@ -497,6 +502,11 @@ FocusScope {
                     anchors.fill: parent
                     visible: root.categoryIndex === SettingsService.displayCategory
 
+                    settingsBackground: root.settingsBackground
+                    settingsSurface: root.settingsSurface
+                    settingsSurfaceRaised: root.settingsSurfaceRaised
+                    settingsSurfaceOverlay: root.settingsSurfaceOverlay
+
                     onCloseRequested: root.closeRequested()
                 }
             }
@@ -528,6 +538,11 @@ FocusScope {
                 WallpaperPage {
                     anchors.fill: parent
                     visible: root.categoryIndex === SettingsService.wallpaperCategory
+
+                    settingsBackground: root.settingsBackground
+                    settingsSurface: root.settingsSurface
+                    settingsSurfaceRaised: root.settingsSurfaceRaised
+                    settingsSurfaceOverlay: root.settingsSurfaceOverlay
                 }
             }
         }
