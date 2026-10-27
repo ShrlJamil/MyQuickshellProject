@@ -147,7 +147,7 @@ A static **40px** top bar, one instance per monitor (`Variants(Quickshell.screen
 | Power menu | `modules/bar/PowerMenuWindow.qml` (host) + `PowerMenu.qml` + `PowerActionItem.qml` | Standalone centred modal over a dimmed background, own focus grab; 6 actions — Lock, Hibernate, Logout, Shutdown, Suspend, Reboot — with hold-to-confirm |
 | Display | `modules/display/DisplayManager.qml` | Monitor-arrangement page in the Settings window (backed by `DisplayService`) |
 | Wallpapers | `modules/wallpapers/WallpaperService.qml` + `WallpaperPage.qml` | Settings page: single collection grid + import, backed by the shared service (stepwise awww + wallust + matugen apply, persistent history) |
-| Control Center | `modules/bar/ControlCenter.qml` + `ControlSlider.qml` / `ControlTile.qml` | Separate top-right overlay window: audio, brightness, network, bluetooth, hotspot and quick toggles (audio over native PipeWire, no `wpctl`) |
+| Control Center | `modules/bar/ControlCenter.qml` + `ControlSlider.qml` / `ControlTile.qml` | Separate top-right overlay window: audio, brightness, network, bluetooth and quick toggles (audio over native PipeWire, no `wpctl`) |
 | Clock/date | `modules/bar/DateTimeWidget.qml` | Clock + calendar popover |
 | Battery | `modules/bar/BatteryWidget.qml` + `BatteryService.qml` | UPower-backed indicator + popover |
 
@@ -188,7 +188,7 @@ One `MediaService` (`modules/services/MediaService.qml`) wraps the native `Quick
 | OSD | `modules/osd/OSD.qml`, `OSDService.qml` | Standalone bottom-centre, click-through overlay: volume / brightness / caps-lock (+ workspace OSD). Brightness keys step optimistically, then run `brightnessctl` detached |
 | Capture | `modules/capture/CaptureService.qml`, `CaptureBar.qml`, `CapturePicker.qml`, `CaptureOverlay.qml`, `ScreenshotPreview.qml` | Region / window / screen / instant-fullscreen shots to file + clipboard; selection overlay; preview. Floating bottom-centre picker (`CapturePicker`) on the focused screen, independent of the bar and `barState.mode`. Screen mode captures only the focused output (`grim -o`), falling back to the full layout when no output name is available |
 | Eco mode | `modules/bar/EcoService.qml` | Snapshot-apply-restore over `hyprctl`: blur/shadow off + opaque QML surfaces, no config edits |
-| Misc services | `AudioService`, `MicService`, `NetworkService`, `BluetoothService`, `BatteryService`, `BrightnessService`, `NightLightService`, `HotspotService`, `SubmapService`, `UptimeService`, `CaffeineService` (all under `modules/bar/`) | Native backends first (PipeWire, UPower, BlueZ, NetworkManager); tiny shell reads only where the 0.3.x QML API has gaps. `MprisService.qml` is a legacy stub superseded by `MediaService` |
+| Misc services | `AudioService`, `MicService`, `NetworkService`, `BluetoothService`, `BatteryService`, `BrightnessService`, `NightLightService`, `SubmapService`, `UptimeService`, `CaffeineService` (all under `modules/bar/`) | Native backends first (PipeWire, UPower, BlueZ, NetworkManager); tiny shell reads only where the 0.3.x QML API has gaps. `MprisService.qml` is a legacy stub superseded by `MediaService` |
 
 ---
 
@@ -275,7 +275,7 @@ Just run `wallust` against a wallpaper as usual — the whole shell picks the ne
 - [x] Dynamic center surfaces: wallpapers, media (power menu and capture picker are standalone windows; the display manager is a Settings page)
 - [x] Power menu with hold-to-confirm, keyboard nav, multi-monitor-safe focus grab
 - [x] MPRIS media stack (preview + expanded player, click-to-expand, prefetch)
-- [x] Control Center (audio/network/bluetooth/hotspot tiles)
+- [x] Control Center (audio/network/bluetooth tiles)
 - [x] Tray (StatusNotifierItem hosts in the bar), notifications (center + popups + reply), OSD (volume/brightness/caps + workspace)
 - [x] Screenshot capture (region/window/screen) with overlay + preview
 - [ ] File search activation — results are found but Enter is a no-op
