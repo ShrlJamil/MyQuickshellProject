@@ -50,6 +50,14 @@ FocusScope {
     // sidebar writes through to the service.
     readonly property int categoryIndex: SettingsService.categoryIndex
 
+    // First-visit latches for the page Loaders in the detail pane: a
+    // page's tree is created the first time its category is selected and
+    // kept for the rest of the session (the shell-level Loader destroys
+    // the whole view when Settings closes anyway), so opening Settings
+    // never pays for pages the user does not visit.
+    property bool _displayVisited: false
+    property bool _wallpaperVisited: false
+
     readonly property var activeCategory: root.categories[Math.max(0, Math.min(root.categories.length - 1, root.categoryIndex))]
 
     signal closeRequested()
@@ -456,25 +464,71 @@ FocusScope {
             // chrome above hides itself for this category so the manager
             // gets the full detail pane - it needs the height, and it carries
             // its own headings.
-            DisplayManager {
-                id: displayPage
+            //
+            // Lazy (Loader latch): the manager's tree - the heaviest in
+            // Settings - is created on the first visit to this category
+            // and kept afterwards. The page keeps its own `visible`
+            // binding, so its onVisibleChanged behaviour on later category
+            // switches is exactly what it was when it lived here directly.
+            Loader {
+                id: displayLoader
 
                 anchors.fill: parent
                 anchors.margins: 12
-                visible: root.categoryIndex === SettingsService.displayCategory
+                active: root.categoryIndex === SettingsService.displayCategory || root._displayVisited
+                sourceComponent: displayPageComponent
 
-                onCloseRequested: root.closeRequested()
+                onLoaded: {
+                    root._displayVisited = true
+                    // First-creation compensation: the page is born
+                    // visible, so the onVisibleChanged trigger it relies
+                    // on (sync + take focus) never fires for this first
+                    // show the way it does for a switch into an existing
+                    // page. Run the same two actions here.
+                    DisplayService.syncFromHyprland()
+                    if (item) item.forceActiveFocus()
+                }
+            }
+
+            Component {
+                id: displayPageComponent
+
+                DisplayManager {
+                    anchors.fill: parent
+                    visible: root.categoryIndex === SettingsService.displayCategory
+
+                    onCloseRequested: root.closeRequested()
+                }
             }
 
             // Same arrangement for the Wallpaper page: a thin view over
             // the shared WallpaperService with its own headings, so the
-            // generic chrome hides for this category too.
-            WallpaperPage {
-                id: wallpaperPage
+            // generic chrome hides for this category too. Lazy the same
+            // way - its thumbnail grid is the second-heaviest tree here.
+            Loader {
+                id: wallpaperLoader
 
                 anchors.fill: parent
                 anchors.margins: 12
-                visible: root.categoryIndex === SettingsService.wallpaperCategory
+                active: root.categoryIndex === SettingsService.wallpaperCategory || root._wallpaperVisited
+                sourceComponent: wallpaperPageComponent
+
+                onLoaded: {
+                    root._wallpaperVisited = true
+                    // First-creation compensation, as above: the page is
+                    // born visible, so its onVisibleChanged reload never
+                    // fires for the first show.
+                    WallpaperService.reload()
+                }
+            }
+
+            Component {
+                id: wallpaperPageComponent
+
+                WallpaperPage {
+                    anchors.fill: parent
+                    visible: root.categoryIndex === SettingsService.wallpaperCategory
+                }
             }
         }
     }
