@@ -95,32 +95,15 @@ Item {
     }
 
     // ---- collection ----------------------------------------------------------------
-    Text {
-        id: collectionLabel
-
-        anchors {
-            top: divider.bottom
-            left: parent.left
-            topMargin: 14
-            leftMargin: 10
-        }
-
-        text: "Collection" + (WallpaperService.wallpapers.count > 0 ? "  ·  " + WallpaperService.wallpapers.count : "")
-        color: Theme.text
-        font.family: Theme.fontFamily
-        font.pixelSize: 12
-        font.weight: Font.DemiBold
-    }
-
     GridView {
         id: grid
 
         anchors {
-            top: collectionLabel.bottom
+            top: divider.bottom
             left: parent.left
             right: parent.right
             bottom: footerDivider.top
-            topMargin: 8
+            topMargin: 14
             leftMargin: 4
             rightMargin: 4
             bottomMargin: 8
@@ -128,7 +111,7 @@ Item {
 
         clip: true
         model: WallpaperService.wallpapers
-        cellWidth: Math.floor(grid.width / Math.max(2, Math.floor(grid.width / 190)))
+        cellWidth: Math.floor(grid.width / Math.max(2, Math.floor(grid.width / 250)))
         cellHeight: Math.round((grid.cellWidth - 12) * 0.5625) + 34
 
         delegate: Item {
@@ -169,7 +152,7 @@ Item {
 
                     height: parent.height - 30
                     source: cell.fileUrl
-                    sourceSize.width: 360
+                    sourceSize.width: 512
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
                     cache: true
@@ -342,6 +325,60 @@ Item {
             font.pixelSize: 11
             horizontalAlignment: Text.AlignHCenter
             wrapMode: Text.WordWrap
+        }
+    }
+
+    // ---- import success flash -------------------------------------------------------
+    // A small pill that fades in over the top of the grid when an import
+    // lands in the collection, then fades out on its own. Purely a
+    // confirmation note - the footer status line keeps the details.
+    Rectangle {
+        id: importFlash
+
+        anchors {
+            top: parent.top
+            horizontalCenter: parent.horizontalCenter
+            topMargin: 56
+        }
+
+        width: flashText.implicitWidth + 28
+        height: 30
+        radius: height / 2
+        color: settingsSurfaceOverlay
+        opacity: 0
+        visible: opacity > 0
+
+        Behavior on opacity {
+            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+        }
+
+        Text {
+            id: flashText
+
+            anchors.centerIn: parent
+            text: "Image saved to ~/Pictures/Wallpapers"
+            color: Theme.text
+            font.family: Theme.fontFamily
+            font.pixelSize: 12
+            font.weight: Font.DemiBold
+        }
+
+        Timer {
+            id: flashTimer
+
+            interval: 2600
+            onTriggered: importFlash.opacity = 0
+        }
+    }
+
+    Connections {
+        target: WallpaperService
+
+        function onImportFinished(success, path) {
+            if (!success)
+                return
+            importFlash.opacity = 1
+            flashTimer.restart()
         }
     }
 
