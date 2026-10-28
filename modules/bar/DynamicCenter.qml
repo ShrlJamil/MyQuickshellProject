@@ -3,7 +3,6 @@ import QtQuick.Shapes
 import Quickshell
 import "../../components"
 import "../capture"
-import "../wallpapers"
 
 Item {
     id: root
@@ -16,7 +15,7 @@ Item {
     width: parent.width
     clip: true
 
-    property string _lastSurface: "wallpapers"
+    property string _lastSurface: "idle"
 
     // The surface being switched AWAY from during a direct surface->surface
     // morph. Kept non-empty for the duration of the 180ms height morph so the
@@ -26,16 +25,12 @@ Item {
 
     // ---- Universal content-driven sizing --------------------------------
     // The frame just fits whatever the active surface reports as its own
-    // natural size. The surface (WallpaperPicker) owns its implicitWidth /
-    // implicitHeight - no per-mode magic numbers live here anymore. (The
-    // display manager used to be a second surface here; it lives in the
-    // Settings window now.)
-    readonly property Item _activeItem: {
-        switch (root.activeSurface) {
-        case "wallpapers": return wallpaperLoader.item
-        default: return null
-        }
-    }
+    // natural size - a surface owns its implicitWidth / implicitHeight and
+    // no per-mode magic numbers live here. Both former surfaces have moved
+    // to the Settings window (display first, then wallpapers), so there is
+    // currently no surface item to fit; the frame machinery below stays
+    // for any future surface.
+    readonly property Item _activeItem: null
 
     // Never exceed 85% of the monitor / 680px - the outer cap that keeps the
     // panel sane on any screen and the fallback when a surface reports nothing.
@@ -90,18 +85,6 @@ Item {
         NumberAnimation { duration: 180; easing.type: Easing.InOutCubic }
     }
 
-    // Content materialization for the height reveal. Surfaces fade in while
-    // the frame grows (no sliced-content flash at open) and fade out fast at
-    // close start so the shrink reads clean; a live switch keeps its 150ms
-    // crossfade. Used by every Loader item's opacity Behavior below.
-    function _contentFadeDuration() {
-        if (root._prevSurface !== "")
-            return 150
-        if (root.targetHeight === 0)
-            return 90
-        return 140
-    }
-
     onTargetWidthChanged: {
         // Only track while a surface is active; on close the width is reset by
         // hideTimer once the panel is fully gone (avoids "widen while closing").
@@ -153,8 +136,7 @@ Item {
 
         // Content box tracks the animated clip height exactly, so the outgoing
         // (possibly taller) surface always fills the frame while it shrinks -
-        // no divergence, no transparent strip. Per-surface opacity below does
-        // the cross-dissolve.
+        // no divergence, no transparent strip.
         height: root.allocatedHeight
 
         // y is permanently 0: open/close is a top-anchored height reveal driven
@@ -244,58 +226,6 @@ Item {
             }
         }
 
-        // Shared per-surface show/fade rules:
-        //   visible  = active | prev (switch linger) | closing linger
-        //   opacity  = 1 while active or closing-linger, else 0
-        //   opacity Behavior duration comes from _contentFadeDuration():
-        //   150ms crossfade on a live switch, 140ms fade-in on open,
-        //   90ms fade-out at close.
-        //
-        // Each surface lives behind a latched Loader: nothing is instantiated
-        // at startup; the first open creates it synchronously (no async pop,
-        // geometry valid on the opening frame) and it stays loaded afterwards.
-        // Loader.active honors the existing visibility conditions plus a
-        // one-way load latch (see below) - the mode remains solely
-        // `activeSurface` (+ the transient `_prevSurface`/`_lastSurface`).
-        Loader {
-            id: wallpaperLoader
-            width: parent.width
-            active: root._wallpapersLatched || root.activeSurface === "wallpapers" || root._prevSurface === "wallpapers"
-                || (root.allocatedHeight > 0 && root._lastSurface === "wallpapers")
-            sourceComponent: WallpaperPicker {
-                width: parent.width
-                visible: root.activeSurface === "wallpapers" || root._prevSurface === "wallpapers"
-                    || (root.allocatedHeight > 0 && root._lastSurface === "wallpapers")
-                opacity: root.activeSurface === "wallpapers" ? 1 : 0
-                Behavior on opacity {
-                    NumberAnimation {
-                        duration: root._contentFadeDuration()
-                        easing.type: Easing.OutCubic
-                    }
-                }
-                onCloseRequested: root.closeRequested()
-            }
-            onLoaded: if (root.activeSurface === "wallpapers") root._focusSurface("wallpapers")
-        }
-    }
-
-    // One-way load latches: set when a surface first becomes active, never
-    // cleared. These are load-lifecycle flags, not mode state - the mode
-    // remains solely `activeSurface` (+ `_prevSurface`/`_lastSurface`).
-    property bool _wallpapersLatched: false
-
-    function _surfaceItem(name) {
-        switch (name) {
-        case "wallpapers": return wallpaperLoader.item
-        default: return null
-        }
-    }
-
-    function _focusSurface(name) {
-        var it = root._surfaceItem(name)
-        if (!it)
-            return
-        it.forceActiveFocus()
     }
 
     onActiveSurfaceChanged: {
@@ -323,10 +253,5 @@ Item {
 
         if (root.activeSurface !== "idle")
             root._lastSurface = root.activeSurface
-
-        if (root.activeSurface === "wallpapers") {
-            root._wallpapersLatched = true
-            root._focusSurface("wallpapers")
-        }
     }
 }

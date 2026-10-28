@@ -3,6 +3,7 @@ import Qt5Compat.GraphicalEffects
 import Quickshell
 import "../../components"
 import "../display"
+import "../wallpapers"
 
 FocusScope {
     id: root
@@ -10,7 +11,12 @@ FocusScope {
     readonly property int pad: 16
     readonly property int headerHeight: 40
     readonly property int gap: 12
-    readonly property real sidebarWidth: Math.max(150, Math.min(216, root.width * 0.26))
+    readonly property real sidebarWidth: Math.max(180, Math.min(264, root.width * 0.30))
+
+    readonly property color settingsBackground: "#0A0A0A"
+    readonly property color settingsSurface: "#141414"
+    readonly property color settingsSurfaceRaised: "#1E1E1E"
+    readonly property color settingsSurfaceOverlay: "#2A2A2A"
 
     readonly property var categories: [
         {
@@ -49,6 +55,14 @@ FocusScope {
     // sidebar writes through to the service.
     readonly property int categoryIndex: SettingsService.categoryIndex
 
+    // First-visit latches for the page Loaders in the detail pane: a
+    // page's tree is created the first time its category is selected and
+    // kept for the rest of the session (the shell-level Loader destroys
+    // the whole view when Settings closes anyway), so opening Settings
+    // never pays for pages the user does not visit.
+    property bool _displayVisited: false
+    property bool _wallpaperVisited: false
+
     readonly property var activeCategory: root.categories[Math.max(0, Math.min(root.categories.length - 1, root.categoryIndex))]
 
     signal closeRequested()
@@ -86,7 +100,7 @@ FocusScope {
         id: baseLayer
 
         anchors.fill: parent
-        color: Theme.background
+        color: settingsBackground
         border.width: 1
         border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
     }
@@ -190,14 +204,14 @@ FocusScope {
 
             width: root.sidebarWidth
             radius: 14
-            color: Qt.rgba(Theme.surface.r, Theme.surface.g, Theme.surface.b, 0.65)
+            color: settingsSurface
             border.width: 1
             border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity * 0.7)
 
             Column {
                 anchors.fill: parent
                 anchors.margins: 8
-                spacing: 4
+                spacing: 6
 
                 Repeater {
                     model: root.categories
@@ -211,7 +225,7 @@ FocusScope {
                         readonly property bool active: root.categoryIndex === sidebarItem.index
 
                         width: parent.width
-                        height: 36
+                        height: 50
                         radius: 10
                         color: sidebarItem.active
                             ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, sidebarArea.containsMouse ? 0.26 : 0.18)
@@ -233,8 +247,8 @@ FocusScope {
                             spacing: 10
 
                             Item {
-                                width: 18
-                                height: 18
+                                width: 24
+                                height: 24
                                 anchors.verticalCenter: parent.verticalCenter
 
                                 Image {
@@ -242,8 +256,8 @@ FocusScope {
 
                                     anchors.fill: parent
                                     source: Quickshell.iconPath(sidebarItem.modelData.icon, sidebarItem.modelData.fallback)
-                                    sourceSize.width: 36
-                                    sourceSize.height: 36
+                                    sourceSize.width: 48
+                                    sourceSize.height: 48
                                     fillMode: Image.PreserveAspectFit
                                     asynchronous: true
                                     smooth: true
@@ -263,14 +277,14 @@ FocusScope {
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
 
-                                width: parent.width - 28
+                                width: parent.width - 34
                                 text: sidebarItem.modelData.label
                                 color: sidebarItem.active
                                     ? Theme.accent
                                     : (sidebarArea.containsMouse ? Theme.text : Theme.textDim)
                                 font.family: Theme.fontFamily
-                                font.pixelSize: 12
-                                font.weight: sidebarItem.active ? Font.DemiBold : Font.Normal
+                                font.pixelSize: 16
+                                font.weight: sidebarItem.active ? Font.DemiBold : Font.Medium
                                 elide: Text.ElideRight
                             }
                         }
@@ -300,14 +314,14 @@ FocusScope {
             }
 
             radius: 14
-            color: Qt.rgba(Theme.surface.r, Theme.surface.g, Theme.surface.b, 0.28)
+            color: settingsBackground
             border.width: 1
             border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
 
             Text {
                 id: detailTitle
 
-                visible: root.categoryIndex !== SettingsService.displayCategory
+                visible: root.categoryIndex !== SettingsService.displayCategory && root.categoryIndex !== SettingsService.wallpaperCategory
 
                 anchors {
                     top: parent.top
@@ -329,7 +343,7 @@ FocusScope {
             Text {
                 id: detailDescription
 
-                visible: root.categoryIndex !== SettingsService.displayCategory
+                visible: root.categoryIndex !== SettingsService.displayCategory && root.categoryIndex !== SettingsService.wallpaperCategory
 
                 anchors {
                     top: detailTitle.bottom
@@ -351,7 +365,7 @@ FocusScope {
             Rectangle {
                 id: divider
 
-                visible: root.categoryIndex !== SettingsService.displayCategory
+                visible: root.categoryIndex !== SettingsService.displayCategory && root.categoryIndex !== SettingsService.wallpaperCategory
 
                 anchors {
                     top: detailDescription.bottom
@@ -369,7 +383,7 @@ FocusScope {
             Rectangle {
                 id: placeholder
 
-                visible: root.categoryIndex !== SettingsService.displayCategory
+                visible: root.categoryIndex !== SettingsService.displayCategory && root.categoryIndex !== SettingsService.wallpaperCategory
 
                 anchors {
                     top: divider.bottom
@@ -455,14 +469,81 @@ FocusScope {
             // chrome above hides itself for this category so the manager
             // gets the full detail pane - it needs the height, and it carries
             // its own headings.
-            DisplayManager {
-                id: displayPage
+            //
+            // Lazy (Loader latch): the manager's tree - the heaviest in
+            // Settings - is created on the first visit to this category
+            // and kept afterwards. The page keeps its own `visible`
+            // binding, so its onVisibleChanged behaviour on later category
+            // switches is exactly what it was when it lived here directly.
+            Loader {
+                id: displayLoader
 
                 anchors.fill: parent
                 anchors.margins: 12
-                visible: root.categoryIndex === SettingsService.displayCategory
+                active: root.categoryIndex === SettingsService.displayCategory || root._displayVisited
+                sourceComponent: displayPageComponent
 
-                onCloseRequested: root.closeRequested()
+                onLoaded: {
+                    root._displayVisited = true
+                    // First-creation compensation: the page is born
+                    // visible, so the onVisibleChanged trigger it relies
+                    // on (sync + take focus) never fires for this first
+                    // show the way it does for a switch into an existing
+                    // page. Run the same two actions here.
+                    DisplayService.syncFromHyprland()
+                    if (item) item.forceActiveFocus()
+                }
+            }
+
+            Component {
+                id: displayPageComponent
+
+                DisplayManager {
+                    anchors.fill: parent
+                    visible: root.categoryIndex === SettingsService.displayCategory
+
+                    settingsBackground: root.settingsBackground
+                    settingsSurface: root.settingsSurface
+                    settingsSurfaceRaised: root.settingsSurfaceRaised
+                    settingsSurfaceOverlay: root.settingsSurfaceOverlay
+
+                    onCloseRequested: root.closeRequested()
+                }
+            }
+
+            // Same arrangement for the Wallpaper page: a thin view over
+            // the shared WallpaperService with its own headings, so the
+            // generic chrome hides for this category too. Lazy the same
+            // way - its thumbnail grid is the second-heaviest tree here.
+            Loader {
+                id: wallpaperLoader
+
+                anchors.fill: parent
+                anchors.margins: 12
+                active: root.categoryIndex === SettingsService.wallpaperCategory || root._wallpaperVisited
+                sourceComponent: wallpaperPageComponent
+
+                onLoaded: {
+                    root._wallpaperVisited = true
+                    // First-creation compensation, as above: the page is
+                    // born visible, so its onVisibleChanged reload never
+                    // fires for the first show.
+                    WallpaperService.reload()
+                }
+            }
+
+            Component {
+                id: wallpaperPageComponent
+
+                WallpaperPage {
+                    anchors.fill: parent
+                    visible: root.categoryIndex === SettingsService.wallpaperCategory
+
+                    settingsBackground: root.settingsBackground
+                    settingsSurface: root.settingsSurface
+                    settingsSurfaceRaised: root.settingsSurfaceRaised
+                    settingsSurfaceOverlay: root.settingsSurfaceOverlay
+                }
             }
         }
     }

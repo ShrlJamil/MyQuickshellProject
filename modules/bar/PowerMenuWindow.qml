@@ -60,7 +60,7 @@ PanelWindow {
     onMenuOpenChanged: {
         // Same focus choreography the DynamicCenter host used: fresh
         // selection state, then hand the menu item keyboard focus so its
-        // Keys handlers (arrows / hold shortcuts / Esc) are live the moment
+        // Keys handlers (arrows / shortcuts / Esc) are live the moment
         // the grab delivers seat focus to this window.
         if (root.menuOpen) {
             powerMenu.reset()

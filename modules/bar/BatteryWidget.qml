@@ -7,7 +7,7 @@ import "../../components"
 
 // Bar battery indicator, sits immediately left of DateTimeWidget. Click toggles
 // a small floating Battery Popover for this screen (same PanelWindow +
-// HyprlandFocusGrab pattern as NotificationCenter). Height stays 40px.
+// HyprlandFocusGrab pattern as NotificationCenter). Height stays 36px.
 Item {
     id: root
 
@@ -21,10 +21,10 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        anchors.topMargin: 1
-        anchors.bottomMargin: 1
-        radius: 17
-        color: root.popoverOpen ? Theme.surface
+        anchors.topMargin: 3
+        anchors.bottomMargin: 3
+        radius: 15
+        color: root.popoverOpen ? ((tap.pressed || hover.hovered) ? Theme.activeSurfaceHover : Theme.activeSurface)
             : ((tap.pressed || hover.hovered) ? Theme.surfaceHover : "transparent")
     }
 
@@ -40,15 +40,15 @@ Item {
         // battery family: a 10-step fill ladder (battery-0 .. battery-9),
         // battery-full at 100%, and a dedicated battery-charge glyph for the
         // charging state - all rendered through the same Image + ColorOverlay.
-        // Enlarged (46x34) to read as prominently as the Control Center bar
-        // button; still comfortably inside the 40px bar.
+        // Enlarged (38x28) to read as prominently as the Control Center bar
+        // button; still comfortably inside the 36px bar.
         Item {
             id: iconBox
 
             anchors.verticalCenter: parent.verticalCenter
-            width: 44
-            implicitWidth: 44
-            height: 32
+            width: 38
+            implicitWidth: 38
+            height: 28
 
             // Charging and critically-low both read as "attention" -> accent.
             readonly property bool attention: BatteryService.charging || BatteryService.low
@@ -98,9 +98,13 @@ Item {
                     verticalOffset: 1
                     radius: 2
                     samples: 9
-                    color: Theme.textShadow
+                    color: root.popoverOpen ? Qt.rgba(1, 1, 1, 0.35) : Theme.textShadow
                 }
-                color: iconBox.attention ? Theme.accent : Theme.icon
+                // While the popover is open the pill wears the light
+                // active surface, so the glyph flips dark; the accent
+                // attention tint only applies on the dark bar.
+                color: root.popoverOpen ? Theme.onActiveSurface
+                    : (iconBox.attention ? Theme.accent : Theme.icon)
 
                 // Subtle fade, fires only while the Image reloads on a
                 // threshold cross, never while idle.
@@ -114,12 +118,13 @@ Item {
         Text {
             anchors.verticalCenter: parent.verticalCenter
             text: Math.round(BatteryService.percent) + "%"
-            color: BatteryService.low ? Theme.accent : Theme.icon
+            color: root.popoverOpen ? Theme.onActiveSurface
+                : (BatteryService.low ? Theme.accent : Theme.icon)
             style: Text.Raised
-            styleColor: Theme.textShadow
+            styleColor: root.popoverOpen ? Qt.rgba(1, 1, 1, 0.35) : Theme.textShadow
             font.family: Theme.fontFamily
             font.weight: Font.Black
-            font.pixelSize: 16
+            font.pixelSize: 14
         }
     }
 
@@ -208,7 +213,7 @@ Item {
             anchors.fill: parent
             anchors.margins: 8
             radius: Theme.cornerRadius
-            color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
+            color: Qt.rgba(Theme.panelBackground.r, Theme.panelBackground.g, Theme.panelBackground.b, Theme.moduleSurfaceOpacity)
             border.width: 1
             border.color: Theme.surfaceHover
 

@@ -13,6 +13,10 @@ Item {
 
     property bool show: false
 
+    // True while the media popover is open: the pill wears the light
+    // active scheme like the bar's other open-state widgets.
+    property bool popoverOpen: false
+
     readonly property int pillHeight: 30
     readonly property int artworkSize: 22
     readonly property int padH: 8
@@ -37,11 +41,15 @@ Item {
     height: implicitHeight
 
     HoverHandler {
+        id: hoverHandler
+
         enabled: root.show
         cursorShape: Qt.PointingHandCursor
     }
 
     TapHandler {
+        id: tapHandler
+
         enabled: root.show
         onTapped: root.activateRequested()
     }
@@ -49,7 +57,8 @@ Item {
     Rectangle {
         anchors.fill: parent
         radius: height / 2
-        color: Theme.surface
+        color: root.popoverOpen ? ((tapHandler.pressed || hoverHandler.hovered) ? Theme.activeSurfaceHover : Theme.activeSurface)
+            : Theme.backgroundInset
     }
 
     Rectangle {
@@ -58,7 +67,7 @@ Item {
         width: root.artworkSize
         height: root.artworkSize
         radius: width / 2
-        color: Theme.background
+        color: root.popoverOpen ? Qt.rgba(Theme.onActiveSurface.r, Theme.onActiveSurface.g, Theme.onActiveSurface.b, 0.15) : Theme.surface
 
         anchors.left: parent.left
         anchors.leftMargin: root.padH
@@ -90,9 +99,9 @@ Item {
             anchors.centerIn: parent
             visible: art.status !== Image.Ready
             text: "\u266a"
-            color: Theme.textMuted
+            color: root.popoverOpen ? Theme.onActiveSurfaceDim : Theme.textMuted
             style: Text.Raised
-            styleColor: Theme.textShadow
+            styleColor: root.popoverOpen ? Qt.rgba(1, 1, 1, 0.35) : Theme.textShadow
             font.pixelSize: 10
         }
     }
@@ -137,9 +146,9 @@ Item {
             id: marquee
 
             text: root.trackText + (textView.overflow ? separator.text + root.trackText : "")
-            color: Theme.text
+            color: root.popoverOpen ? Theme.onActiveSurface : Theme.text
             style: Text.Raised
-            styleColor: Theme.textShadow
+            styleColor: root.popoverOpen ? Qt.rgba(1, 1, 1, 0.35) : Theme.textShadow
             font.family: Theme.fontFamily
             font.pixelSize: 12
             font.weight: Font.DemiBold

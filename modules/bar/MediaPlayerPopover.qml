@@ -89,7 +89,7 @@ PanelWindow {
 
         anchors.centerIn: parent
         radius: Theme.cornerRadius
-        color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
+        color: Qt.rgba(Theme.panelBackground.r, Theme.panelBackground.g, Theme.panelBackground.b, Theme.moduleSurfaceOpacity)
         border.width: 1
         border.color: Theme.surfaceHover
 
@@ -145,7 +145,7 @@ PanelWindow {
                     width: 116
                     height: 116
                     radius: 16
-                    color: Theme.surface
+                    color: Theme.panelSurface
 
                     Image {
                         id: art
@@ -326,7 +326,7 @@ PanelWindow {
                     anchors.verticalCenter: parent.verticalCenter
                     height: 4
                     radius: 2
-                    color: Theme.surface
+                    color: Theme.panelSurface
 
                     Rectangle {
                         id: fill

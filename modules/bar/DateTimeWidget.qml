@@ -12,7 +12,7 @@ Item {
     readonly property bool centerOpen: NotificationService.centerScreen === root.screen
 
     implicitWidth: layout.implicitWidth + 24
-    implicitHeight: 40
+    implicitHeight: 36
 
     SystemClock {
         id: clock
@@ -21,10 +21,10 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        anchors.topMargin: 1
-        anchors.bottomMargin: 1
-        radius: 17
-        color: root.centerOpen ? Theme.surface
+        anchors.topMargin: 3
+        anchors.bottomMargin: 3
+        radius: 15
+        color: root.centerOpen ? ((tap.pressed || hover.hovered) ? Theme.activeSurfaceHover : Theme.activeSurface)
             : ((tap.pressed || hover.hovered) ? Theme.surfaceHover : "transparent")
     }
 
@@ -38,12 +38,12 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             // e.g. "Tue 2 Apr, 17:23"
             text: Qt.formatDateTime(clock.date, "ddd d MMM, HH:mm")
-            color: Theme.icon
+            color: root.centerOpen ? Theme.onActiveSurface : Theme.icon
             style: Text.Raised
-            styleColor: Theme.textShadow
+            styleColor: root.centerOpen ? Qt.rgba(1, 1, 1, 0.35) : Theme.textShadow
             font.family: Theme.fontFamily
             font.weight: Font.Black
-            font.pixelSize: 16
+            font.pixelSize: 14
         }
     }
 
@@ -53,7 +53,7 @@ Item {
         width: 7
         height: 7
         radius: height / 2
-        color: Theme.accent
+        color: root.centerOpen ? Theme.onActiveSurface : Theme.accent
 
         anchors.right: parent.right
         anchors.top: parent.top

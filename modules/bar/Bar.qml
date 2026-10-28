@@ -24,8 +24,17 @@ PanelWindow {
     // Static bar: always on, from the moment quickshell starts. No IPC gate.
     visible: true
 
-    property bool surfaceActive: (barState.screen === root.screen && (barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact"))
+    property bool surfaceActive: (barState.screen === root.screen && (barState.mode === "mediaPreview" || barState.mode === "mediaCompact"))
     property double _mediaPopoverClosedAt: 0
+
+    // Open the shell-rendered tray menu for an item (replaces the
+    // platform menu SystemTrayItem.display() would show).
+    function openTrayMenu(item, centerX) {
+        barState.mediaPopoverOpen = false
+        trayMenu.menuHandle = item.menu
+        trayMenu.anchorCenter = centerX
+        trayMenu.open = true
+    }
 
     // ---- single-window concave (tiled hug) --------------------------------
     // Reactive presence/count from the workspace model; floating + geometry
@@ -536,9 +545,8 @@ PanelWindow {
             id: holdLabel
 
             anchors.centerIn: parent
-            visible: (barState.screen === root.screen && (barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact"))
-            text: barState.mode === "wallpapers" ? "Wallpapers"
-                : (barState.mode === "mediaPreview" || barState.mode === "mediaCompact") ? "Media"
+            visible: (barState.screen === root.screen && (barState.mode === "mediaPreview" || barState.mode === "mediaCompact"))
+            text: (barState.mode === "mediaPreview" || barState.mode === "mediaCompact") ? "Media"
                 : ""
             color: Theme.icon
             style: Text.Raised
@@ -589,11 +597,11 @@ PanelWindow {
             visible: CaffeineService.enabled
             width: CaffeineService.enabled ? 38 : 0
             implicitWidth: width
-            height: 34
+            height: 30
 
             Rectangle {
                 anchors.fill: parent
-                radius: 17
+                radius: 15
                 color: caffeineTap.pressed || caffeineHover.hovered ? Theme.surfaceHover : "transparent"
             }
 
@@ -601,8 +609,8 @@ PanelWindow {
                 id: caffeineIndicatorImg
 
                 anchors.centerIn: parent
-                width: 24
-                height: 24
+                width: 21
+                height: 21
                 sourceSize.width: 48
                 sourceSize.height: 48
                 fillMode: Image.PreserveAspectFit
@@ -665,18 +673,18 @@ PanelWindow {
                     required property var modelData
 
                     width: 38
-                    height: 34
+                    height: 30
 
                     Rectangle {
                         anchors.fill: parent
-                        radius: 17
+                        radius: 15
                         color: trayMouse.containsMouse ? Theme.surfaceHover : "transparent"
                     }
 
                     IconImage {
                         anchors.centerIn: parent
-                        width: 26
-                        height: 26
+                        width: 23
+                        height: 23
                         smooth: true
                         asynchronous: true
 
@@ -702,12 +710,21 @@ PanelWindow {
 
                         onClicked: (mouse) => {
                             if (mouse.button === Qt.RightButton) {
-                                // Anchor the item's own context menu just below
-                                // the icon (coords are window-relative; barContent
+                                // Open the item's context menu as the shell's
+                                // own popover, centred under the icon
+                                // (coords are window-relative; barContent
                                 // sits at 0,0 in root).
+                                if (trayItem.modelData.hasMenu) {
+                                    const p = trayItem.mapToItem(barContent,
+                                        trayItem.width / 2, trayItem.height)
+                                    root.openTrayMenu(trayItem.modelData, p.x)
+                                }
+                            } else if (trayItem.modelData.onlyMenu && trayItem.modelData.hasMenu) {
+                                // Menu-only items have no activation; their
+                                // click opens the menu itself.
                                 const p = trayItem.mapToItem(barContent,
                                     trayItem.width / 2, trayItem.height)
-                                trayItem.modelData.display(root, p.x, p.y)
+                                root.openTrayMenu(trayItem.modelData, p.x)
                             } else {
                                 trayItem.modelData.activate()
                             }
@@ -730,9 +747,12 @@ PanelWindow {
 
             show: !holdLabel.visible && root.mediaService && root.mediaService.hasMedia
 
+            popoverOpen: barState.mediaPopoverOpen
+
             onActivateRequested: {
                 if (Date.now() - root._mediaPopoverClosedAt < 250)
                     return
+                trayMenu.open = false
                 barState.mediaPopoverOpen = !barState.mediaPopoverOpen
             }
         }
@@ -752,6 +772,14 @@ PanelWindow {
             }
         }
 
+        TrayMenuPopover {
+            id: trayMenu
+
+            screen: root.screen
+
+            onDismissRequested: trayMenu.open = false
+        }
+
         // Microphone mute - sits just left of the battery. Click
         // toggles the default PipeWire source mute; glyph swaps on/off.
         Item {
@@ -764,11 +792,11 @@ PanelWindow {
             anchors.rightMargin: 4
 
             width: 38
-            height: 34
+            height: 30
 
             Rectangle {
                 anchors.fill: parent
-                radius: 17
+                radius: 15
                 color: micTap.pressed || micHover.hovered ? Theme.surfaceHover : "transparent"
             }
 
@@ -776,8 +804,8 @@ PanelWindow {
                 id: micIndicatorImg
 
                 anchors.centerIn: parent
-                width: 20
-                height: 20
+                width: 18
+                height: 18
                 sourceSize.width: 40
                 sourceSize.height: 40
                 fillMode: Image.PreserveAspectFit
@@ -881,7 +909,7 @@ PanelWindow {
         id: dynamicCenter
 
         anchors.horizontalCenter: parent.horizontalCenter
-        activeSurface: barState.screen === root.screen && (barState.mode === "wallpapers" || barState.mode === "mediaPreview" || barState.mode === "mediaCompact")
+        activeSurface: barState.screen === root.screen && (barState.mode === "mediaPreview" || barState.mode === "mediaCompact")
             ? barState.mode
             : "idle"
     }

@@ -25,8 +25,8 @@ Item {
     readonly property real radius: root.cornerRadius
 
     readonly property real iconSlotSize: root.round ? Math.max(26, Math.round(Math.min(root.width, root.height) * 0.4)) : 34
-    readonly property real iconSize: root.round ? Math.max(22, Math.round(Math.min(root.width, root.height) * 0.34)) : 30
-    readonly property int labelPixelSize: root.round ? Math.max(9, Math.min(12, Math.round(Math.min(root.width, root.height) * 0.12))) : 12
+    readonly property real iconSize: root.round ? Math.max(22, Math.round(Math.min(root.width, root.height) * 0.35)) : 30
+    readonly property int labelPixelSize: root.round ? 13 : 12
 
     Rectangle {
         id: tile
@@ -36,14 +36,15 @@ Item {
         radius: root.cornerRadius
         border.width: 0
         border.color: "transparent"
-        // Active  -> light muted (Theme.activeTile) surface, Theme.accent contents.
-        // Inactive -> standard dark surface (Theme.background).
+        // Active  -> LIGHT seed surface (Theme.activeSurface) with dark
+        // seed foreground (glyph + label flip to onActiveSurface).
+        // Inactive -> sunken panel tone; hover lifts to panelSurface.
         color: {
             // Active tiles are solid state surfaces: no surfaceOpacity alpha.
             // Inactive tiles stay translucent material.
             if (root.active)
-                return hover.hovered ? Qt.darker(Theme.activeTile, 1.06) : Theme.activeTile
-            const c = hover.hovered ? Qt.lighter(Theme.background, 1.35) : Theme.background
+                return hover.hovered ? Theme.activeSurfaceHover : Theme.activeSurface
+            const c = hover.hovered ? Theme.panelSurface : Theme.backgroundSunken
             return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
         }
 
@@ -80,7 +81,11 @@ Item {
         }
 
         Item {
-            anchors.centerIn: parent
+            id: iconSlot
+
+            anchors.left: parent.left
+            anchors.leftMargin: 14
+            anchors.verticalCenter: parent.verticalCenter
 
             width: root.iconSlotSize
             height: root.iconSlotSize
@@ -120,8 +125,28 @@ Item {
                 anchors.fill: svgIcon
                 source: svgIcon
                 visible: root._localIcon && svgIcon.status === Image.Ready
-                color: root.active ? Theme.accent : Theme.icon
+                color: root.active ? Theme.onActiveSurface : Theme.icon
             }
+        }
+
+        // Label right of the icon: horizontal tile layout. (The `label`
+        // property was carried unused through the icon-only pill phase;
+        // it renders here now.)
+        Text {
+            anchors.left: iconSlot.right
+            anchors.leftMargin: 10
+            anchors.right: parent.right
+            anchors.rightMargin: 12
+            anchors.verticalCenter: parent.verticalCenter
+
+            text: root.label
+            color: root.active ? Theme.onActiveSurface : Theme.text
+            font.family: Theme.fontFamily
+            font.pixelSize: root.labelPixelSize
+            font.weight: Font.Medium
+            elide: Text.ElideRight
+            maximumLineCount: 1
+            visible: root.label !== ""
         }
     }
 }

@@ -11,9 +11,8 @@ Item {
     property int selectedIndex: 0
     property bool stubActions: false
     property bool showError: false
-    property int holdDuration: 1000
 
-    // `key` is the press-and-hold shortcut (see indexForQtKey below).
+    // `key` is the instant shortcut (see indexForQtKey below).
     readonly property var actions: [
         { id: "lock", label: "Lock", command: "hyprlock", icon: "assets/lock-svgrepo-com.svg", key: "l" },
         { id: "hibernate", label: "Hibernate", command: "systemctl hibernate", icon: "assets/moon-sleep-svgrepo-com.svg", key: "h" },
@@ -26,19 +25,14 @@ Item {
     readonly property int itemWidth: Math.floor((actionsRow.width - (root.actions.length - 1) * actionsRow.spacing) / root.actions.length)
     readonly property int itemHeight: 128
 
-    // Inner padding between the panel card edges and the tile grid. Vertical
-    // spacing (top 20 / bottom 30) is intentionally kept as-is; the sides get
-    // extra breathing room.
-    readonly property int contentMarginTop: 20
-    readonly property int contentMarginBottom: 30
-    readonly property int contentMarginSide: 32
-
-    readonly property var currentItem: actionsRepeater.itemAt(root.selectedIndex)
+    // Inner padding between the panel card edges and the tile grid:
+    // one uniform margin on all four sides.
+    readonly property int contentMargin: 24
 
     // Natural size DynamicCenter fits its frame to. Constant (not derived from
     // `width`) so it can't feed a binding loop through the frame.
     implicitWidth: 680
-    implicitHeight: actionsRow.y + actionsRow.height + root.contentMarginBottom + (root.showError ? errorHint.height + 8 : 0)
+    implicitHeight: actionsRow.y + actionsRow.height + root.contentMargin + (root.showError ? errorHint.height + 8 : 0)
 
     signal closeRequested()
 
@@ -67,7 +61,7 @@ Item {
             event.accepted = true
             return
         }
-        // Held keys auto-repeat; the hold animation is already running, ignore.
+        // Held keys auto-repeat; an instant action must never re-fire.
         if (event.isAutoRepeat) {
             event.accepted = true
             return
@@ -83,35 +77,15 @@ Item {
             return
         }
         if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            if (root.currentItem) root.currentItem.startHold()
+            root.executeCommand(root.actions[root.selectedIndex].id)
             event.accepted = true
             return
         }
-        // Press-and-hold shortcut: select that tile and start its hold fill.
+        // Instant shortcut: select that tile and run it immediately.
         const idx = root.indexForQtKey(event.key)
         if (idx >= 0) {
             root.selectedIndex = idx
-            const item = actionsRepeater.itemAt(idx)
-            if (item) item.startHold()
-            event.accepted = true
-        }
-    }
-
-    Keys.onReleased: (event) => {
-        if (event.isAutoRepeat) {
-            event.accepted = true
-            return
-        }
-        if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter) {
-            if (root.currentItem) root.currentItem.cancelHold()
-            event.accepted = true
-            return
-        }
-        // Releasing the shortcut key before 100% aborts that tile's fill.
-        const idx = root.indexForQtKey(event.key)
-        if (idx >= 0) {
-            const item = actionsRepeater.itemAt(idx)
-            if (item) item.cancelHold()
+            root.executeCommand(root.actions[idx].id)
             event.accepted = true
         }
     }
@@ -119,10 +93,6 @@ Item {
     function reset() {
         root.selectedIndex = 0
         root.showError = false
-        for (let i = 0; i < actionsRepeater.count; i++) {
-            const item = actionsRepeater.itemAt(i)
-            if (item) item.reset()
-        }
     }
 
     function executeCommand(actionId) {
@@ -258,9 +228,9 @@ Item {
             right: parent.right
         }
 
-        anchors.topMargin: root.contentMarginTop
-        anchors.leftMargin: root.contentMarginSide
-        anchors.rightMargin: root.contentMarginSide
+        anchors.topMargin: root.contentMargin
+        anchors.leftMargin: root.contentMargin
+        anchors.rightMargin: root.contentMargin
 
         spacing: 10
 

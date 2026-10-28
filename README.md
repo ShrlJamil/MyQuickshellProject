@@ -20,7 +20,7 @@ A hand-rolled [Quickshell](https://github.com/Quickshell/Quickshell) desktop she
 Prototype, not a stable release. Expect rough edges and breaking changes. What exists today:
 
 - **Launcher** (solid): full-screen keyboard app launcher with fuzzy scoring, usage history, and prefix search modes.
-- **Top bar** (working): static 40px bar per monitor with a pop-down **Dynamic Center** (wallpaper picker, expanded media player), a **Control Center** overlay, system tray, and status indicators. The display manager lives in the **Settings** window (Display page).
+- **Top bar** (working): static 40px bar per monitor with a pop-down **Dynamic Center** (expanded media player), a **Control Center** overlay, system tray, and status indicators. The display manager and the wallpaper picker live in the **Settings** window (Display and Wallpaper pages).
 - **Media**: MPRIS-backed now-playing preview in the bar centre (click-to-expand, never auto-expands) plus an expanded player surface.
 - **Notifications**: freedesktop notification history (Notification Center) + popup toasts, with inline reply support.
 - **OSD**: standalone bottom-centre overlay for volume / brightness / caps-lock, plus a workspace OSD.
@@ -146,14 +146,14 @@ A static **40px** top bar, one instance per monitor (`Variants(Quickshell.screen
 | Dynamic center | `modules/bar/DynamicCenter.qml` | Plain `Item` at `y: 40`, attached under the bar; raises one surface at a time, each behind a latched `Loader` with crossfade |
 | Power menu | `modules/bar/PowerMenuWindow.qml` (host) + `PowerMenu.qml` + `PowerActionItem.qml` | Standalone centred modal over a dimmed background, own focus grab; 6 actions — Lock, Hibernate, Logout, Shutdown, Suspend, Reboot — with hold-to-confirm |
 | Display | `modules/display/DisplayManager.qml` | Monitor-arrangement page in the Settings window (backed by `DisplayService`) |
-| Wallpapers | `modules/wallpapers/WallpaperPicker.qml` | Thumbnail strip, keyboard nav, applies via `walset-backend`-style flow (wallpaper + wallust + matugen) |
-| Control Center | `modules/bar/ControlCenter.qml` + `ControlSlider.qml` / `ControlTile.qml` | Separate top-right overlay window: audio, brightness, network, bluetooth, hotspot and quick toggles (audio over native PipeWire, no `wpctl`) |
+| Wallpapers | `modules/wallpapers/WallpaperService.qml` + `WallpaperPage.qml` | Settings page: single collection grid + import, backed by the shared service (stepwise awww + wallust + matugen apply, persistent history) |
+| Control Center | `modules/bar/ControlCenter.qml` + `ControlSlider.qml` / `ControlTile.qml` | Separate top-right overlay window: audio, brightness, network, bluetooth and quick toggles (audio over native PipeWire, no `wpctl`) |
 | Clock/date | `modules/bar/DateTimeWidget.qml` | Clock + calendar popover |
 | Battery | `modules/bar/BatteryWidget.qml` + `BatteryService.qml` | UPower-backed indicator + popover |
 
 ### The dynamic center
 
-The bar's centre can raise a surface that looks like it grows straight out of the bar — no gap, square top corners. Implemented surfaces: `wallpapers`, `media` (expanded player). `mediaPreview` / `mediaCompact` IPC modes also exist. (The capture picker and the power menu are no longer surfaces here — they are standalone floating windows, see Capture below. The display manager is no longer a surface either: it is the Display page of the Settings window, and the `display` IPC target opens it there.)
+The bar's centre can raise a surface that looks like it grows straight out of the bar — no gap, square top corners. Implemented surfaces: `media` (expanded player). `mediaPreview` / `mediaCompact` IPC modes also exist. (The capture picker and the power menu are no longer surfaces here — they are standalone floating windows, see Capture below. The display manager is no longer a surface either: it is the Display page of the Settings window, and the `display` IPC target opens it there. The wallpaper picker followed it: it is the Wallpaper page of the Settings window, and the `wallpapers` IPC target opens it there.)
 
 - The bar's `PanelWindow` height stays constant at runtime; surfaces fade/crossfade inside the allocated space. (Resizing a layer-shell surface every open flickers badly on fractional-scale outputs.)
 - When idle, the transparent area below the 40px strip is click-through (input mask); when a surface is open the window grabs input via `HyprlandFocusGrab`.
@@ -188,7 +188,7 @@ One `MediaService` (`modules/services/MediaService.qml`) wraps the native `Quick
 | OSD | `modules/osd/OSD.qml`, `OSDService.qml` | Standalone bottom-centre, click-through overlay: volume / brightness / caps-lock (+ workspace OSD). Brightness keys step optimistically, then run `brightnessctl` detached |
 | Capture | `modules/capture/CaptureService.qml`, `CaptureBar.qml`, `CapturePicker.qml`, `CaptureOverlay.qml`, `ScreenshotPreview.qml` | Region / window / screen / instant-fullscreen shots to file + clipboard; selection overlay; preview. Floating bottom-centre picker (`CapturePicker`) on the focused screen, independent of the bar and `barState.mode`. Screen mode captures only the focused output (`grim -o`), falling back to the full layout when no output name is available |
 | Eco mode | `modules/bar/EcoService.qml` | Snapshot-apply-restore over `hyprctl`: blur/shadow off + opaque QML surfaces, no config edits |
-| Misc services | `AudioService`, `MicService`, `NetworkService`, `BluetoothService`, `BatteryService`, `BrightnessService`, `NightLightService`, `HotspotService`, `SubmapService`, `UptimeService`, `CaffeineService` (all under `modules/bar/`) | Native backends first (PipeWire, UPower, BlueZ, NetworkManager); tiny shell reads only where the 0.3.x QML API has gaps. `MprisService.qml` is a legacy stub superseded by `MediaService` |
+| Misc services | `AudioService`, `MicService`, `NetworkService`, `BluetoothService`, `BatteryService`, `BrightnessService`, `NightLightService`, `SubmapService`, `UptimeService`, `CaffeineService` (all under `modules/bar/`) | Native backends first (PipeWire, UPower, BlueZ, NetworkManager); tiny shell reads only where the 0.3.x QML API has gaps. `MprisService.qml` is a legacy stub superseded by `MediaService` |
 
 ---
 
@@ -199,8 +199,8 @@ One `MediaService` (`modules/services/MediaService.qml`) wraps the native `Quick
 | Target | Functions |
 | --- | --- |
 | `launcher` | `show`, `hide`, `toggle` |
-| `power`, `wallpapers`, `center`, `mediaPreview`, `mediaCompact` | `show`, `hide`, `toggle` (set `barState.mode` + `screen`) |
-| `display` | `show`, `hide`, `toggle` (opens the Settings window on its Display page) |
+| `power`, `center`, `mediaPreview`, `mediaCompact` | `show`, `hide`, `toggle` (set `barState.mode` + `screen`) |
+| `display`, `wallpapers` | `show`, `hide`, `toggle` (opens the Settings window on its Display / Wallpaper page) |
 | `volume` | `up`, `down` (±5 via native PipeWire) |
 | `brightness` | `up`, `down` (step + OSD) |
 | `capture` | `open`, `bar`, `region`, `window`, `screen`, `fullscreen` |
@@ -275,7 +275,7 @@ Just run `wallust` against a wallpaper as usual — the whole shell picks the ne
 - [x] Dynamic center surfaces: wallpapers, media (power menu and capture picker are standalone windows; the display manager is a Settings page)
 - [x] Power menu with hold-to-confirm, keyboard nav, multi-monitor-safe focus grab
 - [x] MPRIS media stack (preview + expanded player, click-to-expand, prefetch)
-- [x] Control Center (audio/network/bluetooth/hotspot tiles)
+- [x] Control Center (audio/network/bluetooth tiles)
 - [x] Tray (StatusNotifierItem hosts in the bar), notifications (center + popups + reply), OSD (volume/brightness/caps + workspace)
 - [x] Screenshot capture (region/window/screen) with overlay + preview
 - [ ] File search activation — results are found but Enter is a no-op

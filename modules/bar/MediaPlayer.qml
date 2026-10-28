@@ -223,7 +223,7 @@ Item {
                         id: disc
                         anchors.fill: parent
                         radius: width / 2
-                        color: "#0e0e0e"
+                        color: Theme.backgroundInset
                         border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
                         border.width: 1
 
@@ -594,8 +594,8 @@ Item {
                         radius: 6
                         readonly property bool current: root.mediaService
                             && playerRow.modelData.dbusName === root.mediaService.activeBus
-                        color: rowHover.hovered ? Qt.lighter(Theme.background, 1.5)
-                            : (playerRow.current ? Qt.lighter(Theme.background, 1.3) : "transparent")
+                        color: rowHover.hovered ? Theme.surfaceRaised
+                            : (playerRow.current ? Theme.surface : "transparent")
 
                         Text {
                             anchors.left: parent.left

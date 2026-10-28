@@ -19,6 +19,14 @@ Item {
     // Raised by Cancel so the host (the Settings window) tears the page down.
     signal closeRequested()
 
+    // Local Settings surface tokens, set by the host (SettingsView) so this
+    // page stays monochrome-dark regardless of the global Wallust palette.
+    // Text, accent and hover tokens keep following the global theme.
+    property color settingsBackground: "#0A0A0A"
+    property color settingsSurface: "#141414"
+    property color settingsSurfaceRaised: "#1E1E1E"
+    property color settingsSurfaceOverlay: "#2A2A2A"
+
     readonly property var selectedInfo: DisplayService.layout[DisplayService.selectedMonitor]
 
     // Cancel: throw away un-applied local edits and close. No `hyprctl eval`, no
@@ -128,10 +136,12 @@ Item {
 
     // Magnetic snap, measured in screen pixels so it feels the same at any zoom.
     // Hysteresis: engage within snapPx, hold until releasePx, then free again.
-    readonly property real snapPx: 8
-    readonly property real releasePx: 12
-    property real snapGuideX: NaN
-    property real snapGuideY: NaN
+    // Kept to a whisper (2/3 px): the magnets - edge adjacency AND edge
+    // alignment (tops/bottoms, lefts/rights) - only catch a near-exact
+    // miss; anything stronger glues the block to a neighbour and, with
+    // the latch flapping at the boundary, makes it visibly shake.
+    readonly property real snapPx: 2
+    readonly property real releasePx: 3
     // Logical coordinate a snap is currently engaged on (NaN = free) - persists
     // across drag moves so the pointer can travel without re-latching.
     property real _snapEngagedX: NaN
@@ -205,8 +215,6 @@ Item {
 
         root._snapEngagedX = rx.engaged
         root._snapEngagedY = ry.engaged
-        root.snapGuideX = rx.guide
-        root.snapGuideY = ry.guide
 
         DisplayService.setPosition(name, Math.round(rx.pos), Math.round(ry.pos))
     }
@@ -237,19 +245,60 @@ Item {
     }
 
     // ---- Page layout --------------------------------------------------------
-    // App-style settings page: a centred, width-capped column that scrolls
-    // when the window is short, with the action footer pinned below it.
-    // Sections: page header, arrangement card, preset segmented control,
-    // selected-monitor card with labelled rows. All state and actions still
-    // go through DisplayService exactly as before - this is presentation only.
-    Flickable {
-        id: flick
+    // App-style settings page sharing the Wallpaper page's layout pattern:
+    // a pinned header (title only - the page must read without explanation)
+    // over a divider, then a scrolling content column, with the action
+    // footer pinned below it. Content sections: arrangement card,
+    // selected-monitor + display-mode row, selected-monitor card with
+    // labelled rows. All
+    // state and actions still go through DisplayService exactly as before -
+    // this is presentation only.
+
+    // Page header - same title metrics and placement as the Wallpaper page.
+    Text {
+        id: pageTitle
 
         anchors {
             top: parent.top
             left: parent.left
             right: parent.right
+            topMargin: 10
+            leftMargin: 10
+            rightMargin: 10
+        }
+
+        text: "Display"
+        color: Theme.text
+        font.pixelSize: 18
+        font.family: Theme.fontFamily
+        font.weight: Font.DemiBold
+    }
+
+    Rectangle {
+        id: headerDivider
+
+        anchors {
+            top: pageTitle.bottom
+            left: parent.left
+            right: parent.right
+            topMargin: 14
+            leftMargin: 10
+            rightMargin: 10
+        }
+
+        height: 1
+        color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+    }
+
+    Flickable {
+        id: flick
+
+        anchors {
+            top: headerDivider.bottom
+            left: parent.left
+            right: parent.right
             bottom: actionFooter.top
+            topMargin: 14
         }
 
         contentWidth: width
@@ -266,31 +315,10 @@ Item {
             anchors {
                 top: parent.top
                 horizontalCenter: parent.horizontalCenter
-                topMargin: 16
             }
 
-            width: Math.max(280, Math.min(flick.width - 96, 980))
+            width: Math.max(280, Math.min(flick.width - 20, 980))
             spacing: 14
-
-            // Page header.
-            Column {
-                spacing: 2
-
-                Text {
-                    text: "Display"
-                    color: Theme.text
-                    font.pixelSize: 20
-                    font.family: Theme.fontFamily
-                    font.weight: Font.DemiBold
-                }
-
-                Text {
-                    text: "Arrange your monitors and adjust resolution, scale and rotation."
-                    color: Theme.textMuted
-                    font.pixelSize: 11
-                    font.family: Theme.fontFamily
-                }
-            }
 
             // Arrangement card: title + the drag canvas. The canvas is kept
             // deliberately plain - no grid, no origin crosshair - so the
@@ -301,7 +329,7 @@ Item {
                 width: parent.width
                 height: 238
                 radius: 14
-                color: Theme.surface
+                color: settingsSurface
                 border.width: 1
                 border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
 
@@ -360,7 +388,7 @@ Item {
 
                             radius: 8
                             opacity: monBlock.info && monBlock.info.disabled ? 0.35 : 1
-                            color: monBlock.selected ? Qt.lighter(Theme.background, 1.4) : Theme.background
+                            color: monBlock.selected ? settingsSurfaceOverlay : settingsSurfaceRaised
                             border.width: monBlock.selected ? 2 : 1
                             border.color: monBlock.selected ? Theme.accent : Theme.surfaceHover
 
@@ -399,8 +427,14 @@ Item {
 
                                 anchors.fill: parent
 
-                                property real pressX: 0
-                                property real pressY: 0
+                                // Without this the page's Flickable steals
+                                // the gesture mid-drag and the whole column
+                                // (the rows under the card included) scrolls
+                                // along under the pointer.
+                                preventStealing: true
+
+                                property real pressCanvasX: 0
+                                property real pressCanvasY: 0
                                 property real origX: 0
                                 property real origY: 0
 
@@ -413,23 +447,30 @@ Item {
                                     root._snapEngagedX = NaN
                                     root._snapEngagedY = NaN
                                     root.dragging = true
-                                    dragArea.pressX = mouse.x
-                                    dragArea.pressY = mouse.y
+                                    const cp = dragArea.mapToItem(canvasArea, mouse.x, mouse.y)
+                                    dragArea.pressCanvasX = cp.x
+                                    dragArea.pressCanvasY = cp.y
                                     dragArea.origX = monBlock.info.x
                                     dragArea.origY = monBlock.info.y
                                 }
 
                                 onPositionChanged: (mouse) => {
+                                    // Pointer tracked in CANVAS coordinates,
+                                    // never block-relative ones: the block
+                                    // moves to the committed (possibly
+                                    // snapped) position, and block-relative
+                                    // readings feed that movement back into
+                                    // the input - around a latched edge the
+                                    // block shook from exactly that loop.
+                                    const cp = dragArea.mapToItem(canvasArea, mouse.x, mouse.y)
                                     const s = root.viewScale
-                                    const dx = (mouse.x - dragArea.pressX) / s
-                                    const dy = (mouse.y - dragArea.pressY) / s
+                                    const dx = (cp.x - dragArea.pressCanvasX) / s
+                                    const dy = (cp.y - dragArea.pressCanvasY) / s
                                     root.applyDragSnap(monBlock.modelData, dragArea.origX + dx, dragArea.origY + dy)
                                 }
 
                                 onReleased: {
                                     root.dragging = false
-                                    root.snapGuideX = NaN
-                                    root.snapGuideY = NaN
                                     root._snapEngagedX = NaN
                                     root._snapEngagedY = NaN
                                     // Integer normalize + mirror-on-full-overlap only -
@@ -439,27 +480,6 @@ Item {
                                 }
                             }
                         }
-                    }
-
-                    // Snap guide overlay - only visible mid-drag while a snap is engaged.
-                    Rectangle {
-                        visible: root.dragging && !isNaN(root.snapGuideX)
-                        width: 1
-                        height: canvasArea.height
-                        x: root.logicalToCanvasX(root.snapGuideX)
-                        y: 0
-                        color: Theme.accent
-                        opacity: 0.9
-                    }
-
-                    Rectangle {
-                        visible: root.dragging && !isNaN(root.snapGuideY)
-                        width: canvasArea.width
-                        height: 1
-                        x: 0
-                        y: root.logicalToCanvasY(root.snapGuideY)
-                        color: Theme.accent
-                        opacity: 0.9
                     }
 
                     Text {
@@ -476,62 +496,96 @@ Item {
                 }
             }
 
-            // Layout presets as one segmented control, left-aligned with the
-            // cards. The segments are momentary commands (DisplayService has
-            // no persistent "current preset" state to highlight), so only
-            // hover feedback is shown.
-            Rectangle {
-                id: presetBar
-
-                width: presetRow.implicitWidth + 4
+            // Selected monitor + display-mode row, directly under the
+            // arrangement card: the selected monitor's name on the left,
+            // the display-mode menu trigger on the right. The layout
+            // presets (Extend / Mirror / Internal Only / External Only)
+            // used to be a segmented control here; they are momentary
+            // commands (DisplayService keeps no "current preset" state to
+            // show on the trigger), so they now live in modePopup, which
+            // opens centred on this row's trigger instead of dropping down.
+            Item {
+                width: parent.width
                 height: 36
-                radius: height / 2
-                color: Theme.background
-                border.width: 1
-                border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
 
-                Row {
-                    id: presetRow
+                Text {
+                    anchors {
+                        left: parent.left
+                        right: modeBox.left
+                        verticalCenter: parent.verticalCenter
+                        rightMargin: 12
+                    }
+                    text: "Selected Monitor: " + DisplayService.selectedMonitor
+                    color: Theme.text
+                    font.pixelSize: 13
+                    font.family: Theme.fontFamily
+                    font.weight: Font.DemiBold
+                    elide: Text.ElideRight
+                    visible: root.selectedInfo !== undefined
+                }
 
-                    anchors.centerIn: parent
-                    spacing: 2
+                Rectangle {
+                    id: modeBox
 
-                    Repeater {
-                        model: [
-                            { label: "Extend", preset: "extend" },
-                            { label: "Mirror", preset: "mirror" },
-                            { label: "Internal Only", preset: "internalOnly" },
-                            { label: "External Only", preset: "externalOnly" }
-                        ]
+                    anchors {
+                        right: parent.right
+                        verticalCenter: parent.verticalCenter
+                    }
+                    // Same width as the menu it opens (modePopup binds its
+                    // width to this box), so the centred menu's edges line
+                    // up with the button's and nothing spills past the
+                    // content's right edge. The fill is a raised tier, not
+                    // settingsBackground: on the same-valued page
+                    // background the button was nearly invisible.
+                    width: 200
+                    height: 32
+                    radius: 8
+                    color: modeMouse.containsMouse ? settingsSurfaceOverlay : settingsSurfaceRaised
+                    border.width: modeMouse.containsMouse ? 1 : 0
+                    border.color: Theme.accent
 
-                        delegate: Rectangle {
-                            id: presetSegment
+                    Text {
+                        id: modeLabel
 
-                            required property var modelData
+                        anchors {
+                            left: parent.left
+                            verticalCenter: parent.verticalCenter
+                            leftMargin: 12
+                        }
+                        text: "Display Mode"
+                        color: Theme.text
+                        font.pixelSize: 12
+                        font.family: Theme.fontFamily
+                    }
 
-                            width: segmentLabel.implicitWidth + 22
-                            height: 30
-                            radius: height / 2
-                            color: segmentHover.hovered ? Qt.lighter(Theme.background, 1.35) : "transparent"
+                    IconImage {
+                        anchors {
+                            right: parent.right
+                            verticalCenter: parent.verticalCenter
+                            rightMargin: 10
+                        }
+                        width: 14
+                        height: 14
+                        source: Quickshell.iconPath("pan-down-symbolic", "go-down-symbolic")
+                        asynchronous: true
+                    }
 
-                            HoverHandler {
-                                id: segmentHover
-                                cursorShape: Qt.PointingHandCursor
-                            }
+                    MouseArea {
+                        id: modeMouse
 
-                            TapHandler {
-                                onTapped: DisplayService.applyPreset(presetSegment.modelData.preset)
-                            }
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
 
-                            Text {
-                                id: segmentLabel
-                                anchors.centerIn: parent
-                                text: presetSegment.modelData.label
-                                color: Theme.text
-                                font.pixelSize: 11
-                                font.family: Theme.fontFamily
-                                font.weight: Font.DemiBold
-                            }
+                        onClicked: {
+                            // Centre the menu on this button: same width,
+                            // left edges aligned, vertically centred on the
+                            // button - it appears in place over the trigger
+                            // instead of dropping down below it.
+                            const p = modeBox.mapToItem(root, 0, 0)
+                            modePopup.x = p.x
+                            modePopup.y = p.y + modeBox.height / 2 - modePopup.implicitHeight / 2
+                            modePopup.open()
                         }
                     }
                 }
@@ -545,7 +599,7 @@ Item {
                 width: parent.width
                 height: monitorColumn.implicitHeight + 28
                 radius: 14
-                color: Theme.surface
+                color: settingsSurface
                 border.width: 1
                 border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
                 visible: root.selectedInfo !== undefined
@@ -562,23 +616,6 @@ Item {
                         rightMargin: 16
                     }
                     spacing: 0
-
-                    Item {
-                        width: parent.width
-                        height: 30
-
-                        Text {
-                            anchors {
-                                left: parent.left
-                                verticalCenter: parent.verticalCenter
-                            }
-                            text: "Selected Monitor: " + DisplayService.selectedMonitor
-                            color: Theme.text
-                            font.pixelSize: 13
-                            font.family: Theme.fontFamily
-                            font.weight: Font.DemiBold
-                        }
-                    }
 
                     // Primary display preference. Hyprland has no native
                     // primary-output property, so this selects which display
@@ -612,7 +649,7 @@ Item {
                             width: 250
                             height: 32
                             radius: 8
-                            color: Theme.background
+                            color: settingsBackground
                             border.width: primaryMouse.containsMouse ? 1 : 0
                             border.color: Theme.accent
 
@@ -661,9 +698,9 @@ Item {
 
                                 background: Rectangle {
                                     radius: 8
-                                    color: Qt.lighter(Theme.background, 1.5)
+                                    color: settingsSurfaceRaised
                                     border.width: 1
-                                    border.color: Qt.lighter(Theme.background, 1.6)
+                                    border.color: settingsSurfaceOverlay
                                 }
 
                                 contentItem: ListView {
@@ -699,7 +736,7 @@ Item {
 
                                         background: Rectangle {
                                             radius: 6
-                                            color: primaryDelegate.hovered ? Qt.lighter(Theme.background, 1.7) : "transparent"
+                                            color: primaryDelegate.hovered ? settingsSurfaceRaised : "transparent"
                                         }
 
                                         onClicked: {
@@ -773,7 +810,7 @@ Item {
                             width: 250
                             height: 32
                             radius: 8
-                            color: Theme.background
+                            color: settingsBackground
                             border.width: resolutionMouse.containsMouse ? 1 : 0
                             border.color: Theme.accent
 
@@ -822,9 +859,9 @@ Item {
 
                                 background: Rectangle {
                                     radius: 8
-                                    color: Qt.lighter(Theme.background, 1.5)
+                                    color: settingsSurfaceRaised
                                     border.width: 1
-                                    border.color: Qt.lighter(Theme.background, 1.6)
+                                    border.color: settingsSurfaceOverlay
                                 }
 
                                 contentItem: ListView {
@@ -853,7 +890,7 @@ Item {
 
                                         background: Rectangle {
                                             radius: 6
-                                            color: modeDelegate.hovered ? Qt.lighter(Theme.background, 1.7) : "transparent"
+                                            color: modeDelegate.hovered ? settingsSurfaceRaised : "transparent"
                                         }
 
                                         onClicked: {
@@ -909,7 +946,7 @@ Item {
                                     width: 44
                                     height: 28
                                     radius: 10
-                                    color: scalePill.active ? Theme.accent : Theme.background
+                                    color: scalePill.active ? Theme.accent : settingsBackground
 
                                     TapHandler {
                                         onTapped: DisplayService.setScale(DisplayService.selectedMonitor, scalePill.modelData)
@@ -918,7 +955,7 @@ Item {
                                     Text {
                                         anchors.centerIn: parent
                                         text: scalePill.modelData.toFixed(2).replace(/0+$/, "").replace(/\.$/, "")
-                                        color: scalePill.active ? Theme.background : Theme.text
+                                        color: scalePill.active ? settingsBackground : Theme.text
                                         font.pixelSize: 11
                                         font.family: Theme.fontFamily
                                         font.weight: Font.DemiBold
@@ -968,7 +1005,7 @@ Item {
                                     width: 44
                                     height: 28
                                     radius: 10
-                                    color: transformPill.active ? Theme.accent : Theme.background
+                                    color: transformPill.active ? Theme.accent : settingsBackground
 
                                     TapHandler {
                                         onTapped: DisplayService.setTransform(DisplayService.selectedMonitor, transformPill.modelData)
@@ -977,7 +1014,7 @@ Item {
                                     Text {
                                         anchors.centerIn: parent
                                         text: (transformPill.modelData * 90) + "°"
-                                        color: transformPill.active ? Theme.background : Theme.text
+                                        color: transformPill.active ? settingsBackground : Theme.text
                                         font.pixelSize: 11
                                         font.family: Theme.fontFamily
                                         font.weight: Font.DemiBold
@@ -1010,6 +1047,74 @@ Item {
         }
     }
 
+    // Display-mode menu: the layout presets as a popup centred on its
+    // trigger (modeBox, in the row under the arrangement card) - same
+    // width as the button, appearing in place over it instead of dropping
+    // down. Its x/y are set by the trigger's click handler on open.
+    // Picking a row applies the preset immediately, like the old
+    // segmented control.
+    Popup {
+        id: modePopup
+
+        width: modeBox.width
+        padding: 4
+
+        background: Rectangle {
+            radius: 8
+            color: settingsSurfaceRaised
+            border.width: 1
+            border.color: settingsSurfaceOverlay
+        }
+
+        contentItem: Column {
+            spacing: 2
+
+            Repeater {
+                model: [
+                    { label: "Extend", preset: "extend" },
+                    { label: "Mirror", preset: "mirror" },
+                    { label: "Internal Only", preset: "internalOnly" },
+                    { label: "External Only", preset: "externalOnly" }
+                ]
+
+                delegate: Rectangle {
+                    id: modeRow
+
+                    required property var modelData
+
+                    width: modePopup.width - 8
+                    height: 32
+                    radius: 6
+                    color: modeRowHover.hovered ? settingsSurfaceOverlay : "transparent"
+
+                    HoverHandler {
+                        id: modeRowHover
+                        cursorShape: Qt.PointingHandCursor
+                    }
+
+                    TapHandler {
+                        onTapped: {
+                            DisplayService.applyPreset(modeRow.modelData.preset)
+                            modePopup.close()
+                        }
+                    }
+
+                    Text {
+                        anchors {
+                            left: parent.left
+                            verticalCenter: parent.verticalCenter
+                            leftMargin: 8
+                        }
+                        text: modeRow.modelData.label
+                        color: Theme.text
+                        font.pixelSize: 12
+                        font.family: Theme.fontFamily
+                    }
+                }
+            }
+        }
+    }
+
     // Action footer, pinned below the scroll area and aligned with the
     // content column: status message on the left, Cancel (discard un-applied
     // edits + close) and Apply (apply live + persist to monitors.lua) on the
@@ -1023,9 +1128,9 @@ Item {
             bottom: parent.bottom
             leftMargin: (root.width - contentColumn.width) / 2
             rightMargin: (root.width - contentColumn.width) / 2
-            bottomMargin: 14
+            bottomMargin: 10
         }
-        height: 46
+        height: 40
 
         Rectangle {
             anchors {
@@ -1044,7 +1149,7 @@ Item {
                 left: parent.left
                 bottom: parent.bottom
             }
-            height: 34
+            height: 30
             verticalAlignment: Text.AlignVCenter
             text: DisplayService.statusMessage
             color: DisplayService.statusIsError ? Theme.accent : Theme.textMuted
@@ -1063,9 +1168,9 @@ Item {
                 id: cancelButton
 
                 width: 90
-                height: 34
+                height: 30
                 radius: 8
-                color: Theme.background
+                color: settingsBackground
                 border.width: 1
                 border.color: Theme.accent
 
@@ -1087,7 +1192,7 @@ Item {
                 id: applyButton
 
                 width: 90
-                height: 34
+                height: 30
                 radius: 8
                 color: Theme.accent
 
@@ -1098,7 +1203,7 @@ Item {
                 Text {
                     anchors.centerIn: parent
                     text: "Apply"
-                    color: Theme.background
+                    color: settingsBackground
                     font.pixelSize: 12
                     font.family: Theme.fontFamily
                     font.weight: Font.DemiBold
