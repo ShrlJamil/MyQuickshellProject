@@ -725,8 +725,11 @@ Item {
         nameFilters: ["Images (*.jpg *.jpeg *.png *.webp)"]
 
         // Cancellation needs no handling: no state changes until a file
-        // is actually accepted here.
+        // is actually accepted here. QtQuick.Dialogs has no closed
+        // signal - focus returns to the grid off the visible change,
+        // which covers accept and cancel alike.
         onAccepted: WallpaperService.importFile(WallpaperService.pathFromUrl(selectedFile))
-        onClosed: grid.forceActiveFocus()
+        onVisibleChanged: if (!importDialog.visible)
+            grid.forceActiveFocus()
     }
 }
