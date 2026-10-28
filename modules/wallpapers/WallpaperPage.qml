@@ -244,7 +244,9 @@ Item {
             rightMargin: 10
         }
 
-        height: 100
+        // Height follows the preview frame (plus padding), so enlarging
+        // the preview never eats a fixed extra slice beyond its own size.
+        height: previewFrame.height + 20
         radius: 10
         color: settingsSurface
 
@@ -257,8 +259,12 @@ Item {
                 leftMargin: 10
             }
 
-            width: 142
-            height: 80
+            // Responsive 16:9: half the strip, clamped to [224, 320].
+            // At the standard 880-wide window (strip ~596) that lands at
+            // ~298x168 - near the 320x180 target, while a hard 320 would
+            // push the grid under one visible row at 560 window height.
+            width: Math.min(320, Math.max(224, previewStrip.width * 0.5))
+            height: Math.round(width * 9 / 16)
             radius: 7
             color: settingsSurfaceRaised
 
@@ -267,7 +273,7 @@ Item {
 
                 anchors.fill: parent
                 source: root.selectedInfo ? root.selectedInfo.fileUrl : ""
-                sourceSize.width: 512
+                sourceSize.width: 640
                 fillMode: Image.PreserveAspectCrop
                 asynchronous: true
 
