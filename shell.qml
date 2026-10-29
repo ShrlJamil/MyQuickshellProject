@@ -134,6 +134,27 @@ ShellRoot {
         value: PreferencesService.materialBorderOpacity
     }
 
+    // Bar background (Settings > Appearance, Stage 2): with bar
+    // transparency off, the effective strip opacity is 0 - exactly the
+    // long-standing look. With it on, the stored background opacity
+    // becomes effective. The ternary lives here, at the single binding
+    // site, so Theme.barSurfaceOpacity stays the one value every bar
+    // background surface reads (strip, concave fills).
+    Binding {
+        target: Theme
+        property: "barSurfaceOpacity"
+        value: PreferencesService.barTransparency ? PreferencesService.barBackgroundOpacity : 0
+    }
+
+    // Bar layout mode (Stage 3): only "float" has a Theme token; the
+    // default and (not yet implemented) segmented modes both read as
+    // not-floating, so Bar.qml needs no mode string of its own.
+    Binding {
+        target: Theme
+        property: "barFloating"
+        value: PreferencesService.barLayoutMode === "float"
+    }
+
     IpcHandler {
         target: "launcher"
 

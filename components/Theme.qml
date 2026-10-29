@@ -197,11 +197,26 @@ Item {
     property color color15: "#000000"
     property color cursor: "#000000"
 
-    // Surface opacity by layer: every module surface is fully opaque, the bar
-    // strip is fully transparent. (There is deliberately no palette-driven
-    // translucency token: this design has no transparent module surfaces.)
+    // Surface opacity by layer: every module surface is fully opaque.
+    // (There is deliberately no palette-driven translucency token: this
+    // design has no transparent module surfaces.)
     property real moduleSurfaceOpacity: 1
+    // User-adjustable (Settings > Appearance): shell.qml binds this token
+    // to PreferencesService.barTransparency / barBackgroundOpacity
+    // (preferences.json) - 0 while transparency is off, the stored
+    // background opacity while it is on. The literal here is only the
+    // fallback before that binding lands and matches the default
+    // (transparency off) - do not tune the value here.
     property real barSurfaceOpacity: 0
+
+    // Bar layout (Settings > Appearance, Stage 3): shell.qml binds
+    // barFloating to PreferencesService.barLayoutMode === "float". The
+    // float insets live here because Bar, DynamicCenter and the bar
+    // popovers all offset by them; the literal false matches the
+    // service default layoutMode ("default") - do not tune here.
+    property bool barFloating: false
+    readonly property real barFloatInsetX: 12
+    readonly property real barFloatInsetTop: 8
 
     // Icon colour: NOT a neutral white - the seed (accent) mixed 65%
     // toward white, so icons are a white that clearly carries the

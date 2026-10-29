@@ -36,6 +36,22 @@ Item {
     // Appearance page's slider writes it through the setter below.
     property real materialBorderOpacity: root.defaultMaterialBorderOpacity
 
+    // ---- Bar (schema v1, additive) ----------------------------------------
+    // Stage 1: state and persistence only. NOTHING consumes these yet -
+    // the values are stored ahead of the visual stages (transparency,
+    // Float, Segmented), and the defaults describe the bar exactly as
+    // it renders today (no strip background, opaque widget fills), so
+    // landing this section changes no pixel on screen.
+    readonly property string defaultBarLayoutMode: "default"
+    readonly property bool defaultBarTransparency: false
+    readonly property real defaultBarBackgroundOpacity: 0.85
+    readonly property real defaultBarWidgetBackgroundOpacity: 1.0
+
+    property string barLayoutMode: root.defaultBarLayoutMode
+    property bool barTransparency: root.defaultBarTransparency
+    property real barBackgroundOpacity: root.defaultBarBackgroundOpacity
+    property real barWidgetBackgroundOpacity: root.defaultBarWidgetBackgroundOpacity
+
     property bool _loaded: false
     property int _fileVersion: 1
     readonly property bool _writable: root._loaded && root._fileVersion === 1
@@ -56,6 +72,47 @@ Item {
             saveTimer.restart()
     }
 
+    // Bar validators and setters: same contract as the Appearance one -
+    // anything unusable falls back to the field's default, numbers are
+    // clamped to 0..1 and rounded to 3 decimals, and a write is only
+    // ever scheduled once a known-version file has loaded.
+    function _validateLayoutMode(v) {
+        if (v === "default" || v === "float" || v === "segmented")
+            return v
+        return root.defaultBarLayoutMode
+    }
+
+    function _validateBarOpacity(v, fallback) {
+        if (typeof v !== "number" || !isFinite(v))
+            return fallback
+        const clamped = Math.max(0, Math.min(1, v))
+        return Math.round(clamped * 1000) / 1000
+    }
+
+    function setBarLayoutMode(v) {
+        root.barLayoutMode = root._validateLayoutMode(v)
+        if (root._writable)
+            saveTimer.restart()
+    }
+
+    function setBarTransparency(v) {
+        root.barTransparency = (typeof v === "boolean") ? v : root.defaultBarTransparency
+        if (root._writable)
+            saveTimer.restart()
+    }
+
+    function setBarBackgroundOpacity(v) {
+        root.barBackgroundOpacity = root._validateBarOpacity(v, root.defaultBarBackgroundOpacity)
+        if (root._writable)
+            saveTimer.restart()
+    }
+
+    function setBarWidgetBackgroundOpacity(v) {
+        root.barWidgetBackgroundOpacity = root._validateBarOpacity(v, root.defaultBarWidgetBackgroundOpacity)
+        if (root._writable)
+            saveTimer.restart()
+    }
+
     // Reset ONLY the Appearance preferences this service manages in
     // this schema version, back to their defaults. Nothing else in the
     // file (other sections, unknown appearance keys) is touched: the
@@ -66,14 +123,25 @@ Item {
             root._commit()
     }
 
-    // Merge the runtime values into the stored appearance object so
-    // keys this build does not know about survive the write. Assigning
-    // the adapter property is what persists (see onAdapterUpdated).
+    // Merge the runtime values into the stored section objects so keys
+    // this build does not know about survive the write, and so writing
+    // one section can never reset the other: both sections are merged
+    // from their stored objects plus the current runtime values, then
+    // assigned back. Assigning an adapter property is what persists
+    // (see onAdapterUpdated).
     function _commit() {
         const a = (prefsAdapter.appearance && typeof prefsAdapter.appearance === "object")
             ? Object.assign({}, prefsAdapter.appearance) : {}
         a.materialBorderOpacity = root.materialBorderOpacity
         prefsAdapter.appearance = a
+
+        const b = (prefsAdapter.bar && typeof prefsAdapter.bar === "object")
+            ? Object.assign({}, prefsAdapter.bar) : {}
+        b.layoutMode = root.barLayoutMode
+        b.transparency = root.barTransparency
+        b.backgroundOpacity = root.barBackgroundOpacity
+        b.widgetBackgroundOpacity = root.barWidgetBackgroundOpacity
+        prefsAdapter.bar = b
     }
 
     Timer {
@@ -100,6 +168,7 @@ Item {
 
             property int version: 1
             property var appearance: ({ materialBorderOpacity: 0.06 })
+            property var bar: ({ layoutMode: "default", transparency: false, backgroundOpacity: 0.85, widgetBackgroundOpacity: 1.0 })
         }
     }
 
@@ -120,5 +189,15 @@ Item {
         const a = prefsAdapter.appearance
         const raw = (a && typeof a === "object") ? a.materialBorderOpacity : undefined
         root.materialBorderOpacity = root._validateBorderOpacity(raw)
+
+        const b = (prefsAdapter.bar && typeof prefsAdapter.bar === "object")
+            ? prefsAdapter.bar : {}
+        root.barLayoutMode = root._validateLayoutMode(b.layoutMode)
+        root.barTransparency = (typeof b.transparency === "boolean")
+            ? b.transparency : root.defaultBarTransparency
+        root.barBackgroundOpacity = root._validateBarOpacity(b.backgroundOpacity,
+            root.defaultBarBackgroundOpacity)
+        root.barWidgetBackgroundOpacity = root._validateBarOpacity(b.widgetBackgroundOpacity,
+            root.defaultBarWidgetBackgroundOpacity)
     }
 }

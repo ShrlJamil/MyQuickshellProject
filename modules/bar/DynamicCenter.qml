@@ -11,7 +11,9 @@ Item {
     signal closeRequested()
 
     anchors.horizontalCenter: parent.horizontalCenter
-    y: 36
+    // Hang from the strip's bottom edge: 36 in default mode, plus the
+    // float top inset while the bar floats.
+    y: 36 + (Theme.barFloating ? Theme.barFloatInsetTop : 0)
     width: parent.width
     clip: true
 

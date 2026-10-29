@@ -81,7 +81,7 @@ PanelWindow {
     // Window-state only: DynamicCenter must not kill the concave. DC paints
     // below the bar (y>=36) while these Shapes live at y=36..56 beside it.
     readonly property bool _scoopOn: root._haveSolo && root._geoValid && !root._winFloat
-        && root._winY <= 44 && root._scoopW > 40
+        && root._winY <= 44 && root._scoopW > 40 && !Theme.barFloating
     readonly property real _scoopL0: Math.max(0, Math.min(barContent.width, root._winX))
     readonly property real _scoopR0: Math.max(0, Math.min(barContent.width, root._winX + root._winW))
     readonly property real _scoopW: root._scoopR0 - root._scoopL0
@@ -277,6 +277,12 @@ PanelWindow {
 
     readonly property int fixedHeight: 540
 
+    // Float mode (Theme.barFloating): the strip insets from the screen
+    // edges by Theme.barFloatInsetX / barFloatInsetTop and rounds its
+    // corners by half its height (pill ends). Default mode keeps every
+    // value below at today's literal, so nothing moves or reshapes.
+    readonly property int floatRadius: 18
+
     implicitHeight: root.fixedHeight
 
     anchors {
@@ -287,7 +293,10 @@ PanelWindow {
 
     color: "transparent"
 
-    exclusiveZone: 36
+    // Float reserves its full footprint (top inset + strip) so tiled
+    // windows start below the floating strip instead of sliding under
+    // it; default mode keeps the long-standing 36.
+    exclusiveZone: 36 + (Theme.barFloating ? Theme.barFloatInsetTop : 0)
     focusable: root.surfaceActive
 
     mask: root.surfaceActive ? activeMask : idleMask
@@ -325,10 +334,15 @@ PanelWindow {
     Rectangle {
         id: barContent
 
-        x: 0
-        y: 0
-        width: parent.width
+        // Float insets the whole strip; the widget rows inside anchor
+        // to this rectangle, so the internal layout is untouched. The
+        // input mask Regions reference this item, so hit testing
+        // follows the same geometry automatically.
+        x: Theme.barFloating ? Theme.barFloatInsetX : 0
+        y: Theme.barFloating ? Theme.barFloatInsetTop : 0
+        width: parent.width - (Theme.barFloating ? Theme.barFloatInsetX * 2 : 0)
         height: 36
+        radius: Theme.barFloating ? root.floatRadius : 0
         clip: true
         z: 999
 

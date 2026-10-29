@@ -34,8 +34,12 @@ PanelWindow {
     }
 
     margins {
-        top: 44
-        right: Math.max(8, Math.min(root.screenWidth - root.anchorCenter - root.implicitWidth / 2,
+        // 44 = strip (36) + gap (8) from the screen top; float adds the
+        // strip's top inset so the gap below the strip stays 8.
+        top: 44 + (Theme.barFloating ? Theme.barFloatInsetTop : 0)
+        // anchorCenter arrives in bar-content coordinates; float insets
+        // the content, so shift into screen coordinates by the inset.
+        right: Math.max(8, Math.min(root.screenWidth - (root.anchorCenter + (Theme.barFloating ? Theme.barFloatInsetX : 0)) - root.implicitWidth / 2,
             root.screenWidth - root.implicitWidth - 8))
     }
 
