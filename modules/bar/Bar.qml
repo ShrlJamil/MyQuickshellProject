@@ -369,6 +369,19 @@ PanelWindow {
             }
         }
 
+        // Segmented mode only: the centred window title is the one bar
+        // widget with no background rectangle of its own, so its segment
+        // is a sibling sized from the row it backs. It hides with the
+        // row (a DynamicCenter surface owns the centre then).
+        Rectangle {
+            visible: Theme.barSegmented && activeWindowRow.visible
+            anchors.centerIn: activeWindowRow
+            width: activeWindowRow.width + 16
+            height: 30
+            radius: 15
+            color: Theme.barWidgetSurface
+        }
+
         Row {
             id: activeWindowRow
 
@@ -629,7 +642,7 @@ PanelWindow {
             Rectangle {
                 anchors.fill: parent
                 radius: 15
-                color: caffeineTap.pressed || caffeineHover.hovered ? Theme.surfaceHover : "transparent"
+                color: caffeineTap.pressed || caffeineHover.hovered ? Theme.surfaceHover : (Theme.barSegmented ? Theme.barWidgetSurface : "transparent")
             }
 
             Image {
@@ -705,7 +718,7 @@ PanelWindow {
                     Rectangle {
                         anchors.fill: parent
                         radius: 15
-                        color: trayMouse.containsMouse ? Theme.surfaceHover : "transparent"
+                        color: trayMouse.containsMouse ? Theme.surfaceHover : (Theme.barSegmented ? Theme.barWidgetSurface : "transparent")
                     }
 
                     IconImage {
@@ -824,7 +837,7 @@ PanelWindow {
             Rectangle {
                 anchors.fill: parent
                 radius: 15
-                color: micTap.pressed || micHover.hovered ? Theme.surfaceHover : "transparent"
+                color: micTap.pressed || micHover.hovered ? Theme.surfaceHover : (Theme.barSegmented ? Theme.barWidgetSurface : "transparent")
             }
 
             Image {

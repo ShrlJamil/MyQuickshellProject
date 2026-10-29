@@ -218,6 +218,17 @@ Item {
     readonly property real barFloatInsetX: 12
     readonly property real barFloatInsetTop: 8
 
+    // Segmented bar (Stage 4): shell.qml binds barSegmented to
+    // PreferencesService.barLayoutMode === "segmented" and
+    // barWidgetOpacity to barWidgetBackgroundOpacity. barWidgetSurface
+    // is the fill for the widget backgrounds segmented mode ADDS (the
+    // widgets whose base state is transparent today); it must only be
+    // used behind a barSegmented condition - widgets with permanent
+    // fills (MediaPill, RecordPill) never read it, in any mode.
+    property bool barSegmented: false
+    property real barWidgetOpacity: 1
+    readonly property color barWidgetSurface: Qt.rgba(backgroundInset.r, backgroundInset.g, backgroundInset.b, barWidgetOpacity)
+
     // Icon colour: NOT a neutral white - the seed (accent) mixed 65%
     // toward white, so icons are a white that clearly carries the
     // wallpaper's own colour family instead of a milky generic white

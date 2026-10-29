@@ -155,6 +155,20 @@ ShellRoot {
         value: PreferencesService.barLayoutMode === "float"
     }
 
+    // Segmented bar (Stage 4): one layoutMode string drives both mode
+    // tokens, so float and segmented can never be active together.
+    Binding {
+        target: Theme
+        property: "barSegmented"
+        value: PreferencesService.barLayoutMode === "segmented"
+    }
+
+    Binding {
+        target: Theme
+        property: "barWidgetOpacity"
+        value: PreferencesService.barWidgetBackgroundOpacity
+    }
+
     IpcHandler {
         target: "launcher"
 
