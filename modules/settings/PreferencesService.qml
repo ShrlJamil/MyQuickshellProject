@@ -89,6 +89,18 @@ Item {
         return Math.round(clamped * 1000) / 1000
     }
 
+    // Reset ONLY the Bar preferences back to their defaults; the
+    // Appearance section and anything else in the file are untouched
+    // (the commit merges both sections, as always).
+    function resetBar() {
+        root.barLayoutMode = root.defaultBarLayoutMode
+        root.barTransparency = root.defaultBarTransparency
+        root.barBackgroundOpacity = root.defaultBarBackgroundOpacity
+        root.barWidgetBackgroundOpacity = root.defaultBarWidgetBackgroundOpacity
+        if (root._writable)
+            root._commit()
+    }
+
     function setBarLayoutMode(v) {
         root.barLayoutMode = root._validateLayoutMode(v)
         if (root._writable)
