@@ -215,7 +215,7 @@ Item {
             radius: Theme.cornerRadius
             color: Qt.rgba(Theme.panelBackground.r, Theme.panelBackground.g, Theme.panelBackground.b, Theme.moduleSurfaceOpacity)
             border.width: 1
-            border.color: Theme.surfaceHover
+            border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
 
             implicitHeight: col.implicitHeight + 32
 
