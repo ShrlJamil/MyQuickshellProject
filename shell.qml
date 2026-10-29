@@ -121,6 +121,18 @@ ShellRoot {
         value: mediaService.playing
     }
 
+    // User preference -> Theme: the validated border opacity from
+    // PreferencesService (preferences.json) drives Theme's token. Wired
+    // here at the composition root - the CavaService pattern above - so
+    // components/Theme.qml needs no import of the settings module and
+    // no dependency cycle can form; Theme's own 0.06 literal remains
+    // the pre-service fallback and equals the service default.
+    Binding {
+        target: Theme
+        property: "materialBorderOpacity"
+        value: PreferencesService.materialBorderOpacity
+    }
+
     IpcHandler {
         target: "launcher"
 

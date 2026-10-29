@@ -213,6 +213,10 @@ Item {
     // highlight + bottom edge key over the blurred backdrop. Neutral white at
     // single-digit opacities.
     property real materialHighlightOpacity: 0
+    // User-adjustable (Settings > Appearance): shell.qml binds this token
+    // to PreferencesService.materialBorderOpacity (preferences.json). The
+    // literal here is only the fallback before that binding lands and
+    // matches the service default - do not tune the value here.
     property real materialBorderOpacity: 0.06
 
     // Slight raised shadow under bar text (Text.Raised styleColor): dark at
