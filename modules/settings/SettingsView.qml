@@ -225,7 +225,7 @@ FocusScope {
                         readonly property bool active: root.categoryIndex === sidebarItem.index
 
                         width: parent.width
-                        height: 50
+                        height: 44
                         radius: 10
                         color: sidebarItem.active
                             ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, sidebarArea.containsMouse ? 0.26 : 0.18)
@@ -247,8 +247,8 @@ FocusScope {
                             spacing: 10
 
                             Item {
-                                width: 24
-                                height: 24
+                                width: 20
+                                height: 20
                                 anchors.verticalCenter: parent.verticalCenter
 
                                 Image {
@@ -256,8 +256,8 @@ FocusScope {
 
                                     anchors.fill: parent
                                     source: Quickshell.iconPath(sidebarItem.modelData.icon, sidebarItem.modelData.fallback)
-                                    sourceSize.width: 48
-                                    sourceSize.height: 48
+                                    sourceSize.width: 40
+                                    sourceSize.height: 40
                                     fillMode: Image.PreserveAspectFit
                                     asynchronous: true
                                     smooth: true
@@ -277,13 +277,13 @@ FocusScope {
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
 
-                                width: parent.width - 34
+                                width: parent.width - 30
                                 text: sidebarItem.modelData.label
                                 color: sidebarItem.active
                                     ? Theme.accent
                                     : (sidebarArea.containsMouse ? Theme.text : Theme.textDim)
                                 font.family: Theme.fontFamily
-                                font.pixelSize: 16
+                                font.pixelSize: 14
                                 font.weight: sidebarItem.active ? Font.DemiBold : Font.Medium
                                 elide: Text.ElideRight
                             }

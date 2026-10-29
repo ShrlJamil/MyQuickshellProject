@@ -900,22 +900,22 @@ PanelWindow {
                 }
 
                 ControlTile {
-                    id: ecoTile
+                    id: recordTile
 
                     width: root.gridTileSize
                     height: root.gridTileHeight
 
                     round: true
-                    active: EcoService.ecoMode
-                    label: "Eco Mode"
-                    iconSource: "file://" + Quickshell.shellPath("assets/leaf-svgrepo-com.svg")
+                    active: RecordService.recording
+                    label: "Screen Record"
+                    iconSource: "file://" + Quickshell.shellPath("assets/record.svg")
 
                     MouseArea {
                         anchors.fill: parent
 
                         cursorShape: Qt.PointingHandCursor
 
-                        onClicked: EcoService.toggle()
+                        onClicked: RecordService.toggle()
                     }
                 }
 

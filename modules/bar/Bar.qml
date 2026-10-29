@@ -581,6 +581,19 @@ PanelWindow {
             anchors.rightMargin: 4
         }
 
+        // Recording indicator - only present while RecordService is
+        // recording; collapses to zero width when idle, same as the
+        // caffeine indicator it anchors to.
+        RecordPill {
+            id: recordPill
+
+            anchors {
+                verticalCenter: parent.verticalCenter
+                right: caffeineIndicator.left
+            }
+            anchors.rightMargin: RecordService.recording ? 4 : 0
+        }
+
         // Caffeine indicator - only present while CaffeineService.enabled.
         // Collapses to zero width when off so nothing else in the bar shifts
         // (battery/wifi stay anchored independently). Click toggles.
