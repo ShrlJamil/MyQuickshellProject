@@ -5,6 +5,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
+import "components"
 import "modules/launcher"
 import "modules/controllers"
 import "modules/bar"
