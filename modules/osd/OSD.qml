@@ -166,7 +166,7 @@ PanelWindow {
         radius: height / 2
         color: Qt.rgba(Theme.background.r, Theme.background.g, Theme.background.b, Theme.moduleSurfaceOpacity)
         border.width: 1
-        border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+        border.color: Theme.surfaceHover
 
         // Shared glass highlight (see ControlTile): inset by the 1px border
         // so the peak never paints over the border stroke; radius reduced

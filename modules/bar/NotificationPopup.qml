@@ -228,7 +228,7 @@ PanelWindow {
                     radius: 16
                     color: Qt.rgba(Theme.panelBackground.r, Theme.panelBackground.g, Theme.panelBackground.b, Theme.moduleSurfaceOpacity)
                     border.width: 1
-                    border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+                    border.color: Theme.surfaceHover
 
                     x: (slot.entered && !slot.closing) ? 0 : -(slot.width + 24)
                     opacity: (slot.entered && !slot.closing) ? 1 : 0

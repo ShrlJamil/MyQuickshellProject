@@ -91,7 +91,7 @@ PanelWindow {
         radius: Theme.cornerRadius
         color: Qt.rgba(Theme.panelBackground.r, Theme.panelBackground.g, Theme.panelBackground.b, Theme.moduleSurfaceOpacity)
         border.width: 1
-        border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+        border.color: Theme.surfaceHover
 
         width: 420
         height: 236
