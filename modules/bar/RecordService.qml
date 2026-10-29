@@ -8,7 +8,7 @@ import Quickshell.Io
 // Screen recording for the Control Center's record tile. The tile
 // (and the `record` IPC target) drives wf-recorder directly: fullscreen
 // on the focused output, with the default audio device, saved as an MP4
-// under ~/Videos/screencast/.
+// under ~/Videos/Screencasts/.
 //
 // The recorder is a direct child process on purpose: stopping sends it
 // SIGINT, wf-recorder's "stop and finalize" signal, so the file stays a
@@ -18,7 +18,7 @@ import Quickshell.Io
 Item {
     id: root
 
-    readonly property string recordDir: Quickshell.env("HOME") + "/Videos/screencast"
+    readonly property string recordDir: Quickshell.env("HOME") + "/Videos/Screencasts"
 
     property bool recording: false
     property int elapsedSeconds: 0

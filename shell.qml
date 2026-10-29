@@ -297,7 +297,7 @@ ShellRoot {
         target: "record"
 
         // Screen recording (wf-recorder via RecordService): fullscreen on
-        // the focused output with audio, to ~/Videos/screencast/. The bar
+        // the focused output with audio, to ~/Videos/Screencasts/. The bar
         // pill and the Control Center tile expose the same controls.
         function toggle(): void { RecordService.toggle() }
         function start(): void { RecordService.start() }
