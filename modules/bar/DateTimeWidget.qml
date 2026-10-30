@@ -25,7 +25,7 @@ Item {
         anchors.bottomMargin: 3
         radius: 15
         color: root.centerOpen ? ((tap.pressed || hover.hovered) ? Theme.activeSurfaceHover : Theme.activeSurface)
-            : ((tap.pressed || hover.hovered) ? Theme.surfaceHover : "transparent")
+            : ((tap.pressed || hover.hovered) ? Theme.surfaceHover : (Theme.barSegmented ? Theme.barWidgetSurface : "transparent"))
     }
 
     Row {

@@ -52,7 +52,7 @@ Item {
         anchors.fill: parent
         radius: 15
         color: root.centerOpen ? (clusterTap.pressed || clusterHover.hovered ? Theme.activeSurfaceHover : Theme.activeSurface)
-            : (clusterTap.pressed || clusterHover.hovered ? Theme.surfaceHover : "transparent")
+            : (clusterTap.pressed || clusterHover.hovered ? Theme.surfaceHover : (Theme.barSegmented ? Theme.barWidgetSurface : "transparent"))
     }
 
     Row {

@@ -5,6 +5,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import Quickshell.Hyprland
+import "components"
 import "modules/launcher"
 import "modules/controllers"
 import "modules/bar"
@@ -119,6 +120,53 @@ ShellRoot {
         target: CavaService
         property: "active"
         value: mediaService.playing
+    }
+
+    // User preference -> Theme: the validated border opacity from
+    // PreferencesService (preferences.json) drives Theme's token. Wired
+    // here at the composition root - the CavaService pattern above - so
+    // components/Theme.qml needs no import of the settings module and
+    // no dependency cycle can form; Theme's own 0.06 literal remains
+    // the pre-service fallback and equals the service default.
+    Binding {
+        target: Theme
+        property: "materialBorderOpacity"
+        value: PreferencesService.materialBorderOpacity
+    }
+
+    // Bar background (Settings > Appearance, Stage 2): with bar
+    // transparency off, the effective strip opacity is 0 - exactly the
+    // long-standing look. With it on, the stored background opacity
+    // becomes effective. The ternary lives here, at the single binding
+    // site, so Theme.barSurfaceOpacity stays the one value every bar
+    // background surface reads (strip, concave fills).
+    Binding {
+        target: Theme
+        property: "barSurfaceOpacity"
+        value: PreferencesService.barTransparency ? PreferencesService.barBackgroundOpacity : 0
+    }
+
+    // Bar layout mode (Stage 3): only "float" has a Theme token; the
+    // default and (not yet implemented) segmented modes both read as
+    // not-floating, so Bar.qml needs no mode string of its own.
+    Binding {
+        target: Theme
+        property: "barFloating"
+        value: PreferencesService.barLayoutMode === "float"
+    }
+
+    // Segmented bar (Stage 4): one layoutMode string drives both mode
+    // tokens, so float and segmented can never be active together.
+    Binding {
+        target: Theme
+        property: "barSegmented"
+        value: PreferencesService.barLayoutMode === "segmented"
+    }
+
+    Binding {
+        target: Theme
+        property: "barWidgetOpacity"
+        value: PreferencesService.barWidgetBackgroundOpacity
     }
 
     IpcHandler {
@@ -297,7 +345,7 @@ ShellRoot {
         target: "record"
 
         // Screen recording (wf-recorder via RecordService): fullscreen on
-        // the focused output with audio, to ~/Videos/screencast/. The bar
+        // the focused output with audio, to ~/Videos/Screencasts/. The bar
         // pill and the Control Center tile expose the same controls.
         function toggle(): void { RecordService.toggle() }
         function start(): void { RecordService.start() }

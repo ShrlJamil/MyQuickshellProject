@@ -55,6 +55,10 @@ FocusScope {
     // sidebar writes through to the service.
     readonly property int categoryIndex: SettingsService.categoryIndex
 
+    // Appearance has no SettingsService constant (no IPC target opens
+    // it directly); its position in categories above is fixed at 0.
+    readonly property int appearanceCategory: 0
+
     // First-visit latches for the page Loaders in the detail pane: a
     // page's tree is created the first time its category is selected and
     // kept for the rest of the session (the shell-level Loader destroys
@@ -62,6 +66,7 @@ FocusScope {
     // never pays for pages the user does not visit.
     property bool _displayVisited: false
     property bool _wallpaperVisited: false
+    property bool _appearanceVisited: false
 
     readonly property var activeCategory: root.categories[Math.max(0, Math.min(root.categories.length - 1, root.categoryIndex))]
 
@@ -321,7 +326,7 @@ FocusScope {
             Text {
                 id: detailTitle
 
-                visible: root.categoryIndex !== SettingsService.displayCategory && root.categoryIndex !== SettingsService.wallpaperCategory
+                visible: root.categoryIndex !== SettingsService.displayCategory && root.categoryIndex !== SettingsService.wallpaperCategory && root.categoryIndex !== root.appearanceCategory
 
                 anchors {
                     top: parent.top
@@ -343,7 +348,7 @@ FocusScope {
             Text {
                 id: detailDescription
 
-                visible: root.categoryIndex !== SettingsService.displayCategory && root.categoryIndex !== SettingsService.wallpaperCategory
+                visible: root.categoryIndex !== SettingsService.displayCategory && root.categoryIndex !== SettingsService.wallpaperCategory && root.categoryIndex !== root.appearanceCategory
 
                 anchors {
                     top: detailTitle.bottom
@@ -365,7 +370,7 @@ FocusScope {
             Rectangle {
                 id: divider
 
-                visible: root.categoryIndex !== SettingsService.displayCategory && root.categoryIndex !== SettingsService.wallpaperCategory
+                visible: root.categoryIndex !== SettingsService.displayCategory && root.categoryIndex !== SettingsService.wallpaperCategory && root.categoryIndex !== root.appearanceCategory
 
                 anchors {
                     top: detailDescription.bottom
@@ -383,7 +388,7 @@ FocusScope {
             Rectangle {
                 id: placeholder
 
-                visible: root.categoryIndex !== SettingsService.displayCategory && root.categoryIndex !== SettingsService.wallpaperCategory
+                visible: root.categoryIndex !== SettingsService.displayCategory && root.categoryIndex !== SettingsService.wallpaperCategory && root.categoryIndex !== root.appearanceCategory
 
                 anchors {
                     top: divider.bottom
@@ -538,6 +543,36 @@ FocusScope {
                 WallpaperPage {
                     anchors.fill: parent
                     visible: root.categoryIndex === SettingsService.wallpaperCategory
+
+                    settingsBackground: root.settingsBackground
+                    settingsSurface: root.settingsSurface
+                    settingsSurfaceRaised: root.settingsSurfaceRaised
+                    settingsSurfaceOverlay: root.settingsSurfaceOverlay
+                }
+            }
+
+            // Same arrangement for the Appearance page: a thin view over
+            // PreferencesService with its own headings, so the generic
+            // chrome hides for this category too. Lazy the same way.
+            // No first-creation compensation: the page is pure bindings
+            // to the service and relies on no onVisibleChanged trigger.
+            Loader {
+                id: appearanceLoader
+
+                anchors.fill: parent
+                anchors.margins: 12
+                active: root.categoryIndex === root.appearanceCategory || root._appearanceVisited
+                sourceComponent: appearancePageComponent
+
+                onLoaded: root._appearanceVisited = true
+            }
+
+            Component {
+                id: appearancePageComponent
+
+                AppearancePage {
+                    anchors.fill: parent
+                    visible: root.categoryIndex === root.appearanceCategory
 
                     settingsBackground: root.settingsBackground
                     settingsSurface: root.settingsSurface
