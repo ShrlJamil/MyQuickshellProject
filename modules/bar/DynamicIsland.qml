@@ -316,7 +316,7 @@ PanelWindow {
 
         color: Qt.rgba(Theme.backgroundInset.r, Theme.backgroundInset.g, Theme.backgroundInset.b, Theme.moduleSurfaceOpacity)
         border.width: 1
-        border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+        border.color: "transparent"
 
         // Shared material top light: full-bleed (inset by the 1px border) with
         // the pill's own capsule radius, so it can never paint outside the

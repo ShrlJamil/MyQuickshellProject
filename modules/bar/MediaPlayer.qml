@@ -224,7 +224,7 @@ Item {
                         anchors.fill: parent
                         radius: width / 2
                         color: Theme.backgroundInset
-                        border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+                        border.color: "transparent"
                         border.width: 1
 
                         Repeater {
@@ -236,7 +236,7 @@ Item {
                                 height: width
                                 radius: width / 2
                                 color: "transparent"
-                                border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+                                border.color: "transparent"
                                 border.width: 1
                             }
                         }

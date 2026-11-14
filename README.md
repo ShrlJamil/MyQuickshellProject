@@ -146,7 +146,7 @@ A static **40px** top bar, one instance per monitor (`Variants(Quickshell.screen
 | Dynamic center | `modules/bar/DynamicCenter.qml` | Plain `Item` at `y: 40`, attached under the bar; raises one surface at a time, each behind a latched `Loader` with crossfade |
 | Power menu | `modules/bar/PowerMenuWindow.qml` (host) + `PowerMenu.qml` + `PowerActionItem.qml` | Standalone centred modal over a dimmed background, own focus grab; 6 actions — Lock, Hibernate, Logout, Shutdown, Suspend, Reboot — with hold-to-confirm |
 | Display | `modules/display/DisplayManager.qml` | Monitor-arrangement page in the Settings window (backed by `DisplayService`) |
-| Wallpapers | `modules/wallpapers/WallpaperService.qml` + `WallpaperPage.qml` | Settings page: single collection grid + import, backed by the shared service (stepwise awww + wallust + matugen apply, persistent history) |
+| Wallpapers | `modules/wallpapers/WallpaperService.qml` + `WallpaperPage.qml` | Settings page: single collection grid + import, backed by the shared service (stepwise awww + wallust apply, persistent history) |
 | Control Center | `modules/bar/ControlCenter.qml` + `ControlSlider.qml` / `ControlTile.qml` | Separate top-right overlay window: audio, brightness, network, bluetooth and quick toggles (audio over native PipeWire, no `wpctl`) |
 | Clock/date | `modules/bar/DateTimeWidget.qml` | Clock + calendar popover |
 | Battery | `modules/bar/BatteryWidget.qml` + `BatteryService.qml` | UPower-backed indicator + popover |
@@ -258,7 +258,7 @@ Just run `wallust` against a wallpaper as usual — the whole shell picks the ne
 - Per-file imports (each QML file declares its own `QtQuick` / `Quickshell` needs).
 - QML "modules" are plain directories imported by relative path — every `.qml` in `modules/launcher/` or `modules/bar/` becomes a type (`Launcher`, `Bar`, `PowerMenu`, ...). No `qmldir`, no manifest. `components/` is imported the same way for `Theme`.
 - Explanatory comments live with the tricky code (layer-shell sizing, focus grabs, MPRIS quirks) — read them before touching those paths.
-- One non-QtQuick QML dependency: `Qt5Compat.GraphicalEffects` (`ColorOverlay`, for white-tinting icons) — package `qt6-5compat`. Plus external tools the shell shells out to: `cava`, `brightnessctl`, `nmcli`/`ip`, `fd`, `cliphist`, `wallust`/`matugen` (wallpaper flow).
+- One non-QtQuick QML dependency: `Qt5Compat.GraphicalEffects` (`ColorOverlay`, for white-tinting icons) — package `qt6-5compat`. Plus external tools the shell shells out to: `cava`, `brightnessctl`, `nmcli`/`ip`, `fd`, `cliphist`, `wallust` (wallpaper flow), `gsettings` + `kvantummanager` (Dark Mode system bridge via `scripts/theme-mode.sh`: GTK and Kvantum layers, both theme-agnostic, each skipped when absent).
 
 ---
 

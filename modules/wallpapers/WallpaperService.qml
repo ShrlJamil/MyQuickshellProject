@@ -3,6 +3,7 @@ pragma Singleton
 import QtQuick
 import Quickshell
 import Quickshell.Io
+import "../settings"
 
 // The wallpaper core behind the Settings Wallpaper page - the single
 // owner of all wallpaper logic (the DynamicCenter carousel that used to
@@ -536,10 +537,28 @@ Item {
                 root._stepAwww()
             } else {
                 root._imageApplied = true
-                wallustProc.command = ["wallust", "run", root._applyImg, "--skip-sequences"]
+                wallustProc.command = root._wallustCommand(root._applyImg)
                 wallustProc.running = true
             }
         }
+    }
+
+    // Wallust invocation for a wallpaper at the CURRENT appearance
+    // mode. The palette generator (kmeans) ignores the style flag,
+    // but templates branch on {{style}} for their light assignments,
+    // so the flag is what carries the mode into every output file.
+    function _wallustCommand(path) {
+        return ["wallust", "run", path, "--skip-sequences", "-S", PreferencesService.darkMode ? "dark" : "light"]
+    }
+
+    // Re-run ONLY the color generation for the active wallpaper at
+    // the current mode - used when the appearance mode flips without
+    // a wallpaper change (shell.qml wires darkModeChanged to this).
+    function retheme() {
+        if (!root.activePath || rethemeProc.running || wallustProc.running)
+            return
+        rethemeProc.command = root._wallustCommand(root.activePath)
+        rethemeProc.running = true
     }
 
     // Step 4: wallust.
@@ -553,28 +572,25 @@ Item {
                 root._failApply("wallust", root._errLine(wallustErr))
                 return
             }
-            matugenProc.command = ["matugen", "-t", "scheme-tonal-spot", "--contrast", "0.4",
-                "--prefer", "saturation", "image", root._applyImg, "--source-color-index", "0"]
-            matugenProc.running = true
-        }
-    }
-
-    // Step 5: matugen.
-    Process {
-        id: matugenProc
-
-        stderr: StdioCollector { id: matugenErr; waitForEnd: true }
-
-        onExited: (code) => {
-            if (code !== 0) {
-                root._failApply("matugen", root._errLine(matugenErr))
-                return
-            }
             lockMkdirProc.running = true
         }
     }
 
-    // Step 6: hyprlock copy (folder first, then the copy itself).
+    // Mode-flip re-theme: the same wallust step as the apply
+    // pipeline, standalone. Failure only logs - it must not poison
+    // the apply state.
+    Process {
+        id: rethemeProc
+
+        stderr: StdioCollector { id: rethemeErr; waitForEnd: true }
+
+        onExited: (code) => {
+            if (code !== 0)
+                console.warn("[WallpaperService] retheme failed:", root._errLine(rethemeErr))
+        }
+    }
+
+    // Step 5: hyprlock copy (folder first, then the copy itself).
     Process {
         id: lockMkdirProc
 
@@ -605,7 +621,7 @@ Item {
         }
     }
 
-    // Step 7: success notification - only reached when every required
+    // Step 6: success notification - only reached when every required
     // step passed. Its own failure is non-fatal (the apply is real).
     Process {
         id: notifyProc

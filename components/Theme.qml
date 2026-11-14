@@ -53,6 +53,15 @@ Item {
     property color _palTextDim: "#a6adc8"
     property color _palTextMuted: "#888888"
 
+    // ---- Appearance mode -------------------------------------------------
+    // true = the dark shell (the design this file shipped with);
+    // false = the light shell. shell.qml binds this to
+    // PreferencesService.darkMode. In light mode the base lightness
+    // flips to a light register and _tone/_panelTone compress their
+    // offsets around it (see below), so every derived token follows
+    // while the Wallust hue/saturation seeds stay untouched.
+    property bool darkMode: true
+
     // ---- Tonal recipe (THE tuning knobs) ----------------------------------
     // Seed hue: the accent's hue; fall back to the background's, then to a
     // calm blue. Achromatic colours report hue -1 and are skipped.
@@ -68,7 +77,11 @@ Item {
     // register - raised in Tahap 2 ([0.09, 0.15]) so surfaces have room
     // to actually show the seed's colour instead of collapsing to black,
     // while a bright-ish palette still cannot lift the whole shell.
-    readonly property real _baseL: Math.max(0.09, Math.min(0.15, root._palBackground.hslLightness))
+    readonly property real _baseLDark: Math.max(0.09, Math.min(0.15, root._palBackground.hslLightness))
+    // Light register: the mirror clamp - a light base the palette can
+    // only nudge, never drag into mid-tones.
+    readonly property real _baseLLight: Math.max(0.86, Math.min(0.90, 1 - root._palBackground.hslLightness))
+    readonly property real _baseL: root.darkMode ? root._baseLDark : root._baseLLight
     // Container (ON-state) chroma: over half the seed's, capped muted.
     readonly property real _containerSat: Math.max(0.10, Math.min(0.38, root._seedSat * 0.55))
     // Text chroma: a quieter slice of the neutral saturation - text
@@ -83,7 +96,11 @@ Item {
         : Math.max(0.40, Math.min(0.85, root._seedSat * 0.9))
 
     function _tone(lightness) {
-        return Qt.hsla(root._seedHue, root._neutralSat, lightness, 1)
+        // Light mode compresses the offset from the base by 0.55, so
+        // the ladder (authored around a 0.12 base) stays
+        // differentiated under a 0.88 base instead of clamping white.
+        const l = root.darkMode ? lightness : root._baseL + (lightness - root._baseL) * 0.55
+        return Qt.hsla(root._seedHue, root._neutralSat, l, 1)
     }
 
     // ---- Semantic surface tokens (derived) --------------------------------
@@ -96,8 +113,10 @@ Item {
     // quieter saturation (x0.85), so idle tiles sit just under the panel
     // - part of its family, slightly recessed, never separate dark
     // blocks.
-    property color backgroundSunken: Qt.hsla(root._panelHue, root._panelSat * 0.85, root._baseL + 0.095, 1)
-    property color backgroundInset: root._tone(root._baseL * 0.58)
+    // (Light mode: +0.037 is the compressed panel step, 0.130 x 0.55,
+    // minus the same 0.035, so the tiles still sit just under it.)
+    property color backgroundSunken: Qt.hsla(root._panelHue, root._panelSat * 0.85, root._baseL + (root.darkMode ? 0.095 : 0.037), 1)
+    property color backgroundInset: root.darkMode ? root._tone(root._baseL * 0.58) : root._tone(root._baseL - 0.05)
 
     // Control Center panel family: the CC surfaces get their own hue and
     // saturation so the panel reads as the wallpaper's family in a calm
@@ -122,7 +141,8 @@ Item {
         return (hDeg + shift) / 360
     }
     function _panelTone(lightness) {
-        return Qt.hsla(root._panelHue, root._panelSat, lightness, 1)
+        const l = root.darkMode ? lightness : root._baseL + (lightness - root._baseL) * 0.55
+        return Qt.hsla(root._panelHue, root._panelSat, l, 1)
     }
 
     // The CC panel is the family's lightness anchor at base + 0.13 - a
@@ -145,9 +165,9 @@ Item {
     // ON-state tile fill: the seed's muted container tone, anchored
     // RELATIVE to the base tone (+0.17) so its jump from the surrounding
     // surfaces is the same for every wallpaper.
-    property color activeTile: Qt.hsla(root._seedHue, root._containerSat, root._baseL + 0.17, 1)
+    property color activeTile: Qt.hsla(root._seedHue, root._containerSat, root.darkMode ? root._baseL + 0.17 : root._baseL - 0.085, 1)
     // Its hover: the same container one tone step up.
-    property color activeTileHover: Qt.hsla(root._seedHue, root._containerSat, root._baseL + 0.21, 1)
+    property color activeTileHover: Qt.hsla(root._seedHue, root._containerSat, root.darkMode ? root._baseL + 0.21 : root._baseL - 0.115, 1)
 
     // Light ACTIVE scheme (Control Center): an active control is a LIGHT
     // seed surface with DARK seed foreground - the inverse polarity of
@@ -170,10 +190,10 @@ Item {
     // holds for every wallpaper.
     property color accent: root._palAccent
 
-    property color surfaceHover: Qt.rgba(1, 1, 1, 0.05)
-    property color text: Qt.hsla(root._seedHue, root._textSat, 0.92, 1)
-    property color textDim: Qt.hsla(root._seedHue, root._textSat, 0.74, 1)
-    property color textMuted: Qt.hsla(root._seedHue, root._textSat, 0.66, 1)
+    property color surfaceHover: root.darkMode ? Qt.rgba(1, 1, 1, 0.05) : Qt.rgba(0, 0, 0, 0.05)
+    property color text: Qt.hsla(root._seedHue, root._textSat, root.darkMode ? 0.92 : 0.13, 1)
+    property color textDim: Qt.hsla(root._seedHue, root._textSat, root.darkMode ? 0.74 : 0.30, 1)
+    property color textMuted: Qt.hsla(root._seedHue, root._textSat, root.darkMode ? 0.66 : 0.42, 1)
 
     // Raw wallust palette, mirrored 1:1 and UNFILTERED (color0-15 +
     // cursor). Reserved for future use: nothing consumes these yet; they
@@ -233,17 +253,12 @@ Item {
     // toward white, so icons are a white that clearly carries the
     // wallpaper's own colour family instead of a milky generic white
     // (Material You's on-surface idea). Still reads as "white" anywhere.
-    property color icon: root.tint(root._palAccent, 0.65)
+    property color icon: root.darkMode ? root.tint(root._palAccent, 0.65) : Qt.hsla(root._seedHue, Math.min(root._activeSat, 0.6), 0.30, 1)
 
     // Material prototype (static bar only): ultra-subtle directional top
     // highlight + bottom edge key over the blurred backdrop. Neutral white at
     // single-digit opacities.
     property real materialHighlightOpacity: 0
-    // User-adjustable (Settings > Appearance): shell.qml binds this token
-    // to PreferencesService.materialBorderOpacity (preferences.json). The
-    // literal here is only the fallback before that binding lands and
-    // matches the service default - do not tune the value here.
-    property real materialBorderOpacity: 0.06
 
     // Slight raised shadow under bar text (Text.Raised styleColor): dark at
     // moderate alpha, just enough to separate light text from bright
@@ -252,11 +267,14 @@ Item {
     property color textShadow: Qt.rgba(0, 0, 0, 0.6)
 
     // UI text typeface (`font.family: Theme.fontFamily` on Text elements).
-    // "Inter" must be installed on the system (it is not bundled in this
+    // User-selectable in Settings > Appearance > Typography: shell.qml
+    // binds this token to PreferencesService.fontFamily, and "Inter" is
+    // both the built-in value here and that service's default. The
+    // family must be installed on the system (it is not bundled in this
     // repo); if it is missing, Qt silently falls back to another sans.
     // NEVER apply this to icon glyphs (symbol strings, media-control glyphs)
     // - those keep their own family / system fallback so the symbols resolve.
-    readonly property string fontFamily: "Inter"
+    property string fontFamily: "Inter"
 
     readonly property real cornerRadius: 22
 

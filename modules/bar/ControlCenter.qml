@@ -11,6 +11,7 @@ import "../../components"
 import "../capture"
 import "../display"
 import "../services"
+import "../settings"
 
 PanelWindow {
     id: root
@@ -33,29 +34,6 @@ PanelWindow {
     property bool wifiPanelOpen: false
     property bool bluetoothPanelOpen: false
 
-    // Airplane mode: the tile reads
-    // ACTIVE when both radios are off - derived, so it stays in sync
-    // with the hero toggles. Switching on snapshots the radio states
-    // and turns both off; switching off restores the snapshot.
-    property bool _pilotWifi: true
-    property bool _pilotBt: false
-    readonly property bool airplaneActive: !wifiService.enabled && !bluetoothService.enabled
-
-    function toggleAirplane() {
-        if (root.airplaneActive) {
-            if (root._pilotWifi && !wifiService.enabled)
-                wifiService.toggle()
-            if (root._pilotBt && !bluetoothService.enabled)
-                bluetoothService.togglePower()
-        } else {
-            root._pilotWifi = wifiService.enabled
-            root._pilotBt = bluetoothService.enabled
-            if (wifiService.enabled)
-                wifiService.toggle()
-            if (bluetoothService.enabled)
-                bluetoothService.togglePower()
-        }
-    }
     property bool audioOutputPanelOpen: false
 
     visible: root.open || root.closing
@@ -90,13 +68,15 @@ PanelWindow {
     readonly property real colGap: 12
     readonly property real rowGap: 12
     readonly property real panelPadding: 14
-    readonly property real heroHeight: 68
     readonly property real gridTileSize: 215
     readonly property real gridTileHeight: 68
-    readonly property real sliderHeight: 48
+    readonly property real sliderHeight: 84
     readonly property real headerHeight: 30
-    readonly property real tilesHeight: root.heroHeight + 5 + root.gridTileHeight * 4 + 15
-    readonly property real contentHeight: root.headerHeight + root.rowGap + root.tilesHeight + root.rowGap + root.sliderHeight + root.rowGap + root.sliderHeight + root.panelPadding * 2
+    readonly property real topBlockHeight: root.gridTileHeight * 2 + 5
+    readonly property real quickTileSize: (root.gridTileSize * 2 + 5 - 3 * 5) / 4
+    readonly property real quickTileHeight: 80
+    readonly property real gridHeight: root.quickTileHeight * 2 + 5
+    readonly property real contentHeight: root.headerHeight + root.rowGap + root.topBlockHeight + root.rowGap + root.sliderHeight + root.rowGap + root.sliderHeight + root.rowGap + root.gridHeight + root.panelPadding * 2
 
     implicitWidth: root.colWidth * 2 + root.colGap
     implicitHeight: root.contentHeight
@@ -271,6 +251,10 @@ PanelWindow {
 
     NightLightService {
         id: nightLightService
+    }
+
+    ZoomService {
+        id: zoomService
     }
 
     Item {
@@ -469,6 +453,10 @@ PanelWindow {
             }
         }
 
+        // Quick actions, reference layout: four squares under the
+        // sliders. Snip reuses the deferred CaptureBar mechanism,
+        // Power mirrors the header button exactly.
+
         Column {
             id: columns
 
@@ -482,30 +470,242 @@ PanelWindow {
             anchors.rightMargin: root.panelPadding
             anchors.topMargin: root.rowGap
 
-            height: root.tilesHeight
+            height: root.gridHeight
 
             spacing: 5
 
-            Row {
+
+            Grid {
                 anchors.horizontalCenter: parent.horizontalCenter
 
+                columns: 4
                 spacing: 5
+
+
+
+                ControlTile {
+                    id: caffeineTile
+
+                    width: root.quickTileSize
+                    height: root.quickTileHeight
+
+                    round: false
+                    compact: true
+                    active: CaffeineService.enabled
+                    label: "Caffeine"
+                    iconSource: "file://" + Quickshell.shellPath("assets/coffee-svgrepo-com.svg")
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: CaffeineService.toggle()
+                    }
+                }
+
+                ControlTile {
+                    id: mirrorTile
+
+                    width: root.quickTileSize
+                    height: root.quickTileHeight
+
+                    round: false
+                    compact: true
+                    active: DisplayService.mirrorActive
+                    label: "Mirror Screen"
+                    iconSource: "file://" + Quickshell.shellPath("assets/display-mode.svg")
+                    opacity: DisplayService.canMirror ? 1 : 0.4
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        enabled: DisplayService.canMirror
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: DisplayService.toggleMirror()
+                    }
+                }
+
+                ControlTile {
+                    id: recordTile
+
+                    width: root.quickTileSize
+                    height: root.quickTileHeight
+
+                    round: false
+                    compact: true
+                    active: RecordService.recording
+                    label: "Screen Record"
+                    iconSource: "file://" + Quickshell.shellPath("assets/record.svg")
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: RecordService.toggle()
+                    }
+                }
+
+                ControlTile {
+                    id: nightLightTile
+
+                    width: root.quickTileSize
+                    height: root.quickTileHeight
+
+                    round: false
+                    compact: true
+                    active: nightLightService.active
+                    label: "Night Light"
+                    iconSource: "file://" + Quickshell.shellPath("assets/moon-svgrepo-com.svg")
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: nightLightService.toggle()
+                    }
+                }
+
+                ControlTile {
+                    id: colorPickerTile
+
+                    width: root.quickTileSize
+                    height: root.quickTileHeight
+
+                    round: false
+                    compact: true
+                    label: "Color Picker"
+                    iconSource: "file://" + Quickshell.shellPath("assets/picker-svgrepo-com.svg")
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: {
+                            root.pendingColorPick = true
+                            root.close()
+                        }
+                    }
+                }
+
+                ControlTile {
+                    id: audioOutputTile
+
+                    width: root.quickTileSize
+                    height: root.quickTileHeight
+
+                    round: false
+                    compact: true
+                    active: root.audioOutputPanelOpen
+                    label: "Output"
+                    iconSource: "file://" + Quickshell.shellPath("assets/media-output.svg")
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: root.audioOutputPanelOpen = true
+                    }
+                }
+
+                ControlTile {
+                    id: zoomTile
+
+                    width: root.quickTileSize
+                    height: root.quickTileHeight
+
+                    round: false
+                    compact: true
+                    active: zoomService.active
+                    label: "Zoom"
+                    iconSource: "file://" + Quickshell.shellPath("assets/zoom-out-svgrepo-com.svg")
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: zoomService.toggle()
+                    }
+                }
+            }
+        }
+
+        // Top block, reference layout: connectivity stacked on the
+        // left (Wi-Fi over Bluetooth, the old hero row restacked),
+        // Dark Mode (a placeholder for now - the theme is still
+        // Wallust-driven, there is no manual light/dark switch
+        // behind it yet) and Focus on the right.
+        Row {
+            id: topBlock
+
+            anchors {
+                left: parent.left
+                right: parent.right
+                top: header.bottom
+            }
+
+            anchors.leftMargin: root.panelPadding
+            anchors.rightMargin: root.panelPadding
+            anchors.topMargin: root.rowGap
+
+            height: root.topBlockHeight
+            spacing: 5
+
+
+            Rectangle {
+                id: networkCard
+
+                width: root.gridTileSize
+                height: root.topBlockHeight
+                radius: 26
+                color: {
+                    const c = Theme.backgroundSunken
+                    return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
+                }
+
+                // Glass highlight, the tiles' recipe at the card radius.
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 26
+                    gradient: Gradient {
+                        GradientStop {
+                            position: 0
+                            color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                        }
+                        GradientStop {
+                            position: 0.4
+                            color: "transparent"
+                        }
+                        GradientStop {
+                            position: 1
+                            color: "transparent"
+                        }
+                    }
+                }
+
+                Column {
+                    anchors.fill: parent
+                    anchors.margins: 5
+                    spacing: 5
 
                 Rectangle {
                     id: wifiTile
 
                     readonly property bool wifiOn: wifiService.enabled
 
-                    width: 215
-                    height: 68
+                    width: parent.width
+                    height: 63
 
                     // Full pill. The outer capsule ALWAYS stays dark - only the
                     // inner wifiActiveCircle reflects the on/off state.
-                    radius: height / 2
-                    color: {
-                        const c = wifiHover.hovered ? Theme.panelSurface : Theme.backgroundSunken
-                        return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
-                    }
+                    radius: 18
+                    color: wifiHover.hovered ? Qt.rgba(Theme.panelSurface.r, Theme.panelSurface.g, Theme.panelSurface.b, Theme.moduleSurfaceOpacity) : "transparent"
 
                     HoverHandler {
                         id: wifiHover
@@ -517,6 +717,7 @@ PanelWindow {
                     // rect with the tile's own pill radius; falloff by stops.
                     Rectangle {
                         anchors.fill: parent
+                        visible: false
                         radius: height / 2
                         gradient: Gradient {
                             GradientStop {
@@ -604,7 +805,7 @@ PanelWindow {
                         Column {
                             anchors.verticalCenter: parent.verticalCenter
 
-                            width: 126
+                            width: 116
 
                             spacing: 2
 
@@ -634,6 +835,7 @@ PanelWindow {
                                 font.pixelSize: 11
                             }
                         }
+
                     }
 
                     MouseArea {
@@ -655,7 +857,6 @@ PanelWindow {
                         onClicked: root.wifiPanelOpen = true
                     }
                 }
-
                 Rectangle {
                     id: bluetoothTile
 
@@ -668,13 +869,10 @@ PanelWindow {
                         return "On"
                     }
 
-                    width: 215
-                    height: 68
-                    radius: height / 2
-                    color: {
-                        const c = btHover.hovered ? Theme.panelSurface : Theme.backgroundSunken
-                        return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
-                    }
+                    width: parent.width
+                    height: 63
+                    radius: 18
+                    color: btHover.hovered ? Qt.rgba(Theme.panelSurface.r, Theme.panelSurface.g, Theme.panelSurface.b, Theme.moduleSurfaceOpacity) : "transparent"
 
                     HoverHandler {
                         id: btHover
@@ -684,6 +882,7 @@ PanelWindow {
 
                     Rectangle {
                         anchors.fill: parent
+                        visible: false
                         radius: height / 2
                         gradient: Gradient {
                             GradientStop {
@@ -809,178 +1008,235 @@ PanelWindow {
                         onClicked: root.bluetoothPanelOpen = true
                     }
                 }
+                }
             }
 
-            Grid {
-                anchors.horizontalCenter: parent.horizontalCenter
-
-                columns: 2
+            Column {
                 spacing: 5
 
-                ControlTile {
-                    id: airplaneTile
+
+            }
+            Column {
+                spacing: 5
+
+                Rectangle {
+                    id: darkModeCard
+                    color: {
+                        const c = darkModeHover.hovered ? Theme.panelSurface : Theme.backgroundSunken
+                        return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
+                    }
+
+                    HoverHandler {
+                        id: darkModeHover
+
+                        cursorShape: Qt.PointingHandCursor
+                    }
 
                     width: root.gridTileSize
                     height: root.gridTileHeight
+                    radius: 24
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 24
+                        gradient: Gradient {
+                            GradientStop {
+                                position: 0
+                                color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                            }
+                            GradientStop {
+                                position: 0.4
+                                color: "transparent"
+                            }
+                            GradientStop {
+                                position: 1
+                                color: "transparent"
+                            }
+                        }
+                    }
 
-                    round: true
-                    active: root.airplaneActive
-                    label: "Airplane"
-                    iconSource: "file://" + Quickshell.shellPath("assets/flight-svgrepo-com.svg")
+                    Row {
+                        anchors {
+                            left: parent.left
+                            right: parent.right
+                            verticalCenter: parent.verticalCenter
+                        }
 
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 16
+                        spacing: 12
+
+                        Item {
+                            width: 46
+                            height: 46
+
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: 23
+                                color: PreferencesService.darkMode ? Theme.activeSurface : Theme.surfaceHover
+                            }
+
+                            Image {
+                                id: darkModeIcon
+
+                                anchors.centerIn: parent
+                                width: 24
+                                height: 24
+                                source: "file://" + Quickshell.shellPath("assets/dark-mode-svgrepo-com.svg")
+                                sourceSize.width: 48
+                                sourceSize.height: 48
+                                fillMode: Image.PreserveAspectFit
+                                asynchronous: true
+                                smooth: true
+                                visible: false
+                            }
+
+                            ColorOverlay {
+                                anchors.fill: darkModeIcon
+                                source: darkModeIcon
+                                visible: darkModeIcon.status === Image.Ready
+                                color: PreferencesService.darkMode ? Theme.onActiveSurface : Theme.icon
+                            }
+                        }
+
+                        Column {
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 2
+
+                            Text {
+                                text: "Dark Mode"
+                                color: Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 13
+                                font.weight: Font.DemiBold
+                            }
+
+                            Text {
+                                text: PreferencesService.darkMode ? "On" : "Off"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                            }
+                        }
+                    }
                     MouseArea {
                         anchors.fill: parent
 
                         cursorShape: Qt.PointingHandCursor
-
-                        onClicked: root.toggleAirplane()
+                        onClicked: PreferencesService.setDarkMode(!PreferencesService.darkMode)
                     }
+
                 }
 
-                ControlTile {
-                    id: focusTile
+                Rectangle {
+                    id: focusCard
+                    color: {
+                        const c = focusHover.hovered ? Theme.panelSurface : Theme.backgroundSunken
+                        return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
+                    }
+
+                    HoverHandler {
+                        id: focusHover
+
+                        cursorShape: Qt.PointingHandCursor
+                    }
 
                     width: root.gridTileSize
                     height: root.gridTileHeight
+                    radius: 24
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: 24
+                        gradient: Gradient {
+                            GradientStop {
+                                position: 0
+                                color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                            }
+                            GradientStop {
+                                position: 0.4
+                                color: "transparent"
+                            }
+                            GradientStop {
+                                position: 1
+                                color: "transparent"
+                            }
+                        }
+                    }
 
-                    round: true
-                    active: NotificationService.doNotDisturb
-                    label: "Focus"
-                    iconSource: "file://" + Quickshell.shellPath("assets/bell-off-svgrepo-com.svg")
+                    Row {
+                        anchors {
+                            left: parent.left
+                            right: parent.right
+                            verticalCenter: parent.verticalCenter
+                        }
+
+                        anchors.leftMargin: 12
+                        anchors.rightMargin: 16
+                        spacing: 12
+
+                        Item {
+                            width: 46
+                            height: 46
+
+                            Rectangle {
+                                anchors.fill: parent
+                                radius: 23
+                                color: NotificationService.doNotDisturb ? Theme.activeSurface : Theme.surfaceHover
+                            }
+
+                            Image {
+                                id: focusIcon
+
+                                anchors.centerIn: parent
+                                width: 24
+                                height: 24
+                                source: "file://" + Quickshell.shellPath("assets/bell-off-svgrepo-com.svg")
+                                sourceSize.width: 48
+                                sourceSize.height: 48
+                                fillMode: Image.PreserveAspectFit
+                                asynchronous: true
+                                smooth: true
+                                visible: false
+                            }
+
+                            ColorOverlay {
+                                anchors.fill: focusIcon
+                                source: focusIcon
+                                visible: focusIcon.status === Image.Ready
+                                color: NotificationService.doNotDisturb ? Theme.onActiveSurface : Theme.icon
+                            }
+                        }
+
+                        Column {
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 2
+
+                            Text {
+                                text: "Focus"
+                                color: Theme.text
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 13
+                                font.weight: Font.DemiBold
+                            }
+
+                            Text {
+                                text: NotificationService.doNotDisturb ? "On" : "Off"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                            }
+                        }
+                    }
 
                     MouseArea {
                         anchors.fill: parent
 
                         cursorShape: Qt.PointingHandCursor
-
                         onClicked: NotificationService.toggleDnd()
                     }
                 }
 
-                ControlTile {
-                    id: caffeineTile
-
-                    width: root.gridTileSize
-                    height: root.gridTileHeight
-
-                    round: true
-                    active: CaffeineService.enabled
-                    label: "Caffeine"
-                    iconSource: "file://" + Quickshell.shellPath("assets/coffee-svgrepo-com.svg")
-
-                    MouseArea {
-                        anchors.fill: parent
-
-                        cursorShape: Qt.PointingHandCursor
-
-                        onClicked: CaffeineService.toggle()
-                    }
-                }
-
-                ControlTile {
-                    id: mirrorTile
-
-                    width: root.gridTileSize
-                    height: root.gridTileHeight
-
-                    round: true
-                    active: DisplayService.mirrorActive
-                    label: "Mirror Screen"
-                    iconSource: "file://" + Quickshell.shellPath("assets/display-mode.svg")
-                    opacity: DisplayService.canMirror ? 1 : 0.4
-
-                    MouseArea {
-                        anchors.fill: parent
-
-                        enabled: DisplayService.canMirror
-                        cursorShape: Qt.PointingHandCursor
-
-                        onClicked: DisplayService.toggleMirror()
-                    }
-                }
-
-                ControlTile {
-                    id: recordTile
-
-                    width: root.gridTileSize
-                    height: root.gridTileHeight
-
-                    round: true
-                    active: RecordService.recording
-                    label: "Screen Record"
-                    iconSource: "file://" + Quickshell.shellPath("assets/record.svg")
-
-                    MouseArea {
-                        anchors.fill: parent
-
-                        cursorShape: Qt.PointingHandCursor
-
-                        onClicked: RecordService.toggle()
-                    }
-                }
-
-                ControlTile {
-                    id: nightLightTile
-
-                    width: root.gridTileSize
-                    height: root.gridTileHeight
-
-                    round: true
-                    active: nightLightService.active
-                    label: "Night Light"
-                    iconSource: "file://" + Quickshell.shellPath("assets/moon-svgrepo-com.svg")
-
-                    MouseArea {
-                        anchors.fill: parent
-
-                        cursorShape: Qt.PointingHandCursor
-
-                        onClicked: nightLightService.toggle()
-                    }
-                }
-
-                ControlTile {
-                    id: colorPickerTile
-
-                    width: root.gridTileSize
-                    height: root.gridTileHeight
-
-                    round: true
-                    label: "Color Picker"
-                    iconSource: "file://" + Quickshell.shellPath("assets/picker-svgrepo-com.svg")
-
-                    MouseArea {
-                        anchors.fill: parent
-
-                        cursorShape: Qt.PointingHandCursor
-
-                        onClicked: {
-                            root.pendingColorPick = true
-                            root.close()
-                        }
-                    }
-                }
-
-                ControlTile {
-                    id: audioOutputTile
-
-                    width: root.gridTileSize
-                    height: root.gridTileHeight
-
-                    round: true
-                    active: root.audioOutputPanelOpen
-                    label: "Output"
-                    iconSource: "file://" + Quickshell.shellPath("assets/media-output.svg")
-
-                    MouseArea {
-                        anchors.fill: parent
-
-                        cursorShape: Qt.PointingHandCursor
-
-                        onClicked: root.audioOutputPanelOpen = true
-                    }
-                }
             }
+
         }
 
     Rectangle {
@@ -989,7 +1245,7 @@ PanelWindow {
             anchors {
                 left: parent.left
                 right: parent.right
-                top: header.bottom
+                top: topBlock.bottom
             }
 
             anchors.topMargin: root.rowGap
@@ -998,8 +1254,8 @@ PanelWindow {
 
             height: root.sliderHeight
 
-            // Rounded rectangle (radius 13), no longer a full pill.
-            radius: 13
+            // Rounded rectangle (radius 24), no longer a full pill.
+            radius: 24
             color: {
                 const c = displayHover.hovered ? Theme.panelSurface : Theme.backgroundSunken
                 return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
@@ -1015,7 +1271,7 @@ PanelWindow {
             // with the tile's own pill radius; falloff shaped by stops.
             Rectangle {
                 anchors.fill: parent
-                radius: 13
+                radius: 24
                 gradient: Gradient {
                     GradientStop {
                         position: 0
@@ -1034,6 +1290,7 @@ PanelWindow {
 
 
             ControlSlider {
+                label: "Brightness"
                 anchors {
                     left: parent.left
                     right: parent.right
@@ -1079,8 +1336,8 @@ PanelWindow {
 
             height: root.sliderHeight
 
-            // Rounded rectangle (radius 13), no longer a full pill.
-            radius: 13
+            // Rounded rectangle (radius 24), no longer a full pill.
+            radius: 24
             color: {
                 const c = soundHover.hovered ? Theme.panelSurface : Theme.backgroundSunken
                 return Qt.rgba(c.r, c.g, c.b, Theme.moduleSurfaceOpacity)
@@ -1096,7 +1353,7 @@ PanelWindow {
             // with the tile's own pill radius; falloff shaped by stops.
             Rectangle {
                 anchors.fill: parent
-                radius: 13
+                radius: 24
                 gradient: Gradient {
                     GradientStop {
                         position: 0
@@ -1115,6 +1372,7 @@ PanelWindow {
 
 
             ControlSlider {
+                label: "Sound"
                 anchors {
                     left: parent.left
                     right: parent.right
