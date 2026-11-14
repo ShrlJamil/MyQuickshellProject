@@ -114,7 +114,7 @@ PanelWindow {
             radius: 18
             color: Theme.background
             border.width: 1
-            border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+            border.color: "transparent"
 
             layer.enabled: true
             layer.effect: DropShadow {

@@ -3,6 +3,10 @@ import Qt5Compat.GraphicalEffects
 import Quickshell.Widgets
 import "../../components"
 
+// Slider card content, reference form: a header row (icon + label on
+// the left, the value text on the right) over a thick pill slider.
+// The caller (a ControlCenter tile) provides the card surface; this
+// item only draws the header and the slider on top of it.
 Item {
     id: root
 
@@ -30,182 +34,208 @@ Item {
         ? Math.max(0, Math.min(1, (root._shown - root.from) / (root.to - root.from)))
         : 0
 
-    // Which side of the fill edge the icon / value label sit on, from
-    // their actual geometry: the fill's right edge is fillClip.width,
-    // and an element counts as on the (light) fill once that edge passes
-    // the element's centre - so its foreground must flip dark there.
-    readonly property bool _iconOnFill: fillClip.width >= root.edgeInset + 14
-    readonly property bool _labelOnFill: fillClip.width >= valueLabel.x + valueLabel.width - valueLabel.contentWidth / 2
+    implicitHeight: 84
 
-    implicitHeight: 48
-
-    // Horizontal inset for the icon / value label inside the row body.
+    // Horizontal inset for the header and the slider inside the card.
     property real edgeInset: 16
 
-    // Progress: fills the row's full height, drawn directly on the
-    // section background from ControlCenter, which serves as the track
-    // (its idle/hover tones show through wherever the progress has not
-    // reached). The left end keeps a 10px radius; the right end is
-    // clipped SQUARE. Width derives from the knob position, holding a
-    // constant 4px gap between the progress end and the knob.
-    Item {
-        id: fillClip
-
+    Column {
         anchors {
             left: parent.left
-            top: parent.top
-            bottom: parent.bottom
+            right: parent.right
+            verticalCenter: parent.verticalCenter
         }
 
-        width: Math.max(0, knob.x - 4)
-        clip: true
+        anchors.leftMargin: root.edgeInset
+        anchors.rightMargin: root.edgeInset
+        spacing: 10
 
-        Rectangle {
-            anchors {
-                left: parent.left
-                top: parent.top
-                bottom: parent.bottom
+        // Header: icon (clickable - the sound card mutes through it)
+        // and label on the left, the value text on the right.
+        Item {
+            width: parent.width
+            height: 20
+
+            Row {
+                anchors {
+                    left: parent.left
+                    verticalCenter: parent.verticalCenter
+                }
+
+                spacing: 8
+
+                Item {
+                    width: 20
+                    height: 20
+                    visible: root.iconSource !== ""
+
+                    IconImage {
+                        anchors.centerIn: parent
+
+                        width: 18
+                        height: 18
+
+                        source: root._localIcon ? "" : root.iconSource
+                        asynchronous: true
+                        visible: !root._localIcon
+                    }
+
+                    Image {
+                        id: headerSvg
+
+                        anchors.centerIn: parent
+
+                        width: 18
+                        height: 18
+
+                        source: root._localIcon ? root.iconSource : ""
+                        sourceSize.width: 36
+                        sourceSize.height: 36
+                        fillMode: Image.PreserveAspectFit
+                        asynchronous: true
+                        smooth: true
+                        visible: false
+                    }
+
+                    ColorOverlay {
+                        anchors.fill: headerSvg
+                        source: headerSvg
+                        visible: root._localIcon && headerSvg.status === Image.Ready
+                        color: root.iconColor
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.iconActivated()
+                    }
+                }
+
+                Text {
+                    anchors.verticalCenter: parent.verticalCenter
+
+                    text: root.label
+                    color: Theme.text
+                    font.pixelSize: 13
+                    font.family: Theme.fontFamily
+                    font.weight: Font.DemiBold
+                }
             }
 
-            width: fillClip.width + 10
-            radius: 10
-            color: Theme.activeSurface
-        }
-    }
+            Text {
+                anchors {
+                    right: parent.right
+                    verticalCenter: parent.verticalCenter
+                }
 
-    // Whole-row drag/click surface. Declared before the icon slot so the
-    // icon's own MouseArea (mute etc.) still wins inside its slot; every
-    // other point of the row, including both ends, slides.
-    MouseArea {
-        id: dragArea
-
-        anchors.fill: parent
-
-        cursorShape: Qt.PointingHandCursor
-
-        onPressed: (mouse) => {
-            root._active = true
-            root._apply(mouse.x)
+                text: root.rightText
+                color: Theme.textMuted
+                font.pixelSize: 12
+                font.family: Theme.fontFamily
+                font.weight: Font.DemiBold
+            }
         }
 
-        onPositionChanged: (mouse) => {
-            if (dragArea.pressed) root._apply(mouse.x)
+        // The pill slider: track, accent fill, and the slim thumb
+        // at the fill's edge. Dragging or clicking anywhere on the
+        // row sets the value; the wheel steps it.
+        Item {
+            id: sliderRow
+
+            width: parent.width
+            height: 26
+
+            Rectangle {
+                anchors {
+                    left: parent.left
+                    right: parent.right
+                    verticalCenter: parent.verticalCenter
+                }
+
+                height: 26
+                radius: 13
+                color: Theme.panelSurface
+            }
+
+            // Accent fill: the left end keeps the track's radius,
+            // the right end is clipped SQUARE where the thumb stands
+            // (the pre-layout styling) - the inner rect runs one
+            // radius past the clip, so its rounded right end is cut.
+            Item {
+                anchors {
+                    left: parent.left
+                    top: parent.top
+                    bottom: parent.bottom
+                }
+
+                // Ends 4px before the thumb, the pre-layout gap.
+                width: Math.max(0, knob.x - 4)
+                clip: true
+
+                Rectangle {
+                    anchors {
+                        left: parent.left
+                        verticalCenter: parent.verticalCenter
+                    }
+
+                    width: parent.width + 13
+                    height: 26
+                    radius: 13
+                    color: Theme.activeSurface
+                }
+            }
+
+            // Slim vertical thumb, the pre-layout design: a thin
+            // rounded bar taller than the track (32 vs 26), so it
+            // protrudes ~3px above and below the pill; no ancestor
+            // clips, so the protrusion renders.
+            Rectangle {
+                id: knob
+
+                anchors.verticalCenter: parent.verticalCenter
+
+                width: 5
+                height: 32
+                radius: 2.5
+                color: Theme.activeSurface
+
+                x: Math.max(2, Math.min(parent.width - width - 2, parent.width * root.clampedFraction - width / 2))
+            }
+
+            MouseArea {
+                id: dragArea
+
+                anchors.fill: parent
+
+                cursorShape: Qt.PointingHandCursor
+
+                onPressed: (mouse) => {
+                    root._active = true
+                    root._apply(mouse.x)
+                }
+
+                onPositionChanged: (mouse) => {
+                    if (dragArea.pressed) root._apply(mouse.x)
+                }
+
+                onReleased: root._active = false
+                onCanceled: root._active = false
+
+                onWheel: (wheel) => {
+                    const step = wheel.angleDelta.y > 0 ? 5 : -5
+                    const nv = Math.max(root.from, Math.min(root.to, root.value + step))
+                    root.moved(Math.round(nv))
+                }
+            }
         }
-
-        onReleased: root._active = false
-        onCanceled: root._active = false
-
-        onWheel: (wheel) => {
-            const step = wheel.angleDelta.y > 0 ? 5 : -5
-            const nv = Math.max(root.from, Math.min(root.to, root.value + step))
-            root.moved(Math.round(nv))
-        }
-    }
-
-    Item {
-        id: iconSlot
-
-        anchors {
-            left: parent.left
-            leftMargin: root.edgeInset
-            verticalCenter: parent.verticalCenter
-        }
-
-        width: 28
-        height: 28
-
-        // theme icon (already coloured)
-        IconImage {
-            anchors.centerIn: parent
-
-            width: 22
-            height: 22
-
-            source: root._localIcon ? "" : root.iconSource
-            asynchronous: true
-            visible: !root._localIcon && root.iconSource !== ""
-        }
-
-        // custom solid-#000 SVG, tinted to iconColor
-        Image {
-            id: sliderSvg
-
-            anchors.centerIn: parent
-
-            width: 22
-            height: 22
-
-            source: root._localIcon ? root.iconSource : ""
-            sourceSize.width: 44
-            sourceSize.height: 44
-            fillMode: Image.PreserveAspectFit
-            asynchronous: true
-            smooth: true
-            mipmap: true
-            visible: false
-        }
-
-        ColorOverlay {
-            anchors.fill: sliderSvg
-            source: sliderSvg
-            visible: root._localIcon && sliderSvg.status === Image.Ready
-            // On the light fill the glyph flips dark; a caller-dimmed
-            // glyph (muted volume) flips to the DIM dark instead, so
-            // the muted distinction survives on both surfaces.
-            color: root._iconOnFill
-                ? (root.iconColor === Theme.textMuted ? Theme.onActiveSurfaceDim : Theme.onActiveSurface)
-                : root.iconColor
-        }
-
-        MouseArea {
-            anchors.fill: parent
-
-            cursorShape: Qt.PointingHandCursor
-
-            onClicked: root.iconActivated()
-        }
-    }
-
-    Text {
-        id: valueLabel
-
-        anchors {
-            right: parent.right
-            rightMargin: root.edgeInset
-            verticalCenter: parent.verticalCenter
-        }
-
-        width: 46
-        horizontalAlignment: Text.AlignRight
-
-        visible: root.rightText !== ""
-        text: root.rightText
-        color: root._labelOnFill ? Theme.onActiveSurfaceDim : Theme.textMuted
-        font.pixelSize: 11
-        font.family: Theme.fontFamily
-        font.weight: Font.DemiBold
-    }
-
-    // Slim VERTICAL thumb: a thin rounded bar, taller than the full-
-    // height progress (54 vs 48), so it protrudes ~3px above and below
-    // the row; no ancestor clips, so the protrusion renders. Centred on
-    // the value position and clamped inside the row at both extremes.
-    Rectangle {
-        id: knob
-
-        anchors.verticalCenter: parent.verticalCenter
-
-        width: 5
-        height: 54
-        radius: 2.5
-        color: Theme.activeSurface
-
-        x: Math.max(4, Math.min(root.width - width - 4, root.width * root.clampedFraction - width / 2))
     }
 
     function _apply(px) {
-        const f = root.width > 0 ? Math.max(0, Math.min(1, px / root.width)) : 0
+        const w = sliderRow.width
+        const f = w > 0 ? Math.max(0, Math.min(1, px / w)) : 0
         root._pending = root.from + f * (root.to - root.from)
         root.moved(Math.round(root._pending))
     }
 }
+

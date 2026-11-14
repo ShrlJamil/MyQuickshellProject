@@ -35,7 +35,7 @@ Item {
             // background. The selected tile needs none - its light fill
             // is the signal.
             border.width: hover.hovered && !root.selected ? 1 : 0
-            border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+            border.color: "transparent"
         }
 
         Column {

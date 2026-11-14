@@ -4,86 +4,28 @@ import Qt5Compat.GraphicalEffects
 import "../../components"
 
 // The Settings Wallpaper page. A thin view over WallpaperService,
-// which owns the collection, the selection, the active wallpaper and
-// the apply history. Applying never closes Settings: the pipeline runs
-// inside the service and this page just reflects its status.
+// which owns the collection, the active wallpaper and the apply
+// history. The page is deliberately light on text - no search, no
+// file names, no status prose - but fully interactive: the active
+// wallpaper large at the top, then the whole collection under it as
+// a scrolling thumbnail grid, loaded from the wallpaper files. There is
+// no selection state and no Apply step: clicking any thumbnail
+// applies it immediately (the service queues latest-wins while
+// busy), and an imported image applies as soon as its import lands,
+// so nothing here can sit in a "not applied yet" state.
 Item {
     id: root
 
     // Local Settings surface tokens, set by the host (SettingsView) so this
     // page stays monochrome-dark regardless of the global Wallust palette.
     // Text, accent and hover tokens keep following the global theme.
-    property color settingsBackground: "#0A0A0A"
-    property color settingsSurface: "#141414"
-    property color settingsSurfaceRaised: "#1E1E1E"
-    property color settingsSurfaceOverlay: "#2A2A2A"
+    property color settingsBackground: Theme.darkMode ? "#0A0A0A" : Theme.background
+    property color settingsSurface: Theme.darkMode ? "#141414" : Theme.surface
+    property color settingsSurfaceRaised: Theme.darkMode ? "#1E1E1E" : Theme.surfaceRaised
+    property color settingsSurfaceOverlay: Theme.darkMode ? "#2A2A2A" : Theme.surfaceOverlay
 
-    onVisibleChanged: if (root.visible) {
+    onVisibleChanged: if (root.visible)
         WallpaperService.reload()
-        root.rebuildFilter()
-        grid.forceActiveFocus()
-    }
-
-    Component.onCompleted: root.rebuildFilter()
-
-    // The grid's view of the collection: a page-local filter over the
-    // service model. Searching rebuilds this list only - the service's
-    // own model (and the files on disk) are never touched, the selection
-    // is path-based in the service and survives filtering untouched.
-    ListModel {
-        id: filteredModel
-    }
-
-    function rebuildFilter() {
-        const src = WallpaperService.wallpapers
-        const q = searchInput.text.trim().toLowerCase()
-        filteredModel.clear()
-        for (let i = 0; i < src.count; i++) {
-            const e = src.get(i)
-            if (q === "" || e.fileName.toLowerCase().indexOf(q) >= 0)
-                filteredModel.append({ fileUrl: e.fileUrl, filePath: e.filePath, fileName: e.fileName })
-        }
-        root.syncIndexToSelection()
-    }
-
-    // The selected collection entry, looked up in the SERVICE model (not
-    // the filtered one) so the preview can keep showing the selection
-    // even while a search query filters it out of the grid.
-    readonly property var selectedInfo: {
-        const src = WallpaperService.wallpapers
-        for (let i = 0; i < src.count; i++) {
-            const e = src.get(i)
-            if (e.filePath === WallpaperService.selectedPath)
-                return e
-        }
-        return null
-    }
-
-    // True while the grid's currentIndex is being aligned TO the service
-    // selection (page open, rescan): keyboard/mouse navigation drives the
-    // selection, never the other way around.
-    property bool _syncingIndex: false
-
-    function syncIndexToSelection() {
-        for (let i = 0; i < filteredModel.count; i++) {
-            if (filteredModel.get(i).filePath === WallpaperService.selectedPath) {
-                root._syncingIndex = true
-                grid.currentIndex = i
-                root._syncingIndex = false
-                return
-            }
-        }
-        // Selection not in the model (yet): just release the guard the
-        // count change set, so navigation is never left silently dead.
-        root._syncingIndex = false
-    }
-
-    // Shared by Enter and double-click: the service guards the rest
-    // (unknown path, busy queueing), exactly as for the Apply button.
-    function applyPath(path) {
-        if (path)
-            WallpaperService.apply(path)
-    }
 
     component PageButton: Rectangle {
         id: btn
@@ -99,7 +41,7 @@ Item {
         opacity: btn.disabled ? 0.45 : 1
         color: btn.accent ? Theme.accent : (btnHover.hovered && !btn.disabled ? Theme.surfaceHover : Qt.rgba(1, 1, 1, 0.03))
         border.width: 1
-        border.color: btn.accent ? "transparent" : Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+        border.color: "transparent"
 
         Text {
             id: btnLabel
@@ -129,10 +71,8 @@ Item {
         anchors {
             top: parent.top
             left: parent.left
-            right: parent.right
             topMargin: 10
             leftMargin: 10
-            rightMargin: 10
         }
 
         text: "Wallpaper"
@@ -140,6 +80,18 @@ Item {
         font.family: Theme.fontFamily
         font.pixelSize: 18
         font.weight: Font.DemiBold
+    }
+
+    PageButton {
+        anchors {
+            right: parent.right
+            verticalCenter: pageTitle.verticalCenter
+            rightMargin: 10
+        }
+
+        label: "Browse…"
+        disabled: WallpaperService.busy
+        onActivated: importDialog.open()
     }
 
     Rectangle {
@@ -155,359 +107,119 @@ Item {
         }
 
         height: 1
-        color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+        color: "transparent"
     }
 
-    // ---- toolbar: search ------------------------------------------------------------
+    // ---- the active wallpaper, large ------------------------------------------
     Rectangle {
-        id: searchBox
+        id: bigPreview
 
         anchors {
             top: divider.bottom
-            left: parent.left
-            right: clearSearchButton.left
+            horizontalCenter: parent.horizontalCenter
             topMargin: 12
-            leftMargin: 10
-            rightMargin: clearSearchButton.visible ? 8 : 0
         }
 
-        height: 30
-        radius: 8
-        color: settingsSurface
-        border.width: 1
-        border.color: searchInput.activeFocus ? Qt.rgba(1, 1, 1, 0.28) : Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
-
-        TextInput {
-            id: searchInput
-
-            anchors {
-                fill: parent
-                leftMargin: 10
-                rightMargin: 10
-            }
-
-            color: Theme.text
-            font.family: Theme.fontFamily
-            font.pixelSize: 12
-            verticalAlignment: TextInput.AlignVCenter
-            clip: true
-            selectionColor: Theme.accent
-            selectedTextColor: settingsBackground
-
-            onTextChanged: root.rebuildFilter()
-            // Enter means the same thing here as on the grid: apply.
-            onAccepted: root.applyPath(WallpaperService.selectedPath)
-        }
-
-        Text {
-            anchors {
-                left: parent.left
-                verticalCenter: parent.verticalCenter
-                leftMargin: 10
-            }
-
-            visible: searchInput.text === ""
-            text: "Search wallpapers…"
-            color: Theme.textMuted
-            font.family: Theme.fontFamily
-            font.pixelSize: 12
-        }
-    }
-
-    PageButton {
-        id: clearSearchButton
-
-        anchors {
-            top: searchBox.top
-            right: parent.right
-            rightMargin: 10
-        }
-
-        visible: searchInput.text !== ""
-        label: "Clear"
-        onActivated: {
-            searchInput.text = ""
-            grid.forceActiveFocus()
-        }
-    }
-
-    // ---- preview of the current selection --------------------------------------------
-    Rectangle {
-        id: previewStrip
-
-        anchors {
-            top: searchBox.bottom
-            left: parent.left
-            right: parent.right
-            topMargin: 10
-            leftMargin: 10
-            rightMargin: 10
-        }
-
-        // Height follows the preview frame (plus padding), so enlarging
-        // the preview never eats a fixed extra slice beyond its own size.
-        height: previewFrame.height + 20
+        // 16:9, as large as the page allows while reserving room for
+        // at least a slice of the collection grid below: the fixed
+        // reservations total about 170 (gaps and a minimum grid
+        // viewport).
+        width: Math.max(240, Math.min(root.width - 20, 720, (root.height - 170) * 16 / 9))
+        height: Math.round(width * 9 / 16)
         radius: 10
-        color: settingsSurface
+        color: settingsSurfaceRaised
 
-        Rectangle {
-            id: previewFrame
+        Image {
+            id: bigImage
 
-            anchors {
-                left: parent.left
-                verticalCenter: parent.verticalCenter
-                leftMargin: 10
-            }
+            anchors.fill: parent
+            source: WallpaperService.activePath ? WallpaperService.urlForPath(WallpaperService.activePath) : ""
+            sourceSize.width: 1280
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
 
-            // Responsive 16:9: half the strip, clamped to [224, 320].
-            // At the standard 880-wide window (strip ~596) that lands at
-            // ~298x168 - near the 320x180 target, while a hard 320 would
-            // push the grid under one visible row at 560 window height.
-            width: Math.min(320, Math.max(224, previewStrip.width * 0.5))
-            height: Math.round(width * 9 / 16)
-            radius: 7
-            color: settingsSurfaceRaised
-
-            Image {
-                id: previewImage
-
-                anchors.fill: parent
-                source: root.selectedInfo ? root.selectedInfo.fileUrl : ""
-                sourceSize.width: 640
-                fillMode: Image.PreserveAspectCrop
-                asynchronous: true
-
-                layer.enabled: previewImage.status === Image.Ready
-                layer.smooth: true
-                layer.effect: OpacityMask {
-                    maskSource: Rectangle {
-                        width: previewImage.width
-                        height: previewImage.height
-                        radius: 7
-                    }
-                }
-            }
-
-            Text {
-                anchors.centerIn: parent
-                width: parent.width - 12
-                visible: !root.selectedInfo || previewImage.status === Image.Error
-                text: previewImage.status === Image.Error ? "Preview unavailable" : "No selection"
-                color: Theme.textMuted
-                font.family: Theme.fontFamily
-                font.pixelSize: 10
-                horizontalAlignment: Text.AlignHCenter
-                wrapMode: Text.WordWrap
-            }
-        }
-
-        Column {
-            anchors {
-                left: previewFrame.right
-                right: parent.right
-                verticalCenter: parent.verticalCenter
-                leftMargin: 14
-                rightMargin: 12
-            }
-
-            spacing: 4
-
-            Text {
-                width: parent.width
-                text: root.selectedInfo ? root.selectedInfo.fileName : "No wallpaper selected"
-                color: Theme.text
-                font.family: Theme.fontFamily
-                font.pixelSize: 13
-                font.weight: Font.DemiBold
-                elide: Text.ElideRight
-            }
-
-            Text {
-                visible: root.selectedInfo !== null && previewImage.status === Image.Ready
-                text: previewImage.implicitWidth + " × " + previewImage.implicitHeight
-                color: Theme.textDim
-                font.family: Theme.fontFamily
-                font.pixelSize: 11
-            }
-
-            Row {
-                spacing: 7
-
-                Rectangle {
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 7
-                    height: 7
-                    radius: 3.5
-                    color: !root.selectedInfo ? "transparent"
-                         : WallpaperService.selectedPath === WallpaperService.activePath ? Theme.accent
-                         : Theme.textMuted
-                }
-
-                Text {
-                    text: !root.selectedInfo ? "Select a wallpaper from the collection below."
-                        : WallpaperService.selectedPath === WallpaperService.activePath ? "Currently applied"
-                        : "Selected — not applied yet"
-                    color: Theme.textDim
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 11
+            // Rounded via layer OpacityMask - the codebase's proven
+            // pattern (Item.clip does not round an Image).
+            layer.enabled: bigImage.status === Image.Ready
+            layer.smooth: true
+            layer.effect: OpacityMask {
+                maskSource: Rectangle {
+                    width: bigImage.width
+                    height: bigImage.height
+                    radius: 10
                 }
             }
         }
     }
 
-    // ---- collection ----------------------------------------------------------------
+    // ---- the collection ---------------------------------------------------------
     GridView {
         id: grid
 
         anchors {
-            top: previewStrip.bottom
+            top: bigPreview.bottom
             left: parent.left
             right: parent.right
-            bottom: footerDivider.top
-            topMargin: 10
+            bottom: parent.bottom
+            topMargin: 12
             leftMargin: 4
             rightMargin: 4
-            bottomMargin: 8
+            bottomMargin: 6
         }
 
         clip: true
-        model: filteredModel
+        model: WallpaperService.wallpapers
         cellWidth: Math.floor(grid.width / Math.max(2, Math.floor(grid.width / 250)))
-        cellHeight: Math.round((grid.cellWidth - 12) * 0.5625) + 34
-
-        // Keyboard: arrows move the current item (the view scrolls it into
-        // view itself) and the selection follows; Enter applies. Focus is
-        // taken when the page shows and when a cell is clicked.
-        focus: true
-        keyNavigationEnabled: true
-
-        onCurrentIndexChanged: {
-            if (!root._syncingIndex && grid.currentItem)
-                WallpaperService.select(grid.currentItem.filePath)
-        }
-
-        // A rescan rebuilds the model under the view: index changes from
-        // that are the model settling, not navigation - ignore them, the
-        // scanFinished hook re-aligns the index to the selection.
-        onCountChanged: root._syncingIndex = true
-
-        Keys.onReturnPressed: root.applyPath(WallpaperService.selectedPath)
-        Keys.onEnterPressed: root.applyPath(WallpaperService.selectedPath)
+        cellHeight: Math.round((grid.cellWidth - 12) * 0.5625) + 12
 
         delegate: Item {
             id: cell
 
-            required property int index
             required property string filePath
-            required property string fileName
             required property url fileUrl
 
-            readonly property bool isSelected: cell.filePath === WallpaperService.selectedPath
             readonly property bool isActive: cell.filePath === WallpaperService.activePath
 
             width: grid.cellWidth
             height: grid.cellHeight
 
             Rectangle {
-                id: card
-
                 anchors.fill: parent
                 anchors.margins: 6
                 radius: 10
                 color: cellHover.hovered ? Theme.surfaceHover : "transparent"
-                border.width: cell.isSelected ? 2 : 1
-                border.color: cell.isSelected ? Theme.accent : Qt.rgba(1, 1, 1, 0.04)
+                border.width: cell.isActive ? 2 : 1
+                border.color: cell.isActive ? Theme.accent : Qt.rgba(1, 1, 1, 0.04)
 
                 Image {
-                    id: thumb
+                    id: cellThumb
 
-                    anchors {
-                        top: parent.top
-                        left: parent.left
-                        right: parent.right
-                        topMargin: 4
-                        leftMargin: 4
-                        rightMargin: 4
-                    }
-
-                    height: parent.height - 30
+                    anchors.fill: parent
+                    anchors.margins: 4
                     source: cell.fileUrl
                     sourceSize.width: 512
                     fillMode: Image.PreserveAspectCrop
                     asynchronous: true
                     cache: true
 
-                    // Rounded via layer OpacityMask - the codebase's
-                    // proven pattern (Item.clip does not round an Image).
-                    layer.enabled: thumb.status === Image.Ready
+                    layer.enabled: cellThumb.status === Image.Ready
                     layer.smooth: true
                     layer.effect: OpacityMask {
                         maskSource: Rectangle {
-                            width: thumb.width
-                            height: thumb.height
+                            width: cellThumb.width
+                            height: cellThumb.height
                             radius: 7
                         }
                     }
                 }
 
-                // Load-failure fallback: the card (and its name below)
-                // stays fully selectable; only the picture is missing.
+                // Load-failure fallback: the cell stays clickable, only
+                // the picture is missing.
                 Rectangle {
-                    visible: thumb.status === Image.Error
-                    anchors.fill: thumb
+                    visible: cellThumb.status === Image.Error
+                    anchors.fill: cellThumb
                     radius: 7
                     color: settingsSurfaceRaised
-
-                    Text {
-                        anchors.centerIn: parent
-                        text: "Image unavailable"
-                        color: Theme.textMuted
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 10
-                    }
-                }
-
-                Rectangle {
-                    visible: cell.isActive
-                    anchors {
-                        top: thumb.top
-                        left: thumb.left
-                        topMargin: 5
-                        leftMargin: 5
-                    }
-                    width: gridActiveText.implicitWidth + 8
-                    height: 14
-                    radius: 4
-                    color: Theme.accent
-
-                    Text {
-                        id: gridActiveText
-
-                        anchors.centerIn: parent
-                        text: "ACTIVE"
-                        color: settingsBackground
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 8
-                        font.weight: Font.Bold
-                    }
-                }
-
-                Text {
-                    anchors {
-                        top: thumb.bottom
-                        left: parent.left
-                        right: parent.right
-                        topMargin: 5
-                        leftMargin: 6
-                        rightMargin: 6
-                    }
-
-                    text: cell.fileName
-                    color: cell.isSelected ? Theme.text : Theme.textDim
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 10
-                    horizontalAlignment: Text.AlignHCenter
-                    elide: Text.ElideMiddle
                 }
 
                 HoverHandler {
@@ -515,212 +227,33 @@ Item {
                     cursorShape: Qt.PointingHandCursor
                 }
                 TapHandler {
-                    onTapped: {
-                        grid.forceActiveFocus()
-                        grid.currentIndex = cell.index
-                        WallpaperService.select(cell.filePath)
-                    }
-                    onDoubleTapped: root.applyPath(cell.filePath)
+                    onTapped: if (!cell.isActive)
+                        WallpaperService.apply(cell.filePath)
                 }
             }
         }
     }
 
-    // ---- footer (pinned; only the grid scrolls) --------------------------------------
-    Rectangle {
-        id: footerDivider
-
-        anchors {
-            bottom: footer.top
-            left: parent.left
-            right: parent.right
-            bottomMargin: 10
-            leftMargin: 10
-            rightMargin: 10
-        }
-
-        height: 1
-        color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
-    }
-
-    Item {
-        id: footer
-
-        anchors {
-            left: parent.left
-            right: parent.right
-            bottom: parent.bottom
-            leftMargin: 10
-            rightMargin: 10
-            bottomMargin: 10
-        }
-
-        height: 30
-
-        Text {
-            id: statusText
-
-            anchors {
-                left: parent.left
-                right: footerButtons.left
-                verticalCenter: parent.verticalCenter
-                rightMargin: 12
-            }
-
-            text: WallpaperService.statusMessage
-            color: WallpaperService.status === "error" ? Theme.accent : Theme.textMuted
-            font.family: Theme.fontFamily
-            font.pixelSize: 11
-            elide: Text.ElideRight
-        }
-
-        Row {
-            id: footerButtons
-
-            anchors {
-                right: parent.right
-                verticalCenter: parent.verticalCenter
-            }
-
-            spacing: 8
-
-            PageButton {
-                label: "Browse…"
-                disabled: WallpaperService.busy
-                onActivated: importDialog.open()
-            }
-
-            PageButton {
-                label: WallpaperService.status === "applying" ? "Applying…" : "Apply"
-                accent: true
-                // Nothing to apply when the selection already IS the
-                // applied wallpaper - the same dirty-check the Display
-                // page's Apply uses. Enter / double-click stay live
-                // commands regardless (see applyPath).
-                disabled: WallpaperService.busy || !WallpaperService.selectedPath
-                    || WallpaperService.selectedPath === WallpaperService.activePath
-                onActivated: WallpaperService.apply(WallpaperService.selectedPath)
-            }
-        }
-    }
-
-    // ---- empty states ---------------------------------------------------------------
-    Column {
+    // ---- empty collection ---------------------------------------------------------
+    Text {
         visible: WallpaperService.wallpapers.count === 0
 
         anchors.centerIn: grid
-        width: Math.min(360, root.width - 48)
-        spacing: 8
-
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: parent.width
-            text: "No wallpapers yet"
-            color: Theme.textMuted
-            font.family: Theme.fontFamily
-            font.pixelSize: 13
-            font.weight: Font.DemiBold
-            horizontalAlignment: Text.AlignHCenter
-        }
-
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: parent.width
-            text: "Your collection in ~/Pictures/Wallpapers is empty. Use Browse… below to add an image."
-            color: Qt.rgba(Theme.textMuted.r, Theme.textMuted.g, Theme.textMuted.b, 0.7)
-            font.family: Theme.fontFamily
-            font.pixelSize: 11
-            horizontalAlignment: Text.AlignHCenter
-            wrapMode: Text.WordWrap
-        }
+        text: "No wallpapers yet"
+        color: Theme.textMuted
+        font.family: Theme.fontFamily
+        font.pixelSize: 13
+        font.weight: Font.DemiBold
     }
 
-    Column {
-        visible: WallpaperService.wallpapers.count > 0 && filteredModel.count === 0
-
-        anchors.centerIn: grid
-        width: Math.min(360, root.width - 48)
-        spacing: 8
-
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: parent.width
-            text: "No matches for \"" + searchInput.text.trim() + "\""
-            color: Theme.textMuted
-            font.family: Theme.fontFamily
-            font.pixelSize: 13
-            font.weight: Font.DemiBold
-            horizontalAlignment: Text.AlignHCenter
-            elide: Text.ElideRight
-        }
-
-        Text {
-            anchors.horizontalCenter: parent.horizontalCenter
-            width: parent.width
-            text: "No wallpaper name contains that text. Clear the search to see the whole collection."
-            color: Qt.rgba(Theme.textMuted.r, Theme.textMuted.g, Theme.textMuted.b, 0.7)
-            font.family: Theme.fontFamily
-            font.pixelSize: 11
-            horizontalAlignment: Text.AlignHCenter
-            wrapMode: Text.WordWrap
-        }
-    }
-
-    // ---- import success flash -------------------------------------------------------
-    // A small pill that fades in over the top of the grid when an import
-    // lands in the collection, then fades out on its own. Purely a
-    // confirmation note - the footer status line keeps the details.
-    Rectangle {
-        id: importFlash
-
-        anchors {
-            top: grid.top
-            horizontalCenter: parent.horizontalCenter
-            topMargin: 10
-        }
-
-        width: flashText.implicitWidth + 28
-        height: 30
-        radius: height / 2
-        color: settingsSurfaceOverlay
-        opacity: 0
-        visible: opacity > 0
-
-        Behavior on opacity {
-            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
-        }
-
-        Text {
-            id: flashText
-
-            anchors.centerIn: parent
-            text: "Image saved to ~/Pictures/Wallpapers"
-            color: Theme.text
-            font.family: Theme.fontFamily
-            font.pixelSize: 12
-            font.weight: Font.DemiBold
-        }
-
-        Timer {
-            id: flashTimer
-
-            interval: 2600
-            onTriggered: importFlash.opacity = 0
-        }
-    }
-
+    // An import applies straight away: the imported image becomes the
+    // active wallpaper as soon as it lands in the collection.
     Connections {
         target: WallpaperService
 
-        function onScanFinished() {
-            root.rebuildFilter()
-        }
-
         function onImportFinished(success, path) {
-            if (!success)
-                return
-            importFlash.opacity = 1
-            flashTimer.restart()
+            if (success && path)
+                WallpaperService.apply(path)
         }
     }
 
@@ -730,12 +263,6 @@ Item {
         title: "Import Wallpaper"
         nameFilters: ["Images (*.jpg *.jpeg *.png *.webp)"]
 
-        // Cancellation needs no handling: no state changes until a file
-        // is actually accepted here. QtQuick.Dialogs has no closed
-        // signal - focus returns to the grid off the visible change,
-        // which covers accept and cancel alike.
         onAccepted: WallpaperService.importFile(WallpaperService.pathFromUrl(selectedFile))
-        onVisibleChanged: if (!importDialog.visible)
-            grid.forceActiveFocus()
     }
 }

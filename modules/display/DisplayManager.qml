@@ -22,10 +22,10 @@ Item {
     // Local Settings surface tokens, set by the host (SettingsView) so this
     // page stays monochrome-dark regardless of the global Wallust palette.
     // Text, accent and hover tokens keep following the global theme.
-    property color settingsBackground: "#0A0A0A"
-    property color settingsSurface: "#141414"
-    property color settingsSurfaceRaised: "#1E1E1E"
-    property color settingsSurfaceOverlay: "#2A2A2A"
+    property color settingsBackground: Theme.darkMode ? "#0A0A0A" : Theme.background
+    property color settingsSurface: Theme.darkMode ? "#141414" : Theme.surface
+    property color settingsSurfaceRaised: Theme.darkMode ? "#1E1E1E" : Theme.surfaceRaised
+    property color settingsSurfaceOverlay: Theme.darkMode ? "#2A2A2A" : Theme.surfaceOverlay
 
     readonly property var selectedInfo: DisplayService.layout[DisplayService.selectedMonitor]
 
@@ -287,7 +287,7 @@ Item {
         }
 
         height: 1
-        color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+        color: "transparent"
     }
 
     Flickable {
@@ -331,7 +331,7 @@ Item {
                 radius: 14
                 color: settingsSurface
                 border.width: 1
-                border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+                border.color: "transparent"
 
                 Text {
                     anchors {
@@ -601,7 +601,7 @@ Item {
                 radius: 14
                 color: settingsSurface
                 border.width: 1
-                border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+                border.color: "transparent"
                 visible: root.selectedInfo !== undefined
 
                 Column {
@@ -778,7 +778,7 @@ Item {
                     Rectangle {
                         width: parent.width
                         height: 1
-                        color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+                        color: "transparent"
                     }
 
                     Item {
@@ -909,7 +909,7 @@ Item {
                     Rectangle {
                         width: parent.width
                         height: 1
-                        color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+                        color: "transparent"
                     }
 
                     Item {
@@ -968,7 +968,7 @@ Item {
                     Rectangle {
                         width: parent.width
                         height: 1
-                        color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+                        color: "transparent"
                     }
 
                     Item {
@@ -1139,7 +1139,7 @@ Item {
                 right: parent.right
             }
             height: 1
-            color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+            color: "transparent"
         }
 
         Text {

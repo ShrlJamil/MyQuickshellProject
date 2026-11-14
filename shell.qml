@@ -13,6 +13,7 @@ import "modules/capture"
 import "modules/display"
 import "modules/services"
 import "modules/settings"
+import "modules/wallpapers"
 import "modules/osd"
 
 ShellRoot {
@@ -122,28 +123,44 @@ ShellRoot {
         value: mediaService.playing
     }
 
-    // User preference -> Theme: the validated border opacity from
-    // PreferencesService (preferences.json) drives Theme's token. Wired
-    // here at the composition root - the CavaService pattern above - so
-    // components/Theme.qml needs no import of the settings module and
-    // no dependency cycle can form; Theme's own 0.06 literal remains
-    // the pre-service fallback and equals the service default.
-    Binding {
-        target: Theme
-        property: "materialBorderOpacity"
-        value: PreferencesService.materialBorderOpacity
-    }
-
     // Bar background (Settings > Appearance, Stage 2): with bar
-    // transparency off, the effective strip opacity is 0 - exactly the
-    // long-standing look. With it on, the stored background opacity
-    // becomes effective. The ternary lives here, at the single binding
-    // site, so Theme.barSurfaceOpacity stays the one value every bar
+    // transparency off, the strip is solid (effective opacity 1).
+    // With it on, the stored background opacity becomes effective.
+    // The ternary lives here, at the single binding site, so
+    // Theme.barSurfaceOpacity stays the one value every bar
     // background surface reads (strip, concave fills).
     Binding {
         target: Theme
         property: "barSurfaceOpacity"
-        value: PreferencesService.barTransparency ? PreferencesService.barBackgroundOpacity : 0
+        value: PreferencesService.barTransparency ? PreferencesService.barBackgroundOpacity : 1
+    }
+
+    // UI typeface (Settings > Appearance > Typography): the stored
+    // family drives the one Theme token every text element reads, so
+    // picking a font in Settings re-renders the whole shell at once.
+    Binding {
+        target: Theme
+        property: "fontFamily"
+        value: PreferencesService.fontFamily
+    }
+
+    // Appearance mode: Theme.darkMode follows the stored preference;
+    // every derived Theme token flips between the dark and light
+    // shells from this one flag.
+    Binding {
+        target: Theme
+        property: "darkMode"
+        value: PreferencesService.darkMode
+    }
+
+    // A mode flip also re-runs the wallpaper color generation at
+    // the new mode (wallust {{style}}-branched templates), so the
+    // terminal, launcher and prompt colors follow the shell mode.
+    Connections {
+        target: PreferencesService
+        function onDarkModeChanged() {
+            WallpaperService.retheme()
+        }
     }
 
     // Bar layout mode (Stage 3): only "float" has a Theme token; the
@@ -534,3 +551,7 @@ ShellRoot {
 
     ScreenshotPreview {}
 }
+
+
+
+

@@ -1,22 +1,22 @@
 import QtQuick
+import Qt5Compat.GraphicalEffects
 import "../../components"
 
 // The Settings Appearance page: a thin view over PreferencesService,
-// which owns validation and persistence (preferences.json). Two
-// sections: Surface (material border opacity) and Bar Appearance
-// (layout mode, background transparency and opacity, segmented widget
-// background opacity). Every control reads and writes the service
-// directly - no local state - and values reach the shell live through
-// the shell.qml bindings into Theme.
+// which owns validation and persistence (preferences.json). One
+// section: Bar Appearance (layout mode, background transparency and
+// opacity, segmented widget background opacity). Every control reads
+// and writes the service directly - no local state - and values reach
+// the shell live through the shell.qml bindings into Theme.
 Item {
     id: root
 
     // Local Settings surface tokens, set by the host (SettingsView) so
     // this page stays monochrome-dark regardless of the global palette.
-    property color settingsBackground: "#0A0A0A"
-    property color settingsSurface: "#141414"
-    property color settingsSurfaceRaised: "#1E1E1E"
-    property color settingsSurfaceOverlay: "#2A2A2A"
+    property color settingsBackground: Theme.darkMode ? "#0A0A0A" : Theme.background
+    property color settingsSurface: Theme.darkMode ? "#141414" : Theme.surface
+    property color settingsSurfaceRaised: Theme.darkMode ? "#1E1E1E" : Theme.surfaceRaised
+    property color settingsSurfaceOverlay: Theme.darkMode ? "#2A2A2A" : Theme.surfaceOverlay
 
     function percentText(v) {
         const p = Math.round(v * 1000) / 10
@@ -25,11 +25,6 @@ Item {
 
     // Derived from the service only (no local state): the Bar section
     // is at defaults when all four preferences match theirs.
-    readonly property bool barIsDefault: PreferencesService.barLayoutMode === PreferencesService.defaultBarLayoutMode
-        && PreferencesService.barTransparency === PreferencesService.defaultBarTransparency
-        && PreferencesService.barBackgroundOpacity === PreferencesService.defaultBarBackgroundOpacity
-        && PreferencesService.barWidgetBackgroundOpacity === PreferencesService.defaultBarWidgetBackgroundOpacity
-
     component PageButton: Rectangle {
         id: btn
 
@@ -44,7 +39,7 @@ Item {
         opacity: btn.disabled ? 0.45 : 1
         color: btn.accent ? Theme.accent : (btnHover.hovered && !btn.disabled ? Theme.surfaceHover : Qt.rgba(1, 1, 1, 0.03))
         border.width: 1
-        border.color: btn.accent ? "transparent" : Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+        border.color: "transparent"
 
         Text {
             id: btnLabel
@@ -184,6 +179,103 @@ Item {
         }
     }
 
+    // Layout mode picker tile: a flat miniature screen with the bar
+    // drawn in the mode's shape, so the three modes read at a glance
+    // without words. One box only - no frame layer around it - and
+    // the active mode is marked by its border alone. Stateless like
+    // PrefToggle: state comes from the service, chosen() is intent.
+    component ModeTile: Rectangle {
+        id: tile
+
+        property string mode: "default"
+        signal chosen()
+
+        // Screen-shaped: the box keeps a 16:9 ratio at any width.
+        height: width * 9 / 16
+        radius: 8
+        color: tileHover.hovered ? settingsSurfaceRaised : settingsBackground
+        border.width: 2
+        border.color: PreferencesService.barLayoutMode === tile.mode ? Theme.accent : "transparent"
+
+        // Default: one slab attached to the top edge.
+        Rectangle {
+            visible: tile.mode === "default"
+
+            anchors {
+                top: parent.top
+                left: parent.left
+                right: parent.right
+                topMargin: 7
+                leftMargin: 7
+                rightMargin: 7
+            }
+
+            height: 8
+            radius: 3
+            color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.55)
+        }
+
+        // Float: one pill, inset from the top and side edges.
+        Rectangle {
+            visible: tile.mode === "float"
+
+            anchors {
+                top: parent.top
+                horizontalCenter: parent.horizontalCenter
+                topMargin: 14
+            }
+
+            width: parent.width * 0.74
+            height: 8
+            radius: 4
+            color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.55)
+        }
+
+        // Segmented: one pill per widget along the top edge.
+        Row {
+            visible: tile.mode === "segmented"
+
+            anchors {
+                top: parent.top
+                horizontalCenter: parent.horizontalCenter
+                topMargin: 7
+            }
+
+            spacing: 5
+
+            Rectangle {
+                width: tile.width * 0.20
+                height: 8
+                radius: 4
+                color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.55)
+            }
+
+            Rectangle {
+                width: tile.width * 0.32
+                height: 8
+                radius: 4
+                color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.55)
+            }
+
+            Rectangle {
+                width: tile.width * 0.20
+                height: 8
+                radius: 4
+                color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.55)
+            }
+        }
+
+        HoverHandler {
+            id: tileHover
+
+            cursorShape: Qt.PointingHandCursor
+        }
+
+        TapHandler {
+            onTapped: tile.chosen()
+        }
+    }
+
     // ---- header -------------------------------------------------------------
     Text {
         id: pageTitle
@@ -217,7 +309,7 @@ Item {
         }
 
         height: 1
-        color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+        color: "transparent"
     }
 
     // ---- scrollable groups (header and footer stay pinned) -------------------
@@ -228,7 +320,7 @@ Item {
             top: divider.bottom
             left: parent.left
             right: parent.right
-            bottom: footerDivider.top
+            bottom: parent.bottom
         }
 
         contentWidth: width
@@ -239,110 +331,16 @@ Item {
         id: scrollContent
 
         width: pageScroll.width
-        height: barResetRow.y + barResetRow.height + 14
-
-    // ---- Surface group --------------------------------------------------------
-    Text {
-        id: surfaceTitle
-
-        anchors {
-            top: parent.top
-            left: parent.left
-            topMargin: 16
-            leftMargin: 10
-        }
-
-        text: "Surface"
-        color: Theme.text
-        font.family: Theme.fontFamily
-        font.pixelSize: 14
-        font.weight: Font.DemiBold
-    }
-
-    Rectangle {
-        id: surfaceCard
-
-        anchors {
-            top: surfaceTitle.bottom
-            left: parent.left
-            right: parent.right
-            topMargin: 10
-            leftMargin: 10
-            rightMargin: 10
-        }
-
-        height: surfaceContent.implicitHeight + 28
-        radius: 10
-        color: settingsSurface
-
-        Column {
-            id: surfaceContent
-
-            anchors {
-                fill: parent
-                margins: 14
-            }
-
-            spacing: 10
-
-            Row {
-                width: parent.width
-                spacing: 12
-
-                Column {
-                    width: parent.width - valueText.implicitWidth - 12
-                    spacing: 3
-
-                    Text {
-                        width: parent.width
-                        text: "Material border opacity"
-                        color: Theme.text
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 13
-                        font.weight: Font.DemiBold
-                        elide: Text.ElideRight
-                    }
-
-                    Text {
-                        width: parent.width
-                        text: "Strength of the outline borders on shell surfaces and panels."
-                        color: Theme.textDim
-                        font.family: Theme.fontFamily
-                        font.pixelSize: 11
-                        wrapMode: Text.WordWrap
-                    }
-                }
-
-                Text {
-                    id: valueText
-
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: root.percentText(PreferencesService.materialBorderOpacity)
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 13
-                    font.weight: Font.DemiBold
-                }
-            }
-
-            PrefSlider {
-                width: parent.width
-                from: PreferencesService.minMaterialBorderOpacity
-                to: PreferencesService.maxMaterialBorderOpacity
-                value: PreferencesService.materialBorderOpacity
-                onMoved: (v) => PreferencesService.setMaterialBorderOpacity(v)
-            }
-        }
-    }
+        height: typographyCard.y + typographyCard.height + 14
 
     // ---- Bar Appearance group ---------------------------------------------------
     Text {
         id: barTitle
 
         anchors {
-            top: surfaceCard.bottom
+            top: parent.top
             left: parent.left
-            topMargin: 20
+            topMargin: 16
             leftMargin: 10
         }
 
@@ -379,8 +377,10 @@ Item {
 
             spacing: 14
 
-            // Layout mode: three mutually exclusive PageButtons, the
-            // accent one is the service's current mode.
+            // Layout mode: three illustration tiles, one per mode;
+            // the accent-ringed tile is the service's current mode.
+            // The flat miniatures replace the old text buttons and
+            // their description - the shapes say what each mode does.
             Column {
                 width: parent.width
                 spacing: 8
@@ -394,72 +394,36 @@ Item {
                 }
 
                 Row {
-                    spacing: 8
+                    spacing: 14
 
-                    PageButton {
-                        label: "Default"
-                        accent: PreferencesService.barLayoutMode === "default"
-                        onActivated: PreferencesService.setBarLayoutMode("default")
+                    ModeTile {
+                        width: 150
+                        mode: "default"
+                        onChosen: PreferencesService.setBarLayoutMode("default")
                     }
 
-                    PageButton {
-                        label: "Float"
-                        accent: PreferencesService.barLayoutMode === "float"
-                        onActivated: PreferencesService.setBarLayoutMode("float")
+                    ModeTile {
+                        width: 150
+                        mode: "float"
+                        onChosen: PreferencesService.setBarLayoutMode("float")
                     }
 
-                    PageButton {
-                        label: "Segmented"
-                        accent: PreferencesService.barLayoutMode === "segmented"
-                        onActivated: PreferencesService.setBarLayoutMode("segmented")
+                    ModeTile {
+                        width: 150
+                        mode: "segmented"
+                        onChosen: PreferencesService.setBarLayoutMode("segmented")
                     }
-                }
-
-                Text {
-                    width: parent.width
-                    text: PreferencesService.barLayoutMode === "float"
-                        ? "Inset from the top and side edges of the screen, with rounded corners."
-                        : PreferencesService.barLayoutMode === "segmented"
-                            ? "Every widget gets its own background instead of one bar background."
-                            : "Attached to the top edge of the screen, the way the bar has always been."
-                    color: Theme.textDim
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 11
-                    wrapMode: Text.WordWrap
                 }
             }
 
-            // Bar background: the opacity slider keeps its stored value
-            // while transparency is off; it only takes effect (Stage 2
-            // binding) once transparency is on.
-            Item {
-                width: parent.width
-                height: 22
-
-                Text {
-                    anchors {
-                        left: parent.left
-                        verticalCenter: parent.verticalCenter
-                    }
-
-                    text: "Enable transparency"
-                    color: Theme.text
-                    font.family: Theme.fontFamily
-                    font.pixelSize: 13
-                    font.weight: Font.DemiBold
-                }
-
-                PrefToggle {
-                    anchors {
-                        right: parent.right
-                        verticalCenter: parent.verticalCenter
-                    }
-
-                    checked: PreferencesService.barTransparency
-                    onToggled: PreferencesService.setBarTransparency(!PreferencesService.barTransparency)
-                }
-            }
-
+            // Transparency + background opacity as ONE composite
+            // control. The preview is the label: a mock bar over a
+            // flat wallpaper, its fill following the same rule the
+            // shell uses - solid while transparency is off, the
+            // stored opacity while on. The switch beside the preview
+            // owns the on/off; dragging the amount slider turns
+            // transparency on by itself, so the whole thing answers
+            // in one gesture and needs no explaining text.
             Column {
                 width: parent.width
                 spacing: 10
@@ -467,29 +431,96 @@ Item {
                 Row {
                     width: parent.width
                     spacing: 12
-                    opacity: PreferencesService.barTransparency ? 1 : 0.45
 
-                    Column {
-                        width: parent.width - bgValueText.implicitWidth - 12
-                        spacing: 3
+                    Rectangle {
+                        id: bgPreview
 
-                        Text {
-                            width: parent.width
-                            text: "Background opacity"
-                            color: Theme.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 13
-                            font.weight: Font.DemiBold
-                            elide: Text.ElideRight
+                        width: parent.width - 40 - 12
+                        height: 42
+                        radius: 9
+                        color: settingsSurfaceOverlay
+
+                        // Flat wallpaper shapes under the mock bar,
+                        // masked to the preview's rounded corners.
+                        Item {
+                            anchors.fill: parent
+                            layer.enabled: true
+                            layer.effect: OpacityMask {
+                                maskSource: Rectangle {
+                                    width: bgPreview.width
+                                    height: bgPreview.height
+                                    radius: bgPreview.radius
+                                    visible: false
+                                }
+                            }
+
+                            Rectangle {
+                                width: 54
+                                height: 54
+                                radius: 27
+                                x: parent.width - 44
+                                y: -18
+                                color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.55)
+                            }
+
+                            Rectangle {
+                                width: 90
+                                height: 90
+                                radius: 45
+                                x: -30
+                                y: 16
+                                color: Qt.rgba(0, 0, 0, 0.28)
+                            }
+
+                            Rectangle {
+                                width: 46
+                                height: 46
+                                radius: 23
+                                x: parent.width * 0.38
+                                y: 22
+                                color: Qt.rgba(0, 0, 0, 0.18)
+                            }
                         }
 
-                        Text {
-                            width: parent.width
-                            text: "Opacity of the bar background while transparency is on."
-                            color: Theme.textDim
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 11
-                            wrapMode: Text.WordWrap
+                        // The mock bar itself.
+                        Rectangle {
+                            anchors {
+                                top: parent.top
+                                left: parent.left
+                                right: parent.right
+                                margins: 6
+                            }
+
+                            height: 13
+                            radius: 6.5
+                            color: Qt.rgba(1, 1, 1, 0.92)
+                            opacity: PreferencesService.barTransparency ? PreferencesService.barBackgroundOpacity : 1
+                        }
+                    }
+
+                    PrefToggle {
+                        anchors.verticalCenter: parent.verticalCenter
+                        checked: PreferencesService.barTransparency
+                        onToggled: PreferencesService.setBarTransparency(!PreferencesService.barTransparency)
+                    }
+                }
+
+                Row {
+                    width: parent.width
+                    spacing: 12
+
+                    PrefSlider {
+                        width: parent.width - bgValueText.implicitWidth - 12
+                        height: 32
+                        anchors.verticalCenter: parent.verticalCenter
+                        from: 0
+                        to: 1
+                        stepSize: 0.005
+                        value: PreferencesService.barBackgroundOpacity
+                        onMoved: (v) => {
+                            if (!PreferencesService.barTransparency)
+                                PreferencesService.setBarTransparency(true)
+                            PreferencesService.setBarBackgroundOpacity(v)
                         }
                     }
 
@@ -504,49 +535,104 @@ Item {
                         font.weight: Font.DemiBold
                     }
                 }
-
-                PrefSlider {
-                    width: parent.width
-                    from: 0
-                    to: 1
-                    stepSize: 0.005
-                    value: PreferencesService.barBackgroundOpacity
-                    enabled: PreferencesService.barTransparency
-                    onMoved: (v) => PreferencesService.setBarBackgroundOpacity(v)
-                }
             }
 
-            // Segmented widget backgrounds.
+            // Segmented widget backgrounds: the same pattern - three
+            // mock widget pills over the flat wallpaper, their fills
+            // following the stored opacity. No words needed. Shown
+            // only while the segmented layout is active - the one
+            // mode this setting affects.
             Column {
+                visible: PreferencesService.barLayoutMode === "segmented"
                 width: parent.width
                 spacing: 10
+
+                Rectangle {
+                    id: widgetPreview
+
+                    width: parent.width
+                    height: 42
+                    radius: 9
+                    color: settingsSurfaceOverlay
+
+                    Item {
+                        anchors.fill: parent
+                        layer.enabled: true
+                        layer.effect: OpacityMask {
+                            maskSource: Rectangle {
+                                width: widgetPreview.width
+                                height: widgetPreview.height
+                                radius: widgetPreview.radius
+                                visible: false
+                            }
+                        }
+
+                        Rectangle {
+                            width: 54
+                            height: 54
+                            radius: 27
+                            x: parent.width - 44
+                            y: -18
+                            color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.55)
+                        }
+
+                        Rectangle {
+                            width: 90
+                            height: 90
+                            radius: 45
+                            x: -30
+                            y: 16
+                            color: Qt.rgba(0, 0, 0, 0.28)
+                        }
+
+                        Rectangle {
+                            width: 46
+                            height: 46
+                            radius: 23
+                            x: parent.width * 0.38
+                            y: 22
+                            color: Qt.rgba(0, 0, 0, 0.18)
+                        }
+                    }
+
+                    Row {
+                        anchors {
+                            top: parent.top
+                            left: parent.left
+                            right: parent.right
+                            margins: 6
+                        }
+
+                        height: 13
+                        spacing: 6
+
+                        Repeater {
+                            model: [0.24, 0.40, 0.24]
+
+                            Rectangle {
+                                width: (widgetPreview.width - 12 - 12) * modelData
+                                height: 13
+                                radius: 6.5
+                                color: Qt.rgba(1, 1, 1, 0.92)
+                                opacity: PreferencesService.barWidgetBackgroundOpacity
+                            }
+                        }
+                    }
+                }
 
                 Row {
                     width: parent.width
                     spacing: 12
 
-                    Column {
+                    PrefSlider {
                         width: parent.width - widgetValueText.implicitWidth - 12
-                        spacing: 3
-
-                        Text {
-                            width: parent.width
-                            text: "Widget background opacity"
-                            color: Theme.text
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 13
-                            font.weight: Font.DemiBold
-                            elide: Text.ElideRight
-                        }
-
-                        Text {
-                            width: parent.width
-                            text: "Opacity of the individual widget backgrounds in Segmented mode. The main bar background is not affected."
-                            color: Theme.textDim
-                            font.family: Theme.fontFamily
-                            font.pixelSize: 11
-                            wrapMode: Text.WordWrap
-                        }
+                        height: 32
+                        anchors.verticalCenter: parent.verticalCenter
+                        from: 0
+                        to: 1
+                        stepSize: 0.005
+                        value: PreferencesService.barWidgetBackgroundOpacity
+                        onMoved: (v) => PreferencesService.setBarWidgetBackgroundOpacity(v)
                     }
 
                     Text {
@@ -560,26 +646,39 @@ Item {
                         font.weight: Font.DemiBold
                     }
                 }
-
-                PrefSlider {
-                    width: parent.width
-                    from: 0
-                    to: 1
-                    stepSize: 0.005
-                    value: PreferencesService.barWidgetBackgroundOpacity
-                    onMoved: (v) => PreferencesService.setBarWidgetBackgroundOpacity(v)
-                }
             }
         }
     }
 
-    // Bar reset row: scoped to the Bar section only, mirroring the
-    // pinned footer's status + Reset pattern for Appearance.
-    Item {
-        id: barResetRow
+    // ---- Typography group (a section here since the tab redesign; it
+    // used to be its own category). The card holds a font dropdown:
+    // the closed field shows the current family in its own typeface,
+    // and the expanding list renders each candidate in itself, so the
+    // list previews itself. Only families Qt reports as installed are
+    // offered. The pick persists through PreferencesService and binds
+    // shell-wide via Theme.fontFamily.
+    Text {
+        id: typographyTitle
 
         anchors {
             top: barCard.bottom
+            left: parent.left
+            topMargin: 20
+            leftMargin: 10
+        }
+
+        text: "Typography"
+        color: Theme.text
+        font.family: Theme.fontFamily
+        font.pixelSize: 14
+        font.weight: Font.DemiBold
+    }
+
+    Rectangle {
+        id: typographyCard
+
+        anchors {
+            top: typographyTitle.bottom
             left: parent.left
             right: parent.right
             topMargin: 10
@@ -587,88 +686,182 @@ Item {
             rightMargin: 10
         }
 
-        height: 30
+        height: typographyContent.implicitHeight + 28
+        radius: 10
+        color: settingsSurface
 
-        Text {
+        Column {
+            id: typographyContent
+
+            property bool fontListOpen: false
+
             anchors {
-                left: parent.left
-                verticalCenter: parent.verticalCenter
+                fill: parent
+                margins: 14
             }
 
-            text: root.barIsDefault ? "Default values" : "Custom values"
-            color: Theme.textMuted
-            font.family: Theme.fontFamily
-            font.pixelSize: 11
-        }
+            spacing: 10
 
-        PageButton {
-            anchors {
-                right: parent.right
-                verticalCenter: parent.verticalCenter
+            readonly property var fontChoices: {
+                const wanted = ["Inter", "Adwaita Sans", "Google Sans Flex", "SF Pro Display", "Roboto", "Open Sans", "Noto Sans", "Lato", "Montserrat", "Poppins", "Manrope", "Plus Jakarta Sans", "Cantarell", "Red Hat Text", "Ubuntu", "Carlito", "DejaVu Sans"]
+                const available = Qt.fontFamilies()
+                const installed = wanted.filter(function (f) { return available.indexOf(f) >= 0 })
+                if (installed.indexOf(PreferencesService.fontFamily) < 0)
+                    installed.unshift(PreferencesService.fontFamily)
+                return installed
             }
 
-            label: "Reset bar"
-            disabled: root.barIsDefault
-            onActivated: PreferencesService.resetBar()
+            // Dropdown: a closed field showing the current family in
+            // its own typeface, chevron drawn from two bars. The list
+            // expands in place, capped at five rows with its own
+            // scroll, so the page stays compact however many families
+            // the candidate list grows to.
+            Rectangle {
+                id: fontField
+
+                width: parent.width
+                height: 40
+                radius: 8
+                color: settingsBackground
+                border.width: typographyContent.fontListOpen ? 1 : 0
+                border.color: Theme.accent
+
+                Text {
+                    anchors {
+                        left: parent.left
+                        verticalCenter: parent.verticalCenter
+                        leftMargin: 12
+                    }
+
+                    text: PreferencesService.fontFamily
+                    color: Theme.text
+                    font.family: PreferencesService.fontFamily
+                    font.pixelSize: 14
+                }
+
+                Item {
+                    anchors {
+                        right: parent.right
+                        verticalCenter: parent.verticalCenter
+                        rightMargin: 12
+                    }
+
+                    width: 12
+                    height: 8
+                    rotation: typographyContent.fontListOpen ? 180 : 0
+
+                    Behavior on rotation {
+                        NumberAnimation { duration: 150 }
+                    }
+
+                    Rectangle {
+                        width: 8
+                        height: 2
+                        radius: 1
+                        color: Theme.textDim
+                        rotation: 45
+
+                        anchors {
+                            left: parent.left
+                            verticalCenter: parent.verticalCenter
+                        }
+                    }
+
+                    Rectangle {
+                        width: 8
+                        height: 2
+                        radius: 1
+                        color: Theme.textDim
+                        rotation: -45
+
+                        anchors {
+                            right: parent.right
+                            verticalCenter: parent.verticalCenter
+                        }
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    cursorShape: Qt.PointingHandCursor
+                    onClicked: typographyContent.fontListOpen = !typographyContent.fontListOpen
+                }
+            }
+
+            Item {
+                width: parent.width
+                height: typographyContent.fontListOpen ? Math.min(typographyContent.fontChoices.length * 40, 200) : 0
+                visible: height > 0
+                clip: true
+
+                Behavior on height {
+                    NumberAnimation {
+                        duration: 160
+                        easing.type: Easing.OutCubic
+                    }
+                }
+
+                Flickable {
+                    anchors.fill: parent
+                    contentWidth: width
+                    contentHeight: fontList.implicitHeight
+                    clip: true
+                    boundsBehavior: Flickable.StopAtBounds
+
+                    Column {
+                        id: fontList
+
+                        width: parent.width
+                        spacing: 2
+
+                        Repeater {
+                            model: typographyContent.fontChoices
+
+                            delegate: Rectangle {
+                                required property var modelData
+
+                                width: fontList.width
+                                height: 38
+                                radius: 8
+                                color: choiceArea.containsMouse ? settingsSurfaceRaised : "transparent"
+                                border.width: PreferencesService.fontFamily === modelData ? 2 : 0
+                                border.color: Theme.accent
+
+                                Text {
+                                    anchors {
+                                        left: parent.left
+                                        verticalCenter: parent.verticalCenter
+                                        leftMargin: 12
+                                    }
+
+                                    text: modelData
+                                    color: Theme.text
+                                    font.family: modelData
+                                    font.pixelSize: 14
+                                }
+
+                                MouseArea {
+                                    id: choiceArea
+
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+
+                                    onClicked: {
+                                        PreferencesService.setFontFamily(modelData)
+                                        typographyContent.fontListOpen = false
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
     }
-    }
-
-    // ---- footer (pinned) -------------------------------------------------------
-    Rectangle {
-        id: footerDivider
-
-        anchors {
-            bottom: footer.top
-            left: parent.left
-            right: parent.right
-            bottomMargin: 10
-            leftMargin: 10
-            rightMargin: 10
-        }
-
-        height: 1
-        color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
-    }
-
-    Item {
-        id: footer
-
-        anchors {
-            left: parent.left
-            right: parent.right
-            bottom: parent.bottom
-            leftMargin: 10
-            rightMargin: 10
-            bottomMargin: 10
-        }
-
-        height: 30
-
-        Text {
-            anchors {
-                left: parent.left
-                verticalCenter: parent.verticalCenter
-            }
-
-            text: PreferencesService.materialBorderOpacity === PreferencesService.defaultMaterialBorderOpacity
-                ? "Default value" : "Custom value"
-            color: Theme.textMuted
-            font.family: Theme.fontFamily
-            font.pixelSize: 11
-        }
-
-        PageButton {
-            anchors {
-                right: parent.right
-                verticalCenter: parent.verticalCenter
-            }
-
-            label: "Reset"
-            disabled: PreferencesService.materialBorderOpacity === PreferencesService.defaultMaterialBorderOpacity
-            onActivated: PreferencesService.resetAppearance()
-        }
     }
 }
+

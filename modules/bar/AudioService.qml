@@ -5,8 +5,6 @@ import Quickshell.Services.Pipewire
 Item {
     id: root
 
-    property int volume: 0
-    property bool muted: false
     property bool micMuted: false
     property var sinks: []
 
@@ -18,22 +16,34 @@ Item {
     PwObjectTracker { objects: root.sinkNode ? [root.sinkNode] : [] }
     readonly property var sinkAudio: (root.sinkNode && root.sinkNode.audio) ? root.sinkNode.audio : null
 
+    // Live bindings, NOT signal-fed copies: these read the backend
+    // directly, so they are correct the moment this service is created -
+    // including right after a config reload, where the C++ PipeWire
+    // registry kept its values and no volumesChanged signal ever fires
+    // to prime a copy (the old copy sat at 0 until the next real change,
+    // and the volume keys then stepped from that stale 0 and wrote it
+    // to the real sink). While a local write is in flight (_target >= 0)
+    // the requested value is shown until the backend acknowledges it.
+    readonly property int volume: root._target >= 0 ? root._target
+        : (root.sinkAudio ? Math.round(root.sinkAudio.volume * 100) : 0)
+    readonly property bool muted: root.sinkAudio ? root.sinkAudio.muted : false
+
     Connections {
         target: root.sinkAudio
         ignoreUnknownSignals: true
         function onVolumesChanged() {
-            if (root.sinkAudio && root._target < 0)
-                root.volume = Math.round(root.sinkAudio.volume * 100)
-        }
-        function onMutedChanged() {
-            if (root.sinkAudio)
-                root.muted = root.sinkAudio.muted
+            // A write is acknowledged once the backend lands on the
+            // requested value, within the device's own volume step.
+            if (root._target >= 0 && root.sinkAudio
+                    && Math.abs(Math.round(root.sinkAudio.volume * 100) - root._target) <= 1) {
+                root._target = -1
+                ackTimer.stop()
+            }
         }
     }
 
     function setVolume(v) {
         root._target = Math.max(0, Math.min(100, Math.round(v)))
-        root.volume = root._target
         applyTimer.restart()
     }
 
@@ -69,11 +79,21 @@ Item {
                 return
             // Native write (0..1 float); no process. Kept off when no sink so
             // a later setVolume retries instead of dropping the request.
+            // _target stays set until the backend acknowledges the value
+            // (see the Connections above); ackTimer is the fallback if an
+            // exact acknowledgement never arrives.
             if (root.sinkAudio) {
                 root.sinkAudio.volume = root._target / 100
-                root._target = -1
+                ackTimer.restart()
             }
         }
+    }
+
+    Timer {
+        id: ackTimer
+
+        interval: 800
+        onTriggered: root._target = -1
     }
 
     Timer {

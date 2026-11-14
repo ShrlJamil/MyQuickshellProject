@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Shapes
 import Qt5Compat.GraphicalEffects
 import Quickshell
 import "../../components"
@@ -11,53 +12,52 @@ FocusScope {
     readonly property int pad: 16
     readonly property int headerHeight: 40
     readonly property int gap: 12
-    readonly property real sidebarWidth: Math.max(180, Math.min(264, root.width * 0.30))
 
-    readonly property color settingsBackground: "#0A0A0A"
-    readonly property color settingsSurface: "#141414"
-    readonly property color settingsSurfaceRaised: "#1E1E1E"
-    readonly property color settingsSurfaceOverlay: "#2A2A2A"
+    // Tangga permukaan keluarga Settings: hex gelap tetap di mode
+    // gelap (desain aslinya), turunan Theme di mode terang.
+    readonly property color settingsBackground: Theme.darkMode ? "#0A0A0A" : Theme.background
+    readonly property color settingsSurface: Theme.darkMode ? "#141414" : Theme.surface
+    readonly property color settingsSurfaceRaised: Theme.darkMode ? "#1E1E1E" : Theme.surfaceRaised
+    readonly property color settingsSurfaceOverlay: Theme.darkMode ? "#2A2A2A" : Theme.surfaceOverlay
+
+    // One extra step above the overlay tier, same +0x0A spacing as the
+    // ladder above. The hosted pages sit on the surface tier now (the
+    // detail pane shares the active tab's colour), so their whole
+    // ladder shifts up one step and their overlay tier lands here.
+    readonly property color settingsSurfaceMax: Theme.darkMode ? "#343434" : Qt.lighter(Theme.surfaceOverlay, 1.06)
 
     readonly property var categories: [
         {
             label: "Appearance",
-            icon: "preferences-appearance-symbolic",
-            fallback: "applications-graphics",
-            description: "Theme, accent color, and the overall look of the shell."
+            svg: "assets/appearance-svgrepo-com.svg",
         },
         {
             label: "Wallpaper",
-            icon: "preferences-desktop-wallpaper-symbolic",
-            fallback: "image-x-generic",
-            description: "Wallpaper selection and background images for each monitor."
+            svg: "assets/wallpaper-svgrepo-com.svg",
         },
         {
             label: "Display",
-            icon: "preferences-desktop-display-symbolic",
-            fallback: "video-display",
-            description: "Monitor layout, resolution, and refresh rate."
-        },
-        {
-            label: "Typography",
-            icon: "preferences-desktop-font-symbolic",
-            fallback: "font-x-generic",
-            description: "Font family and text sizes used across the shell."
+            svg: "assets/display-svgrepo-com.svg",
         },
         {
             label: "About",
-            icon: "help-about-symbolic",
-            fallback: "dialog-information",
-            description: "Version and environment information for this shell."
+            svg: "assets/about-svgrepo-com.svg",
         }
     ]
 
     // Owned by SettingsService so IPC callers can preselect a page; the
-    // sidebar writes through to the service.
+    // tab strip writes through to the service.
     readonly property int categoryIndex: SettingsService.categoryIndex
 
     // Appearance has no SettingsService constant (no IPC target opens
     // it directly); its position in categories above is fixed at 0.
     readonly property int appearanceCategory: 0
+
+    // About likewise has no IPC target; after the tab redesign it is
+    // the only category still served by the generic chrome (the title
+    // above its content box) - Typography moved into the Appearance
+    // page as a section, so no category remains at its old index.
+    readonly property int aboutCategory: 3
 
     // First-visit latches for the page Loaders in the detail pane: a
     // page's tree is created the first time its category is selected and
@@ -107,7 +107,7 @@ FocusScope {
         anchors.fill: parent
         color: settingsBackground
         border.width: 1
-        border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+        border.color: "transparent"
     }
 
     Item {
@@ -198,71 +198,138 @@ FocusScope {
             bottomMargin: root.pad
         }
 
-        Rectangle {
-            id: sidebar
+        // Browser-style tab strip: the categories as horizontal tabs
+        // along the top of the body, replacing the sidebar. Only the
+        // top 38px of the strip is its own territory: the strip item
+        // runs 20px further down, underlapping the detail pane, and
+        // the active tab's fill runs with it. The pane sits on a
+        // higher layer (see detail.z), so the underlap is covered by
+        // the page and the tab reads as diving behind the page sheet
+        // instead of ending flush at its edge. The tabs and the
+        // hairline stay pinned to the top 38px - the strip's visible
+        // geometry does not move.
+        Item {
+            id: tabStrip
 
             anchors {
                 top: parent.top
                 left: parent.left
-                bottom: parent.bottom
+                right: parent.right
             }
 
-            width: root.sidebarWidth
-            radius: 14
-            color: settingsSurface
-            border.width: 1
-            border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity * 0.7)
+            height: 38 + 20
 
-            Column {
-                anchors.fill: parent
-                anchors.margins: 8
-                spacing: 6
+            Rectangle {
+                anchors {
+                    left: parent.left
+                    right: parent.right
+                    bottom: parent.bottom
+                    bottomMargin: 20
+                }
+
+                height: 1
+                color: "transparent"
+            }
+
+            Row {
+                anchors {
+                    left: parent.left
+                    top: parent.top
+                }
+
+                spacing: 4
 
                 Repeater {
                     model: root.categories
 
-                    delegate: Rectangle {
-                        id: sidebarItem
+                    delegate: Item {
+                        id: tabItem
 
                         required property var modelData
                         required property int index
 
-                        readonly property bool active: root.categoryIndex === sidebarItem.index
+                        readonly property bool active: root.categoryIndex === tabItem.index
 
-                        width: parent.width
-                        height: 44
-                        radius: 10
-                        color: sidebarItem.active
-                            ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, sidebarArea.containsMouse ? 0.26 : 0.18)
-                            : (sidebarArea.containsMouse ? Theme.surfaceHover : "transparent")
+                        width: tabRow.implicitWidth + 28
+                        height: 38
+                        z: tabItem.active ? 1 : 0
 
-                        Behavior on color {
-                            ColorAnimation { duration: 120 }
-                        }
+                        // The active tab is one silhouette: rounded top
+                        // corners and straight sides, its fill running
+                        // 20px below the tab, behind the detail pane, so
+                        // tab and page read as a single piece of surface
+                        // with the tab tucked under the page. A hovered
+                        // inactive tab takes the same silhouette in a
+                        // darker fill, so hover previews the active form.
+                        Shape {
+                            id: tabShape
 
-                        Row {
+                            visible: tabItem.active || tabArea.containsMouse
+
                             anchors {
                                 left: parent.left
                                 right: parent.right
-                                verticalCenter: parent.verticalCenter
-                                leftMargin: 10
-                                rightMargin: 8
+                                top: parent.top
                             }
 
-                            spacing: 10
+                            height: tabItem.height + 20
+                            preferredRendererType: Shape.CurveRenderer
+
+                            ShapePath {
+                                fillColor: tabItem.active ? settingsSurface : Qt.darker(settingsSurface, 1.4)
+                                strokeColor: "transparent"
+                                startX: 0
+                                startY: tabShape.height
+
+                                PathLine {
+                                    x: 0
+                                    y: 8
+                                }
+
+                                PathQuad {
+                                    x: 8
+                                    y: 0
+                                    controlX: 0
+                                    controlY: 0
+                                }
+
+                                PathLine {
+                                    x: tabItem.width - 8
+                                    y: 0
+                                }
+
+                                PathQuad {
+                                    x: tabItem.width
+                                    y: 8
+                                    controlX: tabItem.width
+                                    controlY: 0
+                                }
+
+                                PathLine {
+                                    x: tabItem.width
+                                    y: tabShape.height
+                                }
+                            }
+                        }
+
+                        Row {
+                            id: tabRow
+
+                            anchors.centerIn: parent
+                            spacing: 8
 
                             Item {
-                                width: 20
-                                height: 20
+                                width: 16
+                                height: 16
                                 anchors.verticalCenter: parent.verticalCenter
 
                                 Image {
-                                    id: itemIcon
+                                    id: tabIcon
 
                                     anchors.fill: parent
-                                    source: Quickshell.iconPath(sidebarItem.modelData.icon, sidebarItem.modelData.fallback)
-                                    sourceSize.width: 40
-                                    sourceSize.height: 40
+                                    source: "file://" + Quickshell.shellPath(tabItem.modelData.svg)
+                                    sourceSize.width: 32
+                                    sourceSize.height: 32
                                     fillMode: Image.PreserveAspectFit
                                     asynchronous: true
                                     smooth: true
@@ -270,37 +337,33 @@ FocusScope {
                                 }
 
                                 ColorOverlay {
-                                    anchors.fill: itemIcon
+                                    anchors.fill: tabIcon
 
-                                    source: itemIcon
-                                    color: sidebarItem.active
-                                        ? Theme.accent
-                                        : (sidebarArea.containsMouse ? Theme.text : Theme.textDim)
+                                    source: tabIcon
+                                    color: tabItem.active ? Theme.accent
+                                        : (tabArea.containsMouse ? Theme.text : Theme.textDim)
                                 }
                             }
 
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
 
-                                width: parent.width - 30
-                                text: sidebarItem.modelData.label
-                                color: sidebarItem.active
-                                    ? Theme.accent
-                                    : (sidebarArea.containsMouse ? Theme.text : Theme.textDim)
+                                text: tabItem.modelData.label
+                                color: tabItem.active ? Theme.text
+                                    : (tabArea.containsMouse ? Theme.text : Theme.textDim)
                                 font.family: Theme.fontFamily
-                                font.pixelSize: 14
-                                font.weight: sidebarItem.active ? Font.DemiBold : Font.Medium
-                                elide: Text.ElideRight
+                                font.pixelSize: 13
+                                font.weight: tabItem.active ? Font.DemiBold : Font.Medium
                             }
                         }
 
                         MouseArea {
-                            id: sidebarArea
+                            id: tabArea
 
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: SettingsService.categoryIndex = sidebarItem.index
+                            onClicked: SettingsService.categoryIndex = tabItem.index
                         }
                     }
                 }
@@ -311,22 +374,26 @@ FocusScope {
             id: detail
 
             anchors {
-                top: parent.top
-                left: sidebar.right
+                top: tabStrip.top
+                left: parent.left
                 right: parent.right
                 bottom: parent.bottom
-                leftMargin: root.gap
+                topMargin: 38
             }
 
+            // Above the tab strip, whose 20px underlap reaches under
+            // this pane and is covered by it.
+            z: 1
+
             radius: 14
-            color: settingsBackground
+            color: settingsSurface
             border.width: 1
-            border.color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+            border.color: "transparent"
 
             Text {
                 id: detailTitle
 
-                visible: root.categoryIndex !== SettingsService.displayCategory && root.categoryIndex !== SettingsService.wallpaperCategory && root.categoryIndex !== root.appearanceCategory
+                visible: root.categoryIndex === root.aboutCategory
 
                 anchors {
                     top: parent.top
@@ -345,35 +412,13 @@ FocusScope {
                 elide: Text.ElideRight
             }
 
-            Text {
-                id: detailDescription
-
-                visible: root.categoryIndex !== SettingsService.displayCategory && root.categoryIndex !== SettingsService.wallpaperCategory && root.categoryIndex !== root.appearanceCategory
-
-                anchors {
-                    top: detailTitle.bottom
-                    left: parent.left
-                    right: parent.right
-                    topMargin: 6
-                    leftMargin: 22
-                    rightMargin: 22
-                }
-
-                text: root.activeCategory ? root.activeCategory.description : ""
-                color: Theme.textDim
-                font.family: Theme.fontFamily
-                font.pixelSize: 12
-                lineHeight: 1.25
-                wrapMode: Text.WordWrap
-            }
-
             Rectangle {
                 id: divider
 
-                visible: root.categoryIndex !== SettingsService.displayCategory && root.categoryIndex !== SettingsService.wallpaperCategory && root.categoryIndex !== root.appearanceCategory
+                visible: root.categoryIndex === root.aboutCategory
 
                 anchors {
-                    top: detailDescription.bottom
+                    top: detailTitle.bottom
                     left: parent.left
                     right: parent.right
                     topMargin: 18
@@ -382,13 +427,13 @@ FocusScope {
                 }
 
                 height: 1
-                color: Qt.rgba(1, 1, 1, Theme.materialBorderOpacity)
+                color: "transparent"
             }
 
             Rectangle {
                 id: placeholder
 
-                visible: root.categoryIndex !== SettingsService.displayCategory && root.categoryIndex !== SettingsService.wallpaperCategory && root.categoryIndex !== root.appearanceCategory
+                visible: root.categoryIndex === root.aboutCategory
 
                 anchors {
                     top: divider.bottom
@@ -412,66 +457,121 @@ FocusScope {
                     width: Math.min(360, placeholder.width - 48)
                     spacing: 10
 
-                    Item {
+                    // The author's JL brandmark (assets/brandmark.svg,
+                    // traced from his brand library's white-on-
+                    // transparent PNG master). It ships white, which
+                    // is its approved form on dark surfaces like this
+                    // one, so it renders as-is with no tint.
+                    Image {
                         anchors.horizontalCenter: parent.horizontalCenter
-                        width: 28
-                        height: 28
-                        opacity: 0.75
-
-                        Image {
-                            id: placeholderIcon
-
-                            anchors.fill: parent
-                            source: root.activeCategory
-                                ? Quickshell.iconPath(root.activeCategory.icon, root.activeCategory.fallback)
-                                : ""
-                            sourceSize.width: 56
-                            sourceSize.height: 56
-                            fillMode: Image.PreserveAspectFit
-                            asynchronous: true
-                            smooth: true
-                            visible: false
-                        }
-
-                        ColorOverlay {
-                            anchors.fill: placeholderIcon
-
-                            source: placeholderIcon
-                            color: Theme.textMuted
-                        }
+                        width: 186
+                        height: 96
+                        source: "file://" + Quickshell.shellPath("assets/brandmark.svg")
+                        sourceSize.width: 372
+                        sourceSize.height: 192
+                        fillMode: Image.PreserveAspectFit
+                        asynchronous: true
+                        smooth: true
                     }
 
                     Text {
                         anchors.horizontalCenter: parent.horizontalCenter
 
-                        width: parent.width
-                        text: root.activeCategory
-                            ? root.activeCategory.label + " settings are not available yet."
-                            : ""
-                        color: Theme.textMuted
+                        text: "MyQuickshellProject"
+                        color: Theme.text
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 16
+                        font.weight: Font.DemiBold
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+
+                        text: "by Sahrul Jamil"
+                        color: Theme.textDim
                         font.family: Theme.fontFamily
                         font.pixelSize: 12
                         horizontalAlignment: Text.AlignHCenter
-                        wrapMode: Text.WordWrap
+                    }
+
+                    Column {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        spacing: 5
+
+                        Row {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            spacing: 8
+
+                            Text {
+                                text: "Shell"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                            }
+
+                            Text {
+                                text: "Quickshell 0.3.2"
+                                color: Theme.textDim
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                            }
+                        }
+
+                        Row {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            spacing: 8
+
+                            Text {
+                                text: "Toolkit"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                            }
+
+                            Text {
+                                text: "Qt 6.11"
+                                color: Theme.textDim
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                            }
+                        }
+
+                        Row {
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            spacing: 8
+
+                            Text {
+                                text: "Compositor"
+                                color: Theme.textMuted
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                            }
+
+                            Text {
+                                text: "Hyprland 0.57"
+                                color: Theme.textDim
+                                font.family: Theme.fontFamily
+                                font.pixelSize: 11
+                            }
+                        }
                     }
 
                     Text {
                         anchors.horizontalCenter: parent.horizontalCenter
 
-                        width: parent.width
-                        text: "This section is a placeholder for the upcoming integration."
-                        color: Qt.rgba(Theme.textMuted.r, Theme.textMuted.g, Theme.textMuted.b, 0.7)
+                        text: "github.com/ShrlJamil/MyQuickshellProject"
+                        color: Theme.textMuted
                         font.family: Theme.fontFamily
                         font.pixelSize: 11
                         horizontalAlignment: Text.AlignHCenter
-                        wrapMode: Text.WordWrap
                     }
                 }
             }
 
             // The Display page hosts the real DisplayManager (moved out of
-            // DynamicCenter). The generic title / description / placeholder
-            // chrome above hides itself for this category so the manager
+            // DynamicCenter). The generic title chrome above hides itself
+            // for this category so the manager
             // gets the full detail pane - it needs the height, and it carries
             // its own headings.
             //
@@ -507,10 +607,10 @@ FocusScope {
                     anchors.fill: parent
                     visible: root.categoryIndex === SettingsService.displayCategory
 
-                    settingsBackground: root.settingsBackground
-                    settingsSurface: root.settingsSurface
-                    settingsSurfaceRaised: root.settingsSurfaceRaised
-                    settingsSurfaceOverlay: root.settingsSurfaceOverlay
+                    settingsBackground: root.settingsSurface
+                    settingsSurface: root.settingsSurfaceRaised
+                    settingsSurfaceRaised: root.settingsSurfaceOverlay
+                    settingsSurfaceOverlay: root.settingsSurfaceMax
 
                     onCloseRequested: root.closeRequested()
                 }
@@ -544,10 +644,10 @@ FocusScope {
                     anchors.fill: parent
                     visible: root.categoryIndex === SettingsService.wallpaperCategory
 
-                    settingsBackground: root.settingsBackground
-                    settingsSurface: root.settingsSurface
-                    settingsSurfaceRaised: root.settingsSurfaceRaised
-                    settingsSurfaceOverlay: root.settingsSurfaceOverlay
+                    settingsBackground: root.settingsSurface
+                    settingsSurface: root.settingsSurfaceRaised
+                    settingsSurfaceRaised: root.settingsSurfaceOverlay
+                    settingsSurfaceOverlay: root.settingsSurfaceMax
                 }
             }
 
@@ -574,12 +674,14 @@ FocusScope {
                     anchors.fill: parent
                     visible: root.categoryIndex === root.appearanceCategory
 
-                    settingsBackground: root.settingsBackground
-                    settingsSurface: root.settingsSurface
-                    settingsSurfaceRaised: root.settingsSurfaceRaised
-                    settingsSurfaceOverlay: root.settingsSurfaceOverlay
+                    settingsBackground: root.settingsSurface
+                    settingsSurface: root.settingsSurfaceRaised
+                    settingsSurfaceRaised: root.settingsSurfaceOverlay
+                    settingsSurfaceOverlay: root.settingsSurfaceMax
                 }
             }
         }
     }
 }
+
+

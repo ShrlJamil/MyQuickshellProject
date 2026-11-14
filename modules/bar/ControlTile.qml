@@ -11,6 +11,10 @@ Item {
     property bool active: false
     property bool round: false
 
+    // Compact mode: small square tile, icon centred on top, label
+    // centred below it (used by the 4-up quick-action grid).
+    property bool compact: false
+
     // Opt-in radius override (e.g. a full pill on a non-round tile). Negative =
     // use the default (min-dimension/2 when `round`, else 22).
     property real radiusOverride: -1
@@ -26,7 +30,7 @@ Item {
 
     readonly property real iconSlotSize: root.round ? Math.max(26, Math.round(Math.min(root.width, root.height) * 0.4)) : 34
     readonly property real iconSize: root.round ? Math.max(22, Math.round(Math.min(root.width, root.height) * 0.35)) : 30
-    readonly property int labelPixelSize: root.round ? 13 : 12
+    readonly property int labelPixelSize: root.compact ? 11 : root.round ? 13 : 12
 
     Rectangle {
         id: tile
@@ -133,6 +137,8 @@ Item {
         // property was carried unused through the icon-only pill phase;
         // it renders here now.)
         Text {
+            id: labelText
+
             anchors.left: iconSlot.right
             anchors.leftMargin: 10
             anchors.right: parent.right
@@ -147,6 +153,39 @@ Item {
             elide: Text.ElideRight
             maximumLineCount: 1
             visible: root.label !== ""
+        }
+    }
+
+    states: State {
+        name: "compact"
+        when: root.compact
+
+        AnchorChanges {
+            target: iconSlot
+            anchors.left: undefined
+            anchors.verticalCenter: undefined
+            anchors.horizontalCenter: parent.horizontalCenter
+            anchors.top: parent.top
+        }
+        PropertyChanges {
+            target: iconSlot
+            anchors.topMargin: 13
+        }
+        AnchorChanges {
+            target: labelText
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.verticalCenter: undefined
+            anchors.top: iconSlot.bottom
+        }
+        PropertyChanges {
+            target: labelText
+            anchors.leftMargin: 6
+            anchors.rightMargin: 6
+            anchors.topMargin: 6
+            horizontalAlignment: Text.AlignHCenter
+            maximumLineCount: 2
+            wrapMode: Text.WordWrap
         }
     }
 }
