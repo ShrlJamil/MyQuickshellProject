@@ -5,8 +5,16 @@ import Quickshell.Io
 // (cursor:zoom_factor) through the Lua eval channel. The classic
 // `hyprctl keyword` route is dead on this build ("unknown request"),
 // hl.config via eval is the runtime path and is read back with
-// getoption. zoom_rigid stays at its default (false), so the zoomed
-// view follows the cursor the standard magnifier way.
+// getoption.
+//
+// Behaviour measured live on Hyprland 0.57 (2026-11-16): at activation
+// the zoom anchors by relative-position preservation (the cursor keeps
+// its relative spot in the frame; the view is NOT centred on it).
+// zoom_rigid is forced false on every toggle: non-rigid keeps the view
+// still while the cursor roams inside it and pans just enough when the
+// cursor leaves the view (edge-pan), while rigid would lock the view
+// at the activation anchor for good. SUPER+Z (Hyprland config,
+// modules/keybinds.lua) is the keyboard escape out of this mode.
 Item {
     id: root
 
@@ -19,7 +27,7 @@ Item {
 
         const target = root.active ? 1.0 : root.zoomFactor
         setProc.command = ["hyprctl", "eval",
-            "hl.config({ cursor = { zoom_factor = " + target.toFixed(1) + " } })"]
+            "hl.config({ cursor = { zoom_factor = " + target.toFixed(1) + ", zoom_rigid = false } })"]
         setProc.running = true
     }
 
