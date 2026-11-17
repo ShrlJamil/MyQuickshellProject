@@ -779,26 +779,29 @@ PanelWindow {
             }
         }
 
-        MediaPill {
-            id: mediaPill
+        ActivityIsland {
+            id: activityIsland
 
             anchors {
                 verticalCenter: parent.verticalCenter
-                left: systemTrayRow.right
+                left: workspaceIndicator.right
             }
-            anchors.leftMargin: 4
+            anchors.leftMargin: 10
 
             mediaService: root.mediaService
-
-            show: !holdLabel.visible && root.mediaService && root.mediaService.hasMedia
-
+            mediaSuppressed: holdLabel.visible
             popoverOpen: barState.mediaPopoverOpen
 
-            onActivateRequested: {
+            onMediaActivateRequested: {
                 if (Date.now() - root._mediaPopoverClosedAt < 250)
                     return
                 trayMenu.open = false
                 barState.mediaPopoverOpen = !barState.mediaPopoverOpen
+            }
+
+            onMediaExpandedChanged: {
+                if (!mediaExpanded)
+                    barState.mediaPopoverOpen = false
             }
         }
 
@@ -807,7 +810,7 @@ PanelWindow {
 
             screen: root.screen
             mediaService: root.mediaService
-            anchorCenter: mediaPill.x + mediaPill.width / 2
+            anchorCenter: activityIsland.x + activityIsland.mediaCenterOffset
 
             open: barState.mediaPopoverOpen
 

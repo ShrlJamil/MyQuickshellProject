@@ -19,7 +19,12 @@ Item {
 
     readonly property int pillHeight: 30
     readonly property int artworkSize: 22
-    readonly property int padH: 8
+    // 4 px: the artwork (22 px in the 30 px pill) then sits
+    // concentric with the pill's left cap - the same inset the
+    // minimal circle has - snug to the left as Sahrul asked on
+    // 2026-11-17 (normal mode; the shrink path is unaffected
+    // because its handover already centred the artwork at 4).
+    readonly property int padH: 4
     readonly property int artGap: 6
     readonly property int maxTextWidth: 115
     readonly property real scrollSpeed: 22
@@ -34,11 +39,36 @@ Item {
         return t.length > 0 ? t : a
     }
 
-    visible: root.show
+    // The pill animates its own width (ActivityIsland grow/shrink):
+    // the background fills the item, so the rounded end stays rounded
+    // at every width instead of being sliced by a parent's clip.
+    // Visible latches until the shrink lands, so the animation out
+    // is seen at all.
+    visible: root.show || root.width > 0.5
     implicitWidth: root.padH * 2 + root.artworkSize + root.artGap + textView.width
     implicitHeight: root.pillHeight
-    width: implicitWidth
+    width: root.show ? root.implicitWidth : 0
     height: implicitHeight
+    clip: true
+
+    Behavior on width {
+        NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+    }
+
+    // A shrink hands over to the slot's minimal at exactly
+    // 30 px: by then the pill IS the minimal - a round circle
+    // showing the artwork, centred exactly like the minimal's
+    // (see the artwork margin below) - so the pill cuts out and
+    // the minimal cuts in with no visible change. Above 30 px
+    // the pill is fully itself; a grow fades in over 16 px.
+    opacity: (!root.show && root.width <= 30) ? 0 : Math.min(1, root.width / 16)
+
+    // The TITLE dissolves as the pill collapses toward minimal
+    // size (it would otherwise be sliced by the narrowing clip
+    // for the whole shrink tail). The artwork does NOT dissolve:
+    // it is the form's identity and stays visible into the
+    // 30 px handover circle.
+    readonly property real contentOpacity: Math.max(0, Math.min(1, (root.width - 30) / 15))
 
     HoverHandler {
         id: hoverHandler
@@ -70,6 +100,9 @@ Item {
         color: root.popoverOpen ? Qt.rgba(Theme.onActiveSurface.r, Theme.onActiveSurface.g, Theme.onActiveSurface.b, 0.15) : Theme.surface
 
         anchors.left: parent.left
+        // padH IS the centred inset (4), so the artwork sits
+        // exactly where the minimal's centred artwork sits at
+        // every width - the 30 px handover needs no easing.
         anchors.leftMargin: root.padH
         anchors.verticalCenter: parent.verticalCenter
 
@@ -108,6 +141,8 @@ Item {
 
     Item {
         id: textView
+
+        opacity: root.contentOpacity
 
         width: Math.min(metric.implicitWidth, root.maxTextWidth)
         height: metric.implicitHeight
