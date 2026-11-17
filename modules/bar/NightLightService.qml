@@ -1,6 +1,13 @@
 import QtQuick
 import Quickshell.Io
 
+// Night light (hyprsunset) state is owned by this service: it is the
+// only actor that starts or stops hyprsunset, so `active` flips
+// optimistically in toggle() and is confirmed by ONE pgrep run after
+// each toggle, plus one at startup. No repeating poll - the previous
+// build ran `pgrep -x hyprsunset` every 2 s. Trade-off: if hyprsunset
+// is started or killed from outside the shell, the tile does not
+// notice until the next toggle or a shell restart.
 Item {
     id: root
 
@@ -15,20 +22,8 @@ Item {
         } else {
             toggleProc.command = ["bash", "-c", "hyprsunset -t " + root.temperature + " >/dev/null 2>&1 &"]
         }
-
+        root.active = !root.active
         toggleProc.running = true
-    }
-
-    Timer {
-        id: pollTimer
-
-        interval: 2000
-        repeat: true
-        running: true
-        triggeredOnStart: true
-        onTriggered: {
-            if (!checkProc.running) checkProc.running = true
-        }
     }
 
     Process {
@@ -47,4 +42,6 @@ Item {
 
         onExited: checkProc.running = true
     }
+
+    Component.onCompleted: checkProc.running = true
 }

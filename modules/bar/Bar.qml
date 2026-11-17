@@ -695,17 +695,20 @@ PanelWindow {
             }
         }
 
-        // System tray (StatusNotifierItem hosts - Tailscale, OBS, ...). Sits
-        // on the left cluster, right of the clock; empty (zero-width) when
-        // nothing is registered.
+        // System tray (StatusNotifierItem hosts - Tailscale, OBS, ...).
+        // Leftmost element of the right cluster, left of the caffeine
+        // indicator (Sahrul, 2026-11-17); empty (zero-width, zero
+        // margin) when nothing is registered, so the cluster never
+        // shifts and the left cluster keeps the clock's anchor family
+        // to itself.
         Row {
             id: systemTrayRow
 
             anchors {
                 verticalCenter: parent.verticalCenter
-                left: dateTime.right
+                right: caffeineIndicator.left
             }
-            anchors.leftMargin: 4
+            anchors.rightMargin: systemTrayRow.width > 0 ? 4 : 0
 
             spacing: 4
 

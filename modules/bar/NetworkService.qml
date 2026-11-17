@@ -81,15 +81,16 @@ Item {
 
     // Band of the associated AP ("5 GHz" / "2.4 GHz" / "6 GHz"), or "" when not
     // connected / unknown. No native frequency in Quickshell.Networking 0.3.1, so
-    // this is a small nmcli read refreshed on connect + every 20s while up.
+    // this is a small nmcli read refreshed on connect / interface change only.
     property string frequency: ""
 
     function toggleWifi() {
         Networking.wifiEnabled = !Networking.wifiEnabled
     }
 
-    // Re-resolve IP + band. Called on connect / interface change, on a slow
-    // timer while up, and publicly.
+    // Re-resolve IP + band. Called on connect / interface change and
+    // publicly. No slow timer anymore: the address and band only change
+    // when the connection does, and NetworkManager reports that.
     function refresh() {
         if (root.connected && root.wifiEnabled) {
             if (!ipProc.running)
@@ -159,13 +160,6 @@ Item {
     onConnectedChanged: root.refresh()
     onInterfaceNameChanged: root.refresh()
 
-    Timer {
-        interval: 20000
-        repeat: true
-        running: root.connected
-        triggeredOnStart: true
-        onTriggered: root.refresh()
-    }
 
     // Keep the scanner alive so signalStrength / the associated network stay
     // fresh (mirrors WifiService).
@@ -178,5 +172,8 @@ Item {
     }
 
     onActiveDeviceChanged: root._enableScanner()
-    Component.onCompleted: root._enableScanner()
+    Component.onCompleted: {
+        root._enableScanner()
+        root.refresh()
+    }
 }

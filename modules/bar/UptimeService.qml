@@ -5,9 +5,11 @@ import Quickshell
 import Quickshell.Io
 
 // System summary for the bar's Arch logo popover (fastfetch-style). Cheap
-// one-shot reads - /proc/uptime, /proc/meminfo, `uname -rm` - refreshed once a
-// minute and on demand when the popover opens. Same Process + StdioCollector
-// pattern as BrightnessService; no persistent device poll.
+// one-shot reads - /proc/uptime, /proc/meminfo, `uname -rm` - taken at
+// startup; afterwards the uptime is counted locally once a second (same
+// in-process pattern as RecordService's elapsed timer, no process spawns)
+// and everything is re-read on demand when the Control Center opens.
+// Same Process + StdioCollector pattern as BrightnessService.
 Item {
     id: root
 
@@ -42,10 +44,13 @@ Item {
         return parts.join(", ")
     }
 
+    // Kernel/arch never change at runtime; only read them once.
+    property bool _unameDone: false
+
     function refresh() {
         if (!uptimeProc.running)
             uptimeProc.running = true
-        if (!unameProc.running)
+        if (!root._unameDone && !unameProc.running)
             unameProc.running = true
         if (!memProc.running)
             memProc.running = true
@@ -76,6 +81,7 @@ Item {
                 root.kernel = parts[0]
             if (parts[1])
                 root.arch = parts[1]
+            root._unameDone = true
         }
     }
 
@@ -110,15 +116,16 @@ Item {
         }
     }
 
+    // Local tick seeded by the /proc read in refresh(); re-seeded on
+    // every refresh(), so drift never accumulates beyond an hour.
     Timer {
-        interval: 60000
+        interval: 1000
         repeat: true
-        running: true
-        triggeredOnStart: true
-        onTriggered: root.refresh()
+        running: root.seconds > 0
+        onTriggered: root.seconds += 1
     }
 
-    // Populate os / kernel / memory / uptime immediately at shell start, so the
-    // popover never opens onto blank values.
+    // Populate os / kernel / memory / uptime immediately at shell start, so
+    // the popover never opens onto blank values.
     Component.onCompleted: root.refresh()
 }

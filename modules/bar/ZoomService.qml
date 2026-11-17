@@ -13,8 +13,15 @@ import Quickshell.Io
 // zoom_rigid is forced false on every toggle: non-rigid keeps the view
 // still while the cursor roams inside it and pans just enough when the
 // cursor leaves the view (edge-pan), while rigid would lock the view
-// at the activation anchor for good. SUPER+Z (Hyprland config,
-// modules/keybinds.lua) is the keyboard escape out of this mode.
+// at the activation anchor for good.
+//
+// State is owned by this service - no polling (the previous build ran
+// `hyprctl getoption` every 2 s). The factor is read back once at
+// startup and once after each set, only to confirm. Every actor goes
+// through here: the Control Center tile calls toggle(), and the
+// SUPER+Z escape keybind (his Hyprland config) calls
+// `qs ipc call zoom exit`, falling back to a raw hyprctl eval if the
+// shell is not running.
 Item {
     id: root
 
@@ -24,22 +31,30 @@ Item {
 
     function toggle() {
         if (setProc.running) return
+        root._set(root.active ? 1.0 : root.zoomFactor)
+    }
 
-        const target = root.active ? 1.0 : root.zoomFactor
+    function exit() {
+        if (setProc.running) return
+        if (!root.active && root.factor <= 1.01) return
+        root._set(1.0)
+    }
+
+    function _set(target) {
+        // Optimistic state: the eval below is the only writer, and the
+        // read-back after it lands corrects any surprise.
+        root.factor = target
+        root.active = target > 1.01
         setProc.command = ["hyprctl", "eval",
             "hl.config({ cursor = { zoom_factor = " + target.toFixed(1) + ", zoom_rigid = false } })"]
         setProc.running = true
     }
 
-    Timer {
-        interval: 2000
-        repeat: true
-        running: true
-        triggeredOnStart: true
+    IpcHandler {
+        target: "zoom"
 
-        onTriggered: {
-            if (!checkProc.running) checkProc.running = true
-        }
+        function exit(): void { root.exit() }
+        function toggle(): void { root.toggle() }
     }
 
     Process {
@@ -66,4 +81,6 @@ Item {
 
         onExited: checkProc.running = true
     }
+
+    Component.onCompleted: checkProc.running = true
 }
