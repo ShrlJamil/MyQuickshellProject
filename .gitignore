@@ -6,3 +6,6 @@ palette.json
 
 __pycache__/
 *.py[cod]
+
+# built helper binary (build via scripts/build-caps-watch.sh)
+scripts/caps-watch

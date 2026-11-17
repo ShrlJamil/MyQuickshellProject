@@ -216,7 +216,7 @@ Item {
     // only caps source now that the 1 Hz sysfs poll is gone.
     Process {
         id: capsWatch
-        command: ["python3", Quickshell.shellPath("scripts/caps-watch.py")]
+        command: [Quickshell.shellPath("scripts/caps-watch")]
         running: true
         stdout: SplitParser {
             onRead: (line) => root._onCapsToggle(line)
