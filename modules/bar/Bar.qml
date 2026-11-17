@@ -596,6 +596,20 @@ PanelWindow {
             anchors.leftMargin: 8
         }
 
+        // Workspace indicator (moved from the OSD, format unchanged):
+        // sits right of the clock in the left cluster.
+        WorkspaceIndicator {
+            id: workspaceIndicator
+
+            screen: root.screen
+
+            anchors {
+                verticalCenter: parent.verticalCenter
+                left: dateTime.right
+            }
+            anchors.leftMargin: 10
+        }
+
         BatteryWidget {
             id: battery
 
@@ -608,18 +622,9 @@ PanelWindow {
             anchors.rightMargin: 4
         }
 
-        // Recording indicator - only present while RecordService is
-        // recording; collapses to zero width when idle, same as the
-        // caffeine indicator it anchors to.
-        RecordPill {
-            id: recordPill
-
-            anchors {
-                verticalCenter: parent.verticalCenter
-                right: caffeineIndicator.left
-            }
-            anchors.rightMargin: RecordService.recording ? 4 : 0
-        }
+        // The recording indicator used to live here; it moved into
+        // ActivityIsland beside the media pill on 2026-11-16 (Dynamic
+        // Island model: media and recording share one spot).
 
         // Caffeine indicator - only present while CaffeineService.enabled.
         // Collapses to zero width when off so nothing else in the bar shifts

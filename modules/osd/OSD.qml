@@ -10,10 +10,9 @@ import "../../components"
 // independent of Bar and DynamicCenter and never takes keyboard focus or input
 // (empty mask -> fully click-through).
 //
-// Modes:
-//   volume / brightness / caps  <- OSDService (global; shown on focused screen)
-//   workspace                   <- this screen's own Hyprland active workspace
-//                                  (reuses the model the bar already tracks)
+// Modes: volume / brightness / caps <- OSDService (global; shown on the
+// focused screen). The workspace indicator moved to the bar on
+// 2026-11-16 (modules/bar/WorkspaceIndicator.qml, same format).
 PanelWindow {
     id: root
 
@@ -25,93 +24,10 @@ PanelWindow {
         && root.modelData.screen
         && Hyprland.focusedMonitor.name === root.modelData.screen.name
 
-    // ---- per-screen workspace OSD (ported from DynamicCenter) -----------------
-    readonly property string screenName: root.modelData.screen?.name ?? ""
-    readonly property var ownMonitor: root.modelData.screen ? Hyprland.monitorFor(root.modelData.screen) : null
-    readonly property int ownWorkspaceId: root.ownMonitor?.activeWorkspace?.id ?? -1
-    // ---- workspace digit slider -------------------------------------------
-    // Minimal "Workspace N" indicator: static label + sliding badge. Only the
-    // badge (accent pill + digit, moving as one unit) animates, giving an
-    // infinite-carousel feel. Direction follows the id delta at switch time
-    // (+1 = ids increasing, new badge enters from the right).
-    property string wsDigitShown: "1"
-    property bool wsFrontIsA: true
-    property int wsDigitDir: 1
-
-    function _wsDigitInit(id) {
-        const s = String(id)
-        const R = badgeSlot.pad
-        root.wsDigitShown = s
-        root.wsFrontIsA = true
-        root.wsDigitDir = 1
-        badgeA.numText = s
-        badgeB.numText = s
-        badgeA.x = R
-        badgeB.x = R + badgeSlot.span
-    }
-
-    function _wsDigitGo(id, dir) {
-        const s = String(id)
-        const W = badgeSlot.span
-        const R = badgeSlot.pad
-        // Settle instantly to rest (covers mid-flight retriggers so a stale
-        // badge can never linger), then animate old-out / new-in.
-        badgeABeh.enabled = false
-        badgeBBeh.enabled = false
-        if (root.wsFrontIsA) {
-            badgeA.x = R
-            badgeB.numText = s
-            badgeB.x = R + dir * W
-        } else {
-            badgeB.x = R
-            badgeA.numText = s
-            badgeA.x = R + dir * W
-        }
-        badgeABeh.enabled = true
-        badgeBBeh.enabled = true
-        if (root.wsFrontIsA) {
-            badgeA.x = R - dir * W
-            badgeB.x = R
-        } else {
-            badgeB.x = R - dir * W
-            badgeA.x = R
-        }
-        root.wsFrontIsA = !root.wsFrontIsA
-        root.wsDigitShown = s
-        root.wsDigitDir = dir
-    }
-
-    property int _lastSeenWorkspaceId: -1
-    property bool wsVisible: false
-
-    Timer {
-        id: wsTimer
-        interval: 1500
-        onTriggered: root.wsVisible = false
-    }
-
-    onOwnWorkspaceIdChanged: {
-        if (root.ownWorkspaceId < 0)
-            return
-        if (root._lastSeenWorkspaceId < 0) {
-            root._lastSeenWorkspaceId = root.ownWorkspaceId
-            root._wsDigitInit(root.ownWorkspaceId)
-            return
-        }
-        if (root.ownWorkspaceId === root._lastSeenWorkspaceId)
-            return
-        root._wsDigitGo(root.ownWorkspaceId, root.ownWorkspaceId >= root._lastSeenWorkspaceId ? 1 : -1)
-        root._lastSeenWorkspaceId = root.ownWorkspaceId
-        root.wsVisible = true
-        wsTimer.restart()
-    }
-
     // ---- resolved mode for THIS screen --------------------------------------
     // A deliberate workspace switch wins while its window is open; otherwise the
     // global volume/brightness/caps OSD shows, on the focused screen only.
-    readonly property string shownMode: root.wsVisible
-        ? "workspace"
-        : (OSDService.active && root.isFocused ? OSDService.mode : "")
+    readonly property string shownMode: OSDService.active && root.isFocused ? OSDService.mode : ""
     readonly property bool shown: root.shownMode !== ""
 
     property string _renderMode: "volume"
@@ -217,7 +133,6 @@ PanelWindow {
             implicitWidth: {
                 switch (root._renderMode) {
                 case "caps": return capsRow.implicitWidth
-                case "workspace": return wsView.width
                 default: return meterRow.implicitWidth
                 }
             }
@@ -379,113 +294,6 @@ PanelWindow {
                 }
             }
 
-            // ---------------- workspace label ----------------
-            Item {
-                id: wsView
-
-                anchors.centerIn: parent
-                visible: root._renderMode === "workspace"
-                width: wsRow.implicitWidth
-                height: 24
-
-                Row {
-                    id: wsRow
-
-                    anchors.centerIn: parent
-                    spacing: 8
-
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "Workspace"
-                        color: Theme.text
-                        font.pixelSize: 13
-                        font.family: Theme.fontFamily
-                        font.weight: Font.Bold
-                    }
-
-                    Item {
-                        id: badgeSlot
-
-                        // Slide travel stays 54px; symmetric 8px padding each
-                        // side keeps the badge clear of the wrapper edge.
-                        // Rest position is `pad`; park/fade derive from these.
-                        readonly property int pad: 8
-                        readonly property real span: 54
-
-                        width: 40 + pad * 2
-                        height: 24
-                        clip: true
-
-                        Item {
-                            id: badgeA
-
-                            property string numText: "1"
-
-                            width: 40
-                            height: 24
-                            x: badgeSlot.pad
-                            // Fade near the slot edge so the round badge never
-                            // shows a straight clip cut mid-slide; 1 at rest.
-                            opacity: 1 - Math.min(1, Math.abs(x - badgeSlot.pad) / (badgeSlot.span / 2))
-
-                            Rectangle {
-                                anchors.centerIn: parent
-                                width: 40
-                                height: 22
-                                radius: height / 2
-                                color: Theme.accent
-                            }
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: badgeA.numText
-                                color: Theme.background
-                                font.pixelSize: 13
-                                font.family: Theme.fontFamily
-                                font.weight: Font.Bold
-                            }
-
-                            Behavior on x {
-                                id: badgeABeh
-                                NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
-                            }
-                        }
-
-                        Item {
-                            id: badgeB
-
-                            property string numText: "1"
-
-                            width: 40
-                            height: 24
-                            x: badgeSlot.pad + badgeSlot.span
-                            opacity: 1 - Math.min(1, Math.abs(x - badgeSlot.pad) / (badgeSlot.span / 2))
-
-                            Rectangle {
-                                anchors.centerIn: parent
-                                width: 40
-                                height: 22
-                                radius: height / 2
-                                color: Theme.accent
-                            }
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: badgeB.numText
-                                color: Theme.background
-                                font.pixelSize: 13
-                                font.family: Theme.fontFamily
-                                font.weight: Font.Bold
-                            }
-
-                            Behavior on x {
-                                id: badgeBBeh
-                                NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 }
