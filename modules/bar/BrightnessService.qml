@@ -28,15 +28,13 @@ Item {
         }
     }
 
-    Timer {
-        id: pollTimer
-
-        interval: 2000
-        repeat: true
-        running: true
-        onTriggered: {
-            if (!getProc.running && root._target < 0) getProc.running = true
-        }
+    // No repeating poll (the previous build re-read `brightnessctl g`
+    // every 2 s): this service's own writes are optimistic, and the
+    // Control Center re-reads once via refresh() every time it opens,
+    // which is the only place the value is displayed numerically.
+    function refresh() {
+        if (!getProc.running && root._target < 0)
+            getProc.running = true
     }
 
     Process {

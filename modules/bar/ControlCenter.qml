@@ -206,6 +206,10 @@ PanelWindow {
         if (root.open) {
             root.closing = false
             hideTimer.stop()
+            // One-shot re-reads now that nothing polls in the
+            // background anymore: system summary + brightness slider.
+            UptimeService.refresh()
+            brightnessService.refresh()
         } else {
             root.wifiPanelOpen = false
             root.bluetoothPanelOpen = false

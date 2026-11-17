@@ -163,18 +163,11 @@ Item {
 
     Component.onCompleted: pathProbe.running = true
 
-    Timer {
-        id: sysfsPoll
-        interval: 1000
-        repeat: true
-        running: root._blDir !== "" || root._capsPath !== ""
-        onTriggered: {
-            if (root._blDir !== "")
-                blFile.reload()
-            if (root._capsPath !== "")
-                capsFile.reload()
-        }
-    }
+    // No standing sysfs poll (the previous build reloaded both files
+    // every 1 s): brightness truth comes from the startup probe plus
+    // the post-step reconcile read (blReconcile), and caps state from
+    // the evdev watcher below. External brightness changes made
+    // outside the shell are picked up at the next step's reconcile.
 
     FileView {
         id: blMaxFile
@@ -219,8 +212,8 @@ Item {
 
     // Event-driven Caps Lock: one persistent python-evdev watcher over every
     // *-event-kbd node prints a single `toggle` line per physical press.
-    // Exactly one instance (constant running, never restarted) - if it dies,
-    // the 1 Hz sysfs poll above keeps working as the fallback.
+    // Exactly one instance (constant running, never restarted); it is the
+    // only caps source now that the 1 Hz sysfs poll is gone.
     Process {
         id: capsWatch
         command: ["python3", Quickshell.shellPath("scripts/caps-watch.py")]
