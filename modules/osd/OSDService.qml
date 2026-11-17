@@ -7,9 +7,9 @@ import Quickshell.Services.Pipewire
 
 // Single source of truth for the standalone bottom-centre OSD.
 //
-// Drives three modes here: "volume", "brightness", "caps". The workspace OSD is
-// inherently per-monitor and lives in OSD.qml (it reuses the same Hyprland
-// workspace model the bar already tracks - no duplicated IPC).
+// Drives three modes here: "volume", "brightness", "caps". The workspace
+// indicator is not part of the OSD anymore: since 2026-11-16 it lives
+// permanently in the bar (modules/bar/WorkspaceIndicator.qml).
 //
 // Cost model:
 //  - Volume  : 100% native Quickshell.Services.Pipewire. PwNodeAudio.volume /

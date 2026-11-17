@@ -596,6 +596,20 @@ PanelWindow {
             anchors.leftMargin: 8
         }
 
+        // Workspace indicator (moved from the OSD, format unchanged):
+        // sits right of the clock in the left cluster.
+        WorkspaceIndicator {
+            id: workspaceIndicator
+
+            screen: root.screen
+
+            anchors {
+                verticalCenter: parent.verticalCenter
+                left: dateTime.right
+            }
+            anchors.leftMargin: 10
+        }
+
         BatteryWidget {
             id: battery
 
@@ -608,18 +622,9 @@ PanelWindow {
             anchors.rightMargin: 4
         }
 
-        // Recording indicator - only present while RecordService is
-        // recording; collapses to zero width when idle, same as the
-        // caffeine indicator it anchors to.
-        RecordPill {
-            id: recordPill
-
-            anchors {
-                verticalCenter: parent.verticalCenter
-                right: caffeineIndicator.left
-            }
-            anchors.rightMargin: RecordService.recording ? 4 : 0
-        }
+        // The recording indicator used to live here; it moved into
+        // ActivityIsland beside the media pill on 2026-11-16 (Dynamic
+        // Island model: media and recording share one spot).
 
         // Caffeine indicator - only present while CaffeineService.enabled.
         // Collapses to zero width when off so nothing else in the bar shifts
@@ -774,26 +779,29 @@ PanelWindow {
             }
         }
 
-        MediaPill {
-            id: mediaPill
+        ActivityIsland {
+            id: activityIsland
 
             anchors {
                 verticalCenter: parent.verticalCenter
-                left: systemTrayRow.right
+                left: workspaceIndicator.right
             }
-            anchors.leftMargin: 4
+            anchors.leftMargin: 10
 
             mediaService: root.mediaService
-
-            show: !holdLabel.visible && root.mediaService && root.mediaService.hasMedia
-
+            mediaSuppressed: holdLabel.visible
             popoverOpen: barState.mediaPopoverOpen
 
-            onActivateRequested: {
+            onMediaActivateRequested: {
                 if (Date.now() - root._mediaPopoverClosedAt < 250)
                     return
                 trayMenu.open = false
                 barState.mediaPopoverOpen = !barState.mediaPopoverOpen
+            }
+
+            onMediaExpandedChanged: {
+                if (!mediaExpanded)
+                    barState.mediaPopoverOpen = false
             }
         }
 
@@ -802,7 +810,7 @@ PanelWindow {
 
             screen: root.screen
             mediaService: root.mediaService
-            anchorCenter: mediaPill.x + mediaPill.width / 2
+            anchorCenter: activityIsland.x + activityIsland.mediaCenterOffset
 
             open: barState.mediaPopoverOpen
 

@@ -22,6 +22,11 @@ PanelWindow {
         && root.mediaService.players
         && root.mediaService.players.length > 1
 
+    // Player-selector dropdown state, mirroring MediaPlayer's
+    // selector pill + menu (and the DynamicIsland's).
+    property bool playerMenuOpen: false
+    onHasSelectorChanged: if (!root.hasSelector) root.playerMenuOpen = false
+
     visible: root.open || root.closing
 
     WlrLayershell.layer: WlrLayer.Overlay
@@ -50,6 +55,7 @@ PanelWindow {
 
     onOpenChanged: {
         if (root.open) {
+            root.playerMenuOpen = false
             root.closing = false
             hideTimer.stop()
             card.forceActiveFocus()
@@ -183,6 +189,7 @@ PanelWindow {
                 }
 
                 Column {
+                    id: infoCol
                     width: header.width - artwork.width - header.spacing
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 3
@@ -221,47 +228,60 @@ PanelWindow {
                     }
 
                     Item {
+                        id: selectorSlot
                         width: parent.width
                         height: root.hasSelector ? 22 : 0
                         clip: true
 
-                        Row {
-                            spacing: 4
+                        // Player selector dropdown pill, mirroring
+                        // MediaPlayer's selector pill in the bar (the
+                        // menu itself lives at body level, below).
+                        Rectangle {
+                            id: selectorPill
+
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: Math.min(selectorLabel.implicitWidth + selectorChevron.implicitWidth + 30,
+                                            parent.width)
+                            height: 22
                             visible: root.hasSelector
+                            radius: 11
+                            color: pillHover.hovered ? Theme.surfaceHover : Theme.background
+                            border.width: 1
+                            border.color: Theme.accent
 
-                            Repeater {
-                                model: root.hasSelector ? root.mediaService.players : []
+                            Row {
+                                anchors.centerIn: parent
+                                spacing: 5
 
-                                delegate: Rectangle {
-                                    id: chip
+                                Text {
+                                    id: selectorLabel
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: Math.min(implicitWidth, selectorPill.width - 44)
+                                    text: (root.mediaService && root.mediaService.identity.length > 0)
+                                        ? root.mediaService.identity : "Player"
+                                    color: Theme.text
+                                    font.family: Theme.fontFamily
+                                    font.pixelSize: 10
+                                    font.weight: Font.DemiBold
+                                    elide: Text.ElideRight
+                                }
 
-                                    required property var modelData
+                                Text {
+                                    id: selectorChevron
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    text: root.playerMenuOpen ? "\u25b4" : "\u25be"
+                                    color: Theme.textDim
+                                    font.pixelSize: 10
+                                }
+                            }
 
-                                    readonly property bool current: root.mediaService
-                                        && chip.modelData.dbusName === root.mediaService.activeBus
-
-                                    width: chipText.implicitWidth + 14
-                                    height: 20
-                                    radius: 10
-                                    color: chip.current ? Theme.accent : Theme.surfaceHover
-
-                                    Text {
-                                        id: chipText
-
-                                        anchors.centerIn: parent
-                                        text: chip.modelData.identity || ""
-                                        color: chip.current ? Theme.background : Theme.textDim
-                                        font.family: Theme.fontFamily
-                                        font.pixelSize: 10
-                                        font.weight: chip.current ? Font.DemiBold : Font.Normal
-                                    }
-
-                                    HoverHandler { cursorShape: Qt.PointingHandCursor }
-
-                                    TapHandler {
-                                        onTapped: if (root.mediaService)
-                                            root.mediaService.selectPlayer(chip.modelData.dbusName)
-                                    }
+                            HoverHandler { id: pillHover; cursorShape: Qt.PointingHandCursor }
+                            TapHandler {
+                                onTapped: {
+                                    root.playerMenuOpen = !root.playerMenuOpen
+                                    if (root.mediaService)
+                                        root.mediaService.interaction()
                                 }
                             }
                         }
@@ -481,6 +501,97 @@ PanelWindow {
                     glyph: "\u23ed"
                     available: root.hasMedia && root.mediaService.canNext
                     onTriggered: root.mediaService.next()
+                }
+            }
+
+            // Click-away catcher for the open player menu (mirrors
+            // MediaPlayer): covers the whole card body.
+            MouseArea {
+                anchors.fill: parent
+                z: 55
+                visible: root.playerMenuOpen
+                onClicked: root.playerMenuOpen = false
+            }
+
+            // Player selector menu, dropping down from the selector
+            // pill in the header (mirrors MediaPlayer). Positioned
+            // by bindings because the pill lives in the header's
+            // info column.
+            Rectangle {
+                id: playerMenu
+
+                visible: root.playerMenuOpen
+                z: 60
+                x: header.x + infoCol.x + selectorSlot.x + selectorPill.x
+                y: header.y + infoCol.y + selectorSlot.y + selectorPill.y + selectorPill.height + 4
+                width: Math.min(210, body.width)
+                height: menuCol.implicitHeight + 8
+                radius: 8
+                color: Theme.background
+                border.width: 1
+                border.color: Theme.accent
+
+                Column {
+                    id: menuCol
+                    anchors.top: parent.top
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.topMargin: 4
+                    anchors.leftMargin: 4
+                    anchors.rightMargin: 4
+
+                    Repeater {
+                        model: root.mediaService ? root.mediaService.players : []
+
+                        delegate: Rectangle {
+                            id: playerRow
+                            required property var modelData
+
+                            width: parent.width
+                            height: 28
+                            radius: 6
+                            readonly property bool current: root.mediaService
+                                && playerRow.modelData.dbusName === root.mediaService.activeBus
+                            color: rowHover.hovered ? Theme.surfaceRaised
+                                : (playerRow.current ? Theme.surface : "transparent")
+
+                            Text {
+                                anchors.left: parent.left
+                                anchors.right: dot.left
+                                anchors.leftMargin: 10
+                                anchors.rightMargin: 6
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: playerRow.modelData.identity
+                                    + (playerRow.modelData.isRemote ? "  \u00b7  remote" : "")
+                                color: playerRow.current ? Theme.accent : Theme.text
+                                font.pixelSize: 11
+                                font.family: Theme.fontFamily
+                                font.weight: playerRow.current ? Font.DemiBold : Font.Normal
+                                elide: Text.ElideRight
+                            }
+
+                            Rectangle {
+                                id: dot
+                                anchors.right: parent.right
+                                anchors.rightMargin: 10
+                                anchors.verticalCenter: parent.verticalCenter
+                                width: 6
+                                height: 6
+                                radius: 3
+                                visible: playerRow.modelData.playing
+                                color: Theme.accent
+                            }
+
+                            HoverHandler { id: rowHover; cursorShape: Qt.PointingHandCursor }
+                            TapHandler {
+                                onTapped: {
+                                    if (root.mediaService)
+                                        root.mediaService.selectPlayer(playerRow.modelData.dbusName)
+                                    root.playerMenuOpen = false
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

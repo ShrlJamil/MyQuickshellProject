@@ -35,6 +35,7 @@ PanelWindow {
     property bool bluetoothPanelOpen: false
 
     property bool audioOutputPanelOpen: false
+    property bool powerProfilePanelOpen: false
 
     visible: root.open || root.closing
 
@@ -209,6 +210,7 @@ PanelWindow {
             root.wifiPanelOpen = false
             root.bluetoothPanelOpen = false
             root.audioOutputPanelOpen = false
+            root.powerProfilePanelOpen = false
             wifiPanel.promptSsid = ""
             wifiPanel.menuSsid = ""
             wifiPanel.addOpen = false
@@ -255,6 +257,10 @@ PanelWindow {
 
     ZoomService {
         id: zoomService
+    }
+
+    PowerProfileService {
+        id: powerProfileService
     }
 
     Item {
@@ -448,6 +454,7 @@ PanelWindow {
         Keys.onPressed: (event) => {
             if (event.key === Qt.Key_Escape) {
                 if (root.wifiPanelOpen) root.wifiPanelOpen = false
+                else if (root.powerProfilePanelOpen) root.powerProfilePanelOpen = false
                 else root.close()
                 event.accepted = true
             }
@@ -631,6 +638,27 @@ PanelWindow {
                         cursorShape: Qt.PointingHandCursor
 
                         onClicked: zoomService.toggle()
+                    }
+                }
+
+                ControlTile {
+                    id: powerProfileTile
+
+                    width: root.quickTileSize
+                    height: root.quickTileHeight
+
+                    round: false
+                    compact: true
+                    active: root.powerProfilePanelOpen
+                    label: "Power Profile"
+                    iconSource: "file://" + Quickshell.shellPath("assets/speedometer-04-svgrepo-com.svg")
+
+                    MouseArea {
+                        anchors.fill: parent
+
+                        cursorShape: Qt.PointingHandCursor
+
+                        onClicked: root.powerProfilePanelOpen = true
                     }
                 }
             }
@@ -3583,6 +3611,289 @@ PanelWindow {
 
                                 onClicked: {
                                     if (aoRow.sink) audioService.setDefaultSink(aoRow.sink.id)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Rectangle {
+        id: powerProfilePanel
+
+        readonly property var originTile: powerProfileTile
+        readonly property point originPos: (drift.y, root.open, powerProfilePanel.originTile)
+            ? powerProfilePanel.originTile.mapToItem(powerProfilePanel.parent, 0, 0)
+            : Qt.point(0, 0)
+
+        z: 13
+        color: Theme.panelBackground
+        clip: true
+
+        x: root.powerProfilePanelOpen ? 0 : powerProfilePanel.originPos.x
+        y: root.powerProfilePanelOpen ? 0 : powerProfilePanel.originPos.y
+        width: root.powerProfilePanelOpen ? parent.width : powerProfilePanel.originTile.width
+        height: root.powerProfilePanelOpen ? parent.height : powerProfilePanel.originTile.height
+        radius: root.powerProfilePanelOpen ? 22 : powerProfilePanel.originTile.radius
+        opacity: root.powerProfilePanelOpen ? 1 : 0
+
+        enabled: root.powerProfilePanelOpen
+        visible: powerProfilePanel.opacity > 0
+
+        // Latched by the content Loader below: the panel content tree
+        // is created on first open and kept for the rest of the session.
+        property bool _contentLatched: false
+
+        // Shared glass highlight (see ControlTile): full-bleed rect using
+        // the panel's live radius (it morphs on open/close); falloff shaped
+        // by stops. Below panel content; rows keep their own states.
+        Rectangle {
+            anchors.fill: parent
+            radius: parent.radius
+            gradient: Gradient {
+                GradientStop {
+                    position: 0
+                    color: Qt.rgba(1, 1, 1, Theme.materialHighlightOpacity)
+                }
+                GradientStop {
+                    position: 0.4
+                    color: "transparent"
+                }
+                GradientStop {
+                    position: 1
+                    color: "transparent"
+                }
+            }
+        }
+
+        // x/y tween so the panel morphs out of / back into the Power
+        // Profile tile; `enabled: root.open` snaps them during the CC's
+        // own open/close slide. (See audioOutputPanel.)
+        Behavior on x {
+            enabled: root.open
+            NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+        }
+        Behavior on y {
+            enabled: root.open
+            NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+        }
+        Behavior on width {
+            NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+        }
+        Behavior on height {
+            NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+        }
+        Behavior on radius {
+            NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+        }
+        Behavior on opacity {
+            NumberAnimation { duration: 220; easing.type: Easing.OutCubic }
+        }
+
+        onVisibleChanged: {
+            if (powerProfilePanel.visible) powerProfileService.refresh()
+        }
+
+        // Lazy content stage (Loader latch, the audioOutputPanel
+        // pattern): the content tree does not exist until the panel is
+        // first opened.
+        Loader {
+            id: powerProfileContentLoader
+
+            anchors.fill: parent
+            active: root.powerProfilePanelOpen || powerProfilePanel._contentLatched
+            sourceComponent: powerProfileContentComponent
+
+            onLoaded: powerProfilePanel._contentLatched = true
+        }
+
+        Component {
+            id: powerProfileContentComponent
+
+            Item {
+                anchors.fill: parent
+
+                Item {
+                    id: powerProfileContent
+
+                    anchors {
+                        top: parent.top
+                        left: parent.left
+                        right: parent.right
+                        bottom: parent.bottom
+                    }
+
+                    anchors.margins: 14
+
+                    opacity: root.powerProfilePanelOpen ? 1 : 0
+                    visible: powerProfileContent.opacity > 0
+
+                    Behavior on opacity {
+                        NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+                    }
+
+                    Item {
+                        id: ppHeader
+
+                        anchors {
+                            top: parent.top
+                            left: parent.left
+                            right: parent.right
+                        }
+
+                        height: 32
+
+                        MouseArea {
+                            id: ppBackButton
+
+                            anchors.left: parent.left
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            width: 32
+                            height: 32
+                            cursorShape: Qt.PointingHandCursor
+
+                            onClicked: root.powerProfilePanelOpen = false
+
+                            Rectangle {
+                                anchors.fill: parent
+
+                                radius: 16
+                                color: ppBackHover.hovered ? Theme.panelSurface : "transparent"
+                            }
+
+                            HoverHandler {
+                                id: ppBackHover
+                            }
+
+                            IconImage {
+                                anchors.centerIn: parent
+
+                                width: 18
+                                height: 18
+
+                                source: Quickshell.iconPath("go-previous-symbolic", "go-previous")
+                                asynchronous: true
+                            }
+                        }
+
+                        Text {
+                            anchors.left: ppBackButton.right
+                            anchors.leftMargin: 8
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            text: "Power Profile"
+                            color: Theme.text
+                            font.family: Theme.fontFamily
+                            font.pixelSize: 16
+                            font.weight: Font.DemiBold
+                        }
+                    }
+
+                    Text {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        anchors.top: ppHeader.bottom
+                        anchors.topMargin: 12
+
+                        visible: !powerProfileService.available
+                        text: "Power profiles unavailable"
+                        color: Theme.textMuted
+                        font.family: Theme.fontFamily
+                        font.pixelSize: 12
+                    }
+
+                    Column {
+                        id: ppList
+
+                        anchors {
+                            top: ppHeader.bottom
+                            left: parent.left
+                            right: parent.right
+                        }
+
+                        anchors.topMargin: 8
+
+                        spacing: 4
+                        visible: powerProfileService.available
+
+                        Repeater {
+                            model: powerProfileService.profiles
+
+                            delegate: Rectangle {
+                                id: ppRow
+
+                                required property var modelData
+
+                                readonly property bool isActive: powerProfileService.profile === modelData.id
+
+                                width: ppList.width
+                                height: 52
+                                radius: 14
+                                color: ppRowHover.hovered || ppRow.isActive
+                                    ? Theme.panelSurface
+                                    : "transparent"
+
+                                HoverHandler {
+                                    id: ppRowHover
+
+                                    cursorShape: Qt.PointingHandCursor
+                                }
+
+                                Row {
+                                    anchors.fill: parent
+
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 12
+
+                                    spacing: 10
+
+                                    IconImage {
+                                        anchors.verticalCenter: parent.verticalCenter
+
+                                        width: 24
+                                        height: 24
+
+                                        source: Quickshell.iconPath(modelData.icon, modelData.iconAlt)
+                                        asynchronous: true
+                                    }
+
+                                    Text {
+                                        anchors.verticalCenter: parent.verticalCenter
+
+                                        width: parent.width - 24 - 10 - (ppCheck.visible ? ppCheck.width + 10 : 0)
+                                        elide: Text.ElideRight
+
+                                        text: modelData.name
+                                        color: Theme.text
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 13
+                                        font.weight: ppRow.isActive ? Font.DemiBold : Font.Normal
+                                    }
+                                }
+
+                                IconImage {
+                                    id: ppCheck
+
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 12
+                                    anchors.verticalCenter: parent.verticalCenter
+
+                                    width: 18
+                                    height: 18
+                                    visible: ppRow.isActive
+
+                                    source: Quickshell.iconPath("object-select-symbolic", "emblem-default")
+                                    asynchronous: true
+                                }
+
+                                MouseArea {
+                                    anchors.fill: parent
+
+                                    cursorShape: Qt.PointingHandCursor
+
+                                    onClicked: powerProfileService.setProfile(modelData.id)
                                 }
                             }
                         }

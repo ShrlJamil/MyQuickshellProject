@@ -187,6 +187,14 @@ PanelWindow {
     // changes never oscillate it.
     property bool expanded: false
 
+    // Player-selector dropdown state (expanded mode, >1 live player),
+    // mirroring MediaPlayer's selector pill + menu in the bar.
+    property bool playerMenuOpen: false
+    readonly property bool hasSelector: root.mediaService
+        && root.mediaService.players
+        && root.mediaService.players.length > 1
+    onHasSelectorChanged: if (!root.hasSelector) root.playerMenuOpen = false
+
     // Latched by the expanded-content Loader: the expanded player tree
     // is created on first expand and kept for the rest of the session.
     property bool _expandedLatched: false
@@ -210,6 +218,8 @@ PanelWindow {
     }
     // Give the pill active focus on open so its Keys handler (Escape) works.
     onExpandedChanged: {
+        if (!root.expanded)
+            root.playerMenuOpen = false
         if (root.expanded) {
             hideTimer.stop()
             pill.forceActiveFocus()
@@ -257,8 +267,12 @@ PanelWindow {
         // repeated clicks) just re-targets cleanly, no duplicate loops. Height
         // grows downward from the fixed top anchor; width stays centred.
         height: root.expanded ? root.expandedH : root.collapsedH
+        // Media mode pads the row by only 4 px a side (was 14):
+        // the 24 px artwork then sits concentric with the pill's
+        // left cap - the same snug inset the bar's MediaPill got
+        // (Sahrul, 2026-11-17). Clock mode keeps its wide padding.
         width: root.expanded ? root.expandedW
-            : root.mediaMode ? mediaRow.implicitWidth + 28
+            : root.mediaMode ? mediaRow.implicitWidth + 8
             : Math.max(clockRow.implicitWidth + 48, 130)
 
         Behavior on width {
@@ -573,7 +587,11 @@ PanelWindow {
                         y: 18
                         width: 88
                         height: 88
-                        radius: width / 2
+                        // Rounded square, not a disc: the same 16 px
+                        // corner as the bar media player popover's
+                        // artwork (Sahrul, 2026-11-17). The mask below
+                        // binds to this radius, so it follows.
+                        radius: 16
                         clip: true
                         color: Theme.surface
 
@@ -663,7 +681,7 @@ PanelWindow {
                             maximumLineCount: 1
                         }
 
-                        // Transport (left) + compact player selector chips (right).
+                        // Transport (left) + player selector dropdown (right).
                         Item {
                             id: controlsRow
                             width: parent.width
@@ -727,56 +745,153 @@ PanelWindow {
                                 }
                             }
 
-                            // Inline selector (only with >1 live player): one chip per
-                            // player, the active one accent-outlined. Lives entirely
-                            // inside the panel, so it needs no dropdown, no second
-                            // surface, and no input-region change.
-                            Row {
-                                id: playerChips
+                            // Player selector dropdown, mirroring MediaPlayer in
+                            // the bar: a pill showing the active player, a tap
+                            // opens the player list. The list opens UPWARD from
+                            // the pill (the seek row sits below it) and lives
+                            // entirely inside the panel - no second surface, no
+                            // input-region change.
+                            Rectangle {
+                                id: selectorBtn
+
                                 anchors.left: ctlRow.right
                                 anchors.leftMargin: 10
-                                anchors.right: parent.right
                                 anchors.verticalCenter: parent.verticalCenter
-                                spacing: 6
-                                clip: true
-                                visible: root.mediaService && root.mediaService.players
-                                    && root.mediaService.players.length > 1
+                                width: Math.min(selectorLabel.implicitWidth + selectorChevron.implicitWidth + 30,
+                                                parent.width - ctlRow.width - 10)
+                                height: 22
+                                visible: root.hasSelector
+                                radius: 11
+                                color: btnHover.hovered ? Theme.surfaceHover : Theme.background
+                                border.width: 1
+                                border.color: Theme.accent
 
-                                Repeater {
-                                    model: playerChips.visible ? root.mediaService.players : []
+                                Row {
+                                    anchors.centerIn: parent
+                                    spacing: 5
 
-                                    delegate: Rectangle {
-                                        id: chip
-                                        required property var modelData
-                                        readonly property bool current: root.mediaService
-                                            && chip.modelData.dbusName === root.mediaService.activeBus
+                                    Text {
+                                        id: selectorLabel
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        width: Math.min(implicitWidth, selectorBtn.width - 44)
+                                        text: (root.mediaService && root.mediaService.identity.length > 0)
+                                            ? root.mediaService.identity : "Player"
+                                        color: Theme.text
+                                        font.family: Theme.fontFamily
+                                        font.pixelSize: 10
+                                        font.weight: Font.DemiBold
+                                        elide: Text.ElideRight
+                                    }
 
-                                        width: Math.min(chipLabel.implicitWidth + 18, 110)
-                                        height: 22
-                                        radius: 11
-                                        color: chipHover.hovered ? Theme.surfaceHover
-                                            : (chip.current
-                                                ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.18)
-                                                : Theme.surface)
-                                        border.width: 1
-                                        border.color: chip.current ? Theme.accent : "transparent"
+                                    Text {
+                                        id: selectorChevron
+                                        anchors.verticalCenter: parent.verticalCenter
+                                        text: root.playerMenuOpen ? "\u25b4" : "\u25be"
+                                        color: Theme.textDim
+                                        font.pixelSize: 10
+                                    }
+                                }
 
-                                        Text {
-                                            id: chipLabel
-                                            anchors.centerIn: parent
-                                            width: parent.width - 16
-                                            text: chip.modelData.identity + (chip.modelData.isRemote ? " · r" : "")
-                                            color: chip.current ? Theme.accent : Theme.text
-                                            font.family: Theme.fontFamily
-                                            font.pixelSize: 10
-                                            elide: Text.ElideRight
-                                            horizontalAlignment: Text.AlignHCenter
-                                        }
+                                HoverHandler { id: btnHover; cursorShape: Qt.PointingHandCursor }
+                                TapHandler {
+                                    onTapped: {
+                                        root.playerMenuOpen = !root.playerMenuOpen
+                                        if (root.mediaService)
+                                            root.mediaService.interaction()
+                                    }
+                                }
+                            }
 
-                                        HoverHandler { id: chipHover; cursorShape: Qt.PointingHandCursor }
-                                        TapHandler {
-                                            onTapped: if (root.mediaService)
-                                                root.mediaService.selectPlayer(chip.modelData.dbusName)
+                            // Click-away catcher for the open menu (mirrors
+                            // MediaPlayer): covers the whole expanded content.
+                            // It lives in the controls row's subtree, so it is
+                            // positioned over expandedContent by bindings
+                            // rather than anchors.
+                            MouseArea {
+                                x: -infoCol.x
+                                y: -(infoCol.y + controlsRow.y)
+                                width: expandedContent.width
+                                height: expandedContent.height
+                                z: 55
+                                visible: root.playerMenuOpen
+                                onClicked: root.playerMenuOpen = false
+                            }
+
+                            // The player list, opening upward from the pill.
+                            Rectangle {
+                                id: playerMenu
+
+                                visible: root.playerMenuOpen
+                                z: 60
+                                anchors.bottom: selectorBtn.top
+                                anchors.bottomMargin: 4
+                                anchors.right: selectorBtn.right
+                                width: Math.min(210, expandedContent.width - 16)
+                                height: menuCol.implicitHeight + 8
+                                radius: 8
+                                color: Theme.background
+                                border.width: 1
+                                border.color: Theme.accent
+
+                                Column {
+                                    id: menuCol
+                                    anchors.top: parent.top
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.topMargin: 4
+                                    anchors.leftMargin: 4
+                                    anchors.rightMargin: 4
+
+                                    Repeater {
+                                        model: root.mediaService ? root.mediaService.players : []
+
+                                        delegate: Rectangle {
+                                            id: playerRow
+                                            required property var modelData
+
+                                            width: parent.width
+                                            height: 28
+                                            radius: 6
+                                            readonly property bool current: root.mediaService
+                                                && playerRow.modelData.dbusName === root.mediaService.activeBus
+                                            color: rowHover.hovered ? Theme.surfaceRaised
+                                                : (playerRow.current ? Theme.surface : "transparent")
+
+                                            Text {
+                                                anchors.left: parent.left
+                                                anchors.right: dot.left
+                                                anchors.leftMargin: 10
+                                                anchors.rightMargin: 6
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                text: playerRow.modelData.identity
+                                                    + (playerRow.modelData.isRemote ? "  \u00b7  remote" : "")
+                                                color: playerRow.current ? Theme.accent : Theme.text
+                                                font.pixelSize: 11
+                                                font.family: Theme.fontFamily
+                                                font.weight: playerRow.current ? Font.DemiBold : Font.Normal
+                                                elide: Text.ElideRight
+                                            }
+
+                                            Rectangle {
+                                                id: dot
+                                                anchors.right: parent.right
+                                                anchors.rightMargin: 10
+                                                anchors.verticalCenter: parent.verticalCenter
+                                                width: 6
+                                                height: 6
+                                                radius: 3
+                                                visible: playerRow.modelData.playing
+                                                color: Theme.accent
+                                            }
+
+                                            HoverHandler { id: rowHover; cursorShape: Qt.PointingHandCursor }
+                                            TapHandler {
+                                                onTapped: {
+                                                    if (root.mediaService)
+                                                        root.mediaService.selectPlayer(playerRow.modelData.dbusName)
+                                                    root.playerMenuOpen = false
+                                                }
+                                            }
                                         }
                                     }
                                 }
