@@ -23,25 +23,26 @@ Item {
 
     readonly property string os: "Arch Linux" + (root.arch.length ? " " + root.arch : "")
 
-    // "3 hours, 15 mins" / "2 days, 4 hours" / "less than a minute".
+    // "3h 15m" / "2d 4h" / "<1m" - compact units, same components as
+    // the long form had (minutes still drop out at day scale).
     readonly property string pretty: {
         const total = Math.floor(root.seconds)
         if (total <= 0)
-            return "less than a minute"
+            return "<1m"
         const d = Math.floor(total / 86400)
         const h = Math.floor((total % 86400) / 3600)
         const m = Math.floor((total % 3600) / 60)
         let parts = []
         if (d > 0)
-            parts.push(d + (d === 1 ? " day" : " days"))
+            parts.push(d + "d")
         if (h > 0)
-            parts.push(h + (h === 1 ? " hour" : " hours"))
+            parts.push(h + "h")
         // Minutes only matter below the day scale.
         if (m > 0 && d === 0)
-            parts.push(m + (m === 1 ? " min" : " mins"))
+            parts.push(m + "m")
         if (parts.length === 0)
-            return "less than a minute"
-        return parts.join(", ")
+            return "<1m"
+        return parts.join(" ")
     }
 
     // Kernel/arch never change at runtime; only read them once.

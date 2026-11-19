@@ -15,6 +15,7 @@ import "modules/services"
 import "modules/settings"
 import "modules/wallpapers"
 import "modules/osd"
+import "modules/widgets"
 
 ShellRoot {
     function closeLauncher(): void {
@@ -392,6 +393,8 @@ ShellRoot {
     }
 
     IpcHandler {
+        id: settingsIpc
+
         target: "settings"
 
         function show(): void {
@@ -477,6 +480,7 @@ ShellRoot {
 
         delegate: ControlCenter {
             onPowerRequested: powerIpc.show()
+            onSettingsRequested: settingsIpc.show()
         }
     }
 
@@ -547,6 +551,14 @@ ShellRoot {
         model: Quickshell.screens.map(screen => ({ screen: screen }))
 
         delegate: OSD {}
+    }
+
+    Variants {
+        // Desktop widgets (calendar + weather) on the internal panel
+        // bottom-layer card fed by WeatherService (see modules/widgets).
+        model: Quickshell.screens.filter(screen => isInternalScreen(screen)).map(screen => ({ screen: screen }))
+
+        delegate: DesktopWidgets {}
     }
 
     ScreenshotPreview {}

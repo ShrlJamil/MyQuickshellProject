@@ -763,8 +763,6 @@ PanelWindow {
                                 visible: root.hasSelector
                                 radius: 11
                                 color: btnHover.hovered ? Theme.surfaceHover : Theme.background
-                                border.width: 1
-                                border.color: Theme.accent
 
                                 Row {
                                     anchors.centerIn: parent
@@ -830,8 +828,6 @@ PanelWindow {
                                 height: menuCol.implicitHeight + 8
                                 radius: 8
                                 color: Theme.background
-                                border.width: 1
-                                border.color: Theme.accent
 
                                 Column {
                                     id: menuCol
