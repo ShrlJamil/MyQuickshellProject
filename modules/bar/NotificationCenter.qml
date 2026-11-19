@@ -5,6 +5,7 @@ import Quickshell.Hyprland
 import Quickshell.Wayland
 import Quickshell.Widgets
 import "../../components"
+import "../services"
 
 // Standalone floating panel (one per screen) opened from the bar's Date & Time.
 // Top: a visual month calendar. Below: the notification list with Clear all and
@@ -263,7 +264,7 @@ PanelWindow {
                 const d = new Date()
                 return new Date(d.getFullYear(), d.getMonth(), 1)
             }
-            readonly property var today: new Date()
+            readonly property var today: CalendarService.today
             readonly property int vYear: calendar.view.getFullYear()
             readonly property int vMonth: calendar.view.getMonth()
             readonly property int firstWeekday: new Date(calendar.vYear, calendar.vMonth, 1).getDay()
