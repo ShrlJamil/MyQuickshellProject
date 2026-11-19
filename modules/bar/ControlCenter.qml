@@ -26,8 +26,10 @@ PanelWindow {
 
     // The header power button asks shell.qml to run the existing `power`
     // IPC handler's show() - the button itself touches no system action
-    // and writes no barState.
+    // and writes no barState. The settings button beside it does the same
+    // with the `settings` handler.
     signal powerRequested()
+    signal settingsRequested()
     property bool closing: false
     property bool pendingCaptureOpen: false
     property bool pendingColorPick: false
@@ -281,9 +283,10 @@ PanelWindow {
             color: Theme.panelBackground
         }
 
-        // Header row: uptime on the left, a small round power button on
-        // the right (outside the tile grid). The button only emits
-        // powerRequested - shell.qml runs the `power` IPC show().
+        // Header row: uptime on the left, small round settings and power
+        // buttons on the right (outside the tile grid). The buttons only
+        // emit settingsRequested / powerRequested - shell.qml runs the
+        // matching IPC show().
         Item {
             id: header
 
@@ -293,8 +296,10 @@ PanelWindow {
                 top: parent.top
             }
 
-            anchors.leftMargin: root.panelPadding
-            anchors.rightMargin: root.panelPadding
+            // Inset deeper than the panel padding (22px, tuned live with
+            // Sahrul): the header row sits inside the tile boxes' rhythm.
+            anchors.leftMargin: 22
+            anchors.rightMargin: 22
             anchors.topMargin: root.panelPadding
 
             height: root.headerHeight
@@ -305,11 +310,65 @@ PanelWindow {
                     verticalCenter: parent.verticalCenter
                 }
 
-                text: UptimeService.pretty
+                text: "Uptime " + UptimeService.pretty
                 color: Theme.textMuted
                 font.family: Theme.fontFamily
                 font.pixelSize: 13
                 font.weight: Font.Medium
+            }
+
+            Rectangle {
+                id: settingsButton
+
+                anchors {
+                    right: powerButton.left
+                    rightMargin: 8
+                    verticalCenter: parent.verticalCenter
+                }
+
+                width: 30
+                height: 30
+                radius: 15
+                color: settingsHover.hovered ? Theme.panelSurface : Theme.backgroundSunken
+
+                HoverHandler {
+                    id: settingsHover
+
+                    cursorShape: Qt.PointingHandCursor
+                }
+
+                Image {
+                    id: settingsGlyph
+
+                    anchors.centerIn: parent
+
+                    width: 20
+                    height: 20
+
+                    source: "file://" + Quickshell.shellPath("assets/settings-1-svgrepo-com.svg")
+                    sourceSize.width: 40
+                    sourceSize.height: 40
+                    fillMode: Image.PreserveAspectFit
+                    asynchronous: true
+                    smooth: true
+                    mipmap: true
+                    visible: false
+                }
+
+                ColorOverlay {
+                    anchors.fill: settingsGlyph
+                    source: settingsGlyph
+                    visible: settingsGlyph.status === Image.Ready
+                    color: Theme.icon
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+
+                    cursorShape: Qt.PointingHandCursor
+
+                    onClicked: root.settingsRequested()
+                }
             }
 
             Rectangle {
@@ -2166,12 +2225,10 @@ PanelWindow {
                     width: 184
                     height: menuPopupColumn.height + 12
 
-                    // Separation from the dark list comes from the crisp accent hairline;
-                    // fill stays Theme.panelBackground.
+                    // No border: separation from the panel comes from the
+                    // tile tone (backgroundSunken) fill.
                     radius: 10
-                    color: Theme.panelBackground
-                    border.width: 1
-                    border.color: Theme.accent
+                    color: Theme.backgroundSunken
 
                     Column {
                         id: menuPopupColumn
@@ -2202,8 +2259,7 @@ PanelWindow {
                                 anchors.verticalCenter: parent.verticalCenter
 
                                 text: "Disconnect"
-                                color: popupDisconnectHover.hovered ? Theme.accent : Theme.text
-                                Behavior on color { ColorAnimation { duration: 100 } }
+                                color: Theme.text
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 12
                             }
@@ -2240,8 +2296,7 @@ PanelWindow {
                                 anchors.verticalCenter: parent.verticalCenter
 
                                 text: "Forget Network"
-                                color: popupForgetHover.hovered ? Theme.accent : Theme.text
-                                Behavior on color { ColorAnimation { duration: 100 } }
+                                color: Theme.text
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 12
                             }
@@ -2294,12 +2349,10 @@ PanelWindow {
                         NumberAnimation { duration: 120; easing.type: Easing.OutCubic }
                     }
 
-                    // Dialog card: Theme.panelBackground fill, crisp accent hairline,
+                    // Dialog card: tile-tone fill (backgroundSunken), no border,
                     // floating over the scrim (addBackdrop).
                     radius: 10
-                    color: Theme.panelBackground
-                    border.width: 1
-                    border.color: Theme.accent
+                    color: Theme.backgroundSunken
 
                     Column {
                         id: addModalColumn
@@ -2454,9 +2507,7 @@ PanelWindow {
 
                                 background: Rectangle {
                                     radius: 10
-                                    color: Theme.background
-                                    border.width: 1
-                                    border.color: Theme.accent
+                                    color: Theme.panelBackground
                                 }
 
                                 contentItem: ListView {
@@ -3231,12 +3282,10 @@ PanelWindow {
                     width: 180
                     height: btMenuColumn.height + 12
 
-                    // Separation from the dark list comes from the crisp accent hairline;
-                    // fill stays Theme.panelBackground.
+                    // No border: separation from the panel comes from the
+                    // tile tone (backgroundSunken) fill.
                     radius: 10
-                    color: Theme.panelBackground
-                    border.width: 1
-                    border.color: Theme.accent
+                    color: Theme.backgroundSunken
 
                     Column {
                         id: btMenuColumn
@@ -3267,8 +3316,7 @@ PanelWindow {
                                 anchors.verticalCenter: parent.verticalCenter
 
                                 text: "Trust Device"
-                                color: btTrustHover.hovered ? Theme.accent : Theme.text
-                                Behavior on color { ColorAnimation { duration: 100 } }
+                                color: Theme.text
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 12
                             }
@@ -3316,8 +3364,7 @@ PanelWindow {
                                 anchors.verticalCenter: parent.verticalCenter
 
                                 text: "Forget Device"
-                                color: btForgetHover.hovered ? Theme.accent : Theme.text
-                                Behavior on color { ColorAnimation { duration: 100 } }
+                                color: Theme.text
                                 font.family: Theme.fontFamily
                                 font.pixelSize: 12
                             }

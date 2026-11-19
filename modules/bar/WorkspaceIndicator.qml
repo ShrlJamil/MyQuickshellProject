@@ -11,13 +11,14 @@ import "../../components"
 // ignored, exactly as the OSD ignored them, so the badge keeps showing
 // the last normal workspace.
 //
-// Switch animation (reworked 2026-11-16, Sahrul's call): the OSD's
-// long carousel slide crossed the whole slot and read as clipped at
-// both edges. Here the change is fade-led: the old badge fades out
-// while the new one fades in, and the slide is only a slight drift
-// (badgeSlot.drift px) through the centre, eased InOutCubic so the
-// movement concentrates mid-travel near the rest position. The badge
-// never reaches the slot edges while visible, so nothing looks cut.
+// Switch animation (reworked 2026-11-16, Sahrul's call; digits-only
+// 2026-11-17, also his call): the pill itself never moves - only the
+// digit inside it changes, with the same fade-led crossfade the
+// whole badge used to do: the old digit fades out while the new one
+// fades in, and the slide is only a slight drift (badgeSlot.drift
+// px) through the centre, eased InOutCubic so the movement
+// concentrates mid-travel near the rest position. The digit never
+// reaches the pill edges while visible, so nothing looks cut.
 Item {
     id: root
 
@@ -132,15 +133,29 @@ Item {
         Item {
             id: badgeSlot
 
-            // The badges live at `pad` and only ever drift `drift` px
-            // away from it while fading, so the slot is just the badge
-            // plus symmetric padding; the clip is a formality now.
+            // The digit layers live at `pad` and only ever drift
+            // `drift` px away from it while fading, inside the static
+            // pill; the slot is the pill plus symmetric padding and
+            // the clip is a formality now.
             readonly property int pad: 8
             readonly property real drift: 10
 
             width: 40 + pad * 2
             height: 24
             clip: true
+
+            // The one static pill: it never moves or fades - the
+            // crossfade below happens to the digit layers only.
+            Rectangle {
+                id: badgePill
+
+                x: badgeSlot.pad
+                anchors.verticalCenter: parent
+                width: 40
+                height: 22
+                radius: height / 2
+                color: Theme.accent
+            }
 
             Item {
                 id: badgeA
@@ -151,14 +166,6 @@ Item {
                 height: 24
                 x: badgeSlot.pad
                 opacity: 1
-
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: 40
-                    height: 22
-                    radius: height / 2
-                    color: Theme.accent
-                }
 
                 Text {
                     anchors.centerIn: parent
@@ -189,14 +196,6 @@ Item {
                 height: 24
                 x: badgeSlot.pad
                 opacity: 0
-
-                Rectangle {
-                    anchors.centerIn: parent
-                    width: 40
-                    height: 22
-                    radius: height / 2
-                    color: Theme.accent
-                }
 
                 Text {
                     anchors.centerIn: parent
